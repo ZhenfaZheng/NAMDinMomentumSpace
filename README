@@ -1,0 +1,5 @@
+
+This project is designed to perform non-adiabatic molecular dynamics (NAMD) simultion in momentum space, in which the non-adiabatic couplings (NACs) are replaced by electron-phonon (e-p) interaction matrix.
+
+The code is based on the namd code written by Qijing Zheng from USTC.
+For more information please visit https://github.com/QijingZheng/Hefei-NAMD
