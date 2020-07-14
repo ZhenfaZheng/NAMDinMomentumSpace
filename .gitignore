@@ -1,2 +1,6 @@
-# ignore all .o files
+# ignore all .o and .mod files
 *.o
+*.mod
+
+# ignore compiled file namd.
+namd
