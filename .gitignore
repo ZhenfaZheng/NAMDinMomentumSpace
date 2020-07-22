@@ -4,3 +4,6 @@
 
 # ignore compiled file namd.
 namd
+
+# ignore test folder
+test

@@ -8,6 +8,7 @@ module fileio
     integer :: BMAX
     integer :: NBASIS      ! No. of adiabatic states as basis
     integer :: NBANDS      ! No. of band of the system
+    integer :: NKPOINTS    ! No. of k-points of the system
     integer :: INIBAND     ! inititial adiabatic state of excited electron/hole
     integer :: NSW         ! No. of MD steps
     integer :: NAMDTINI    ! Initial time step of NAMD
@@ -45,6 +46,7 @@ module fileio
       integer :: nsw
       integer :: iniband
       integer :: nbands
+      integer :: nkpoints
       integer :: namdtime
       ! integer :: namdtini    
       integer :: ntraj
@@ -64,7 +66,7 @@ module fileio
 
 
       namelist /NAMDPARA/ bmin, bmax, nsw,    &
-                                   nbands,    &
+                         nbands, nkpoints,    &
                           potim, ntraj, nelm, &
                           temp, rundir,       &
                           lhole, lshp, lcpext,&
@@ -80,6 +82,7 @@ module fileio
       bmin = 0
       bmax = 0
       nbands = 0
+      nkpoints = 1
       ! iniband = 0
       ntraj = 1000
       nelm = 1000
@@ -140,6 +143,7 @@ module fileio
       inp%NBASIS   = bmax - bmin + 1
       inp%NSW      = nsw
       inp%NBANDS   = nbands
+      inp%NKPOINTS   = nkpoints
       inp%NAMDTIME = namdtime
       inp%NTRAJ    = ntraj
       inp%NELM     = nelm
@@ -163,6 +167,7 @@ module fileio
       write(*,'(A30,A3,I5)') 'BMAX',     ' = ', inp%BMAX
       write(*,'(A30,A3,I5)') 'INIBAND',  ' = ', inp%INIBAND
       write(*,'(A30,A3,I5)') 'NBANDS',   ' = ', inp%NBANDS
+      write(*,'(A30,A3,I5)') 'NKPOINTS', ' = ', inp%NKPOINTS
 
       write(*,'(A30,A3,I5)')   'NSW',    ' = ', inp%NSW
       write(*,'(A30,A3,F5.1)') 'POTIM',  ' = ', inp%POTIM

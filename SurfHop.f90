@@ -149,6 +149,7 @@ module shop
       write(io,'(A,A12,A3,I5)') '#', 'BMAX',     ' = ', inp%BMAX
       write(io,'(A,A12,A3,I5)') '#', 'INIBAND',  ' = ', inp%INIBAND
       write(io,'(A,A12,A3,I5)') '#', 'NBANDS',   ' = ', inp%NBANDS
+      write(io,'(A,A12,A3,I5)') '#', 'NKPOINTS',   ' = ', inp%NKPOINTS
 
       write(io,'(A,A12,A3,I5)')   '#', 'NSW',    ' = ', inp%NSW
       write(io,'(A,A12,A3,F5.1)') '#', 'POTIM',  ' = ', inp%POTIM
