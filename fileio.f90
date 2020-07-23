@@ -155,7 +155,7 @@ module fileio
       ! assign the parameters
       inp%BMIN     = bmin
       inp%BMAX     = bmax
-      inp%NBASIS   = bmax - bmin + 1
+      inp%NBASIS   = (bmax - bmin + 1) * nkpoints
       inp%NSW      = nsw
       inp%NBANDS   = nbands
       inp%NKPOINTS   = nkpoints
