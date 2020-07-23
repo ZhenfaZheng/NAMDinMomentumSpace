@@ -10,7 +10,7 @@ module couplings
     integer :: NBANDS
     integer :: TSTEPS
     real(kind=q) :: dt
-    real(kind=q), allocatable, dimension(:,:,:) :: Dij
+    complex(kind=q), allocatable, dimension(:,:,:) :: Dij
     real(kind=q), allocatable, dimension(:,:) :: Eig
   end type
 
@@ -67,14 +67,18 @@ module couplings
     type(overlap), intent(in) :: olap
 
     ! Couplings are save to a binary file
-    integer :: recordL
+    integer :: recordLA, recordLB, recordL
     integer :: i, j, k, ierr, irec
     ! to find out the record length
-    real(kind=q), allocatable, dimension(:)  :: values
+    complex(kind=q), allocatable, dimension(:)  :: valuesA
+    real(kind=q), allocatable, dimension(:)  :: valuesB
 
-    allocate(values(olap%NBANDS * olap%NBANDS + olap%NBANDS))
-    inquire (iolength=recordL) values
-    deallocate(values)
+    allocate(valuesA(olap%NBANDS * olap%NBANDS))
+    allocate(valuesB(olap%NBANDS))
+    inquire (iolength=recordLA) valuesA
+    inquire (iolength=recordLB) valuesB
+    recordL = recordLA + recordLB
+    deallocate(valuesA, valuesB)
 
     open(unit=20, file='COUPCAR', access='direct', form='unformatted', &
          status='unknown', recl=recordL, iostat=ierr)
@@ -111,12 +115,11 @@ module couplings
     integer :: i, j
     type(psi) :: ket
     ! <psi_i(t)| d/dt |(psi_j(t))>
-    ! The coupling as defined above is a real number
-    real(kind=q), dimension(:,:), intent(inout)  :: Cij
+    complex(kind=q), dimension(:,:), intent(inout)  :: Cij
     ! stores plane wave coefficients of the wavefunctions
     complex(kind=qs), allocatable, dimension(:,:) :: crA
     complex(kind=qs), allocatable, dimension(:,:) :: crB
-    real(kind=q) :: pij, pji
+    complex(kind=q) :: pij, pji
 
     allocate(crA(waveA%NPLWS(1), waveA%NBANDS))
     allocate(crB(waveB%NPLWS(1), waveB%NBANDS))
@@ -140,7 +143,7 @@ module couplings
     write(*,*) "#", trim(waveA%WAVECAR)
     do i=1, waveA%NBANDS
       ! write(*,*) "C_ZERO: ", REAL(crA(1,i)), AIMAG(crA(1,i))
-      do j=i+1, waveA%NBANDS
+      do j=i, waveA%NBANDS
         ! <psi_i(t)|psi_j(t+dt)> 
         pij = SUM(CONJG(crA(:,i)) * crB(:,j))
         ! <psi_j(t)|psi_i(t+dt)> 
@@ -149,7 +152,7 @@ module couplings
         ! Not devided by 2 * dt
         Cij(i, j) = pij - pji
         if ( i /= j ) then
-          Cij(j, i) = -Cij(i, j)
+          Cij(j, i) = -CONJG(Cij(i, j))
         end if
       end do
     end do
