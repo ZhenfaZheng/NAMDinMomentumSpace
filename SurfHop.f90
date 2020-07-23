@@ -163,6 +163,7 @@ module shop
       write(io,'(A,A12,A3,L5)') '#', 'LHOLE',    ' = ', inp%LHOLE
       write(io,'(A,A12,A3,L5)') '#', 'LSHP',     ' = ', inp%LSHP
       write(io,'(A,A12,A3,L5)') '#', 'LCPTXT',   ' = ', inp%LCPTXT
+      write(io,'(A,A12,A3,L5)') '#', 'LGAMMA',   ' = ', inp%LGAMMA
       write(io,'(A,A12,A3,A)')  '#', 'RUNDIR',   ' = ', TRIM(ADJUSTL(inp%rundir))
     end do
 

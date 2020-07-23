@@ -27,6 +27,13 @@ module fileio
     ! whether to perform surface hopping, right now the value is .TRUE.
     logical :: LSHP
     logical :: LCPTXT
+
+    ! whether the WAVECARs come from gamma version VASP or not.
+    ! for other version WAVECARs, the NA couplings are complex number.
+    ! for gamma version WAVECARs, the NA couplings are real number.
+    ! NA coupling = <psi_i(t)| d/dt |(psi_j(t))>
+    logical :: LGAMMA
+
     ! running directories
     character(len=256) :: RUNDIR
     character(len=256) :: TBINIT
@@ -60,16 +67,18 @@ module fileio
       ! surface hopping?
       logical :: lshp
       logical :: lcpext
+      logical :: lgamma
       ! running directories
       character(len=256) :: rundir
       character(len=256) :: tbinit
 
 
       namelist /NAMDPARA/ bmin, bmax, nsw,    &
-                         nbands, nkpoints,    &
+                          nbands, nkpoints,   &
                           potim, ntraj, nelm, &
                           temp, rundir,       &
-                          lhole, lshp, lcpext,&
+                          lhole, lshp,        &
+                          lcpext, lgamma,     &
                           namdtime,           &
                           nsample, tbinit
 
@@ -93,6 +102,12 @@ module fileio
       potim = 1.0_q
       temp = 300.
       lcpext = .FALSE.
+      lgamma = .TRUE.
+
+      ! if No. of k-points more than 1, lgamma automatically set to False.
+      if ( nkpoints > 1) then
+          lgamma = .FALSE.
+      end if
 
       open(file="inp", unit=8, status='unknown', action='read', iostat=ierr)
       if ( ierr /= 0 ) then
@@ -154,6 +169,7 @@ module fileio
       inp%NSAMPLE  = nsample
       inp%POTIM    = potim
       inp%LCPTXT   = lcpext
+      inp%LGAMMA   = lgamma
       inp%TEMP     = temp
     end subroutine
 
@@ -181,6 +197,7 @@ module fileio
       write(*,'(A30,A3,L5)') 'LHOLE',    ' = ', inp%LHOLE
       write(*,'(A30,A3,L5)') 'LSHP',     ' = ', inp%LSHP
       write(*,'(A30,A3,L5)') 'LCPTXT',   ' = ', inp%LCPTXT
+      write(*,'(A30,A3,L5)') 'LGAMMA',   ' = ', inp%LGAMMA
       write(*,'(A30,A3,A)')  'RUNDIR',   ' = ', TRIM(ADJUSTL(inp%rundir))
 
       write(*,'(A)') "------------------------------------------------------------"
