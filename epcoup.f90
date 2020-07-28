@@ -7,11 +7,13 @@ module epcoup
 
   type epCoupling
     complex(kind=DP), allocatable, dimension(:,:,:,:,:) :: epmat
+    complex(kind=DP), allocatable, dimension(:,:,:,:) :: phmodes
+    real(kind=DP), allocatable, dimension(:,:,:) :: displacement
   end type
 
   contains
 
-  subroutine ReadEPC(inp, epc)
+  subroutine ReadEPMat(inp, epc)
     implicit none
 
     type(namdInfo), intent(in) :: inp
@@ -48,13 +50,27 @@ module epcoup
       end do
     end do
 
-  end subroutine
+  end subroutine ReadEPMat
 
   subroutine EPCq2r(epc)
     implicit none
 
     type(epCoupling), intent(inout) :: epc
-  end subroutine
+  end subroutine EPCq2r
+
+  subroutine ReadPhmodes(inp, epc)
+    implicit none
+
+    type(namdInfo), intent(in) :: inp
+    type(epCoupling), intent(inout) :: epc
+  end subroutine ReadPhmodes
+
+  subroutine ReadDISPL(inp, epc)
+    implicit none
+
+    type(namdInfo), intent(in) :: inp
+    type(epCoupling), intent(inout) :: epc
+  end subroutine ReadDISPL
 
   subroutine TDepCoupIJ(inp, epc, olap)
     implicit none
@@ -62,6 +78,6 @@ module epcoup
     type(namdInfo), intent(in) :: inp
     type(epCoupling), intent(inout) :: epc
     type(overlap), intent(inout) :: olap
-  end subroutine
+  end subroutine TDepCoupIJ
 
 end module epcoup
