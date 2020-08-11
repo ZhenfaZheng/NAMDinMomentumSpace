@@ -9,6 +9,7 @@ module epcoup
     complex(kind=DP), allocatable, dimension(:,:,:,:,:) :: epmat
     complex(kind=DP), allocatable, dimension(:,:,:,:) :: phmodes
     real(kind=DP), allocatable, dimension(:,:,:,:) :: phmodesR
+    real(kind=DP), allocatable, dimension(:,:) :: qpoints
     real(kind=DP), allocatable, dimension(:,:,:) :: displ
     ! Phonon projection of displacement in MD.
     real(kind=DP), allocatable, dimension(:,:,:) :: phproj
@@ -64,9 +65,10 @@ module epcoup
     integer :: ierr, i
     integer :: iq, imode, iatom, iaxis
     integer :: nqs, nmodes, nat, naxis
-    character(len=255) :: filphmodes, fmtDISPL, line
-    character(len=1) :: bra, ket
+    character(len=255) :: filphmodes, fmtDISPL
+    character(len=24) :: charac, bra, ket
     complex(kind=DP) :: temp
+    real(kind=DP), allocatable, dimension(:,:) :: atompos
 
     filphmodes = 'graphene.matdyn.modes'
 
@@ -76,22 +78,31 @@ module epcoup
       stop
     end if
 
-    nqs = 10
+    nqs = 241
     nmodes = 6
     nat = 2
     naxis = 3 ! 3 dimension in xyz space.
     allocate(epc%phmodes(nqs, nmodes, nat, naxis))
     allocate(epc%phmodesR(nqs, nmodes, nat, naxis))
+    allocate(epc%qpoints(nqs, naxis))
+    allocate(atompos(nat, naxis))
+
+    atompos(1,:) = (/0.0, 0.0, 0.5/)
+    atompos(2,:) = (/0.333333333, 0.666666667, 0.5/)
 
     do iq=1,nqs
-      do i=1,3
-        read(unit=909, fmt=*) line
-      end do
+      read(unit=909, fmt=*)
+      read(unit=909, fmt=*)
+      read(unit=909, fmt=9019) charac, charac, (epc%qpoints(iq, iaxis), &
+                                                iaxis=1,naxis)
+      ! write(*,'(3f12.4)') epc%qpoints(iq,:)
+      read(unit=909, fmt=*)
       do imode=1,nmodes
-        read(unit=909, fmt=*) line
+        read(unit=909, fmt=*)
         do iatom=1,nat
           read(unit=909, fmt=9021) bra, (epc%phmodes(iq, imode, iatom, iaxis), &
                                          iaxis=1,naxis), ket
+          ! write(*, 9020) (epc%phmodes(iq, imode, iatom, iaxis), iaxis=1,naxis)
           do iaxis=1,naxis
             temp = epc%phmodes(iq, imode, iatom, iaxis)
             if (abs(real(temp)) >= abs(aimag(temp))) then
@@ -104,12 +115,12 @@ module epcoup
           end do
         end do
       end do
-      read(unit=909, fmt=*) line
+      read(unit=909, fmt=*)
     end do
-    ! write(*,*) epc%phmodesR(1,1,:,:)
 
+  9019 format ( 1x, a1, 1x, a1, 1x, 3f12.4)
   9020 format ( 1x, '(', 3(f10.6,1x,f10.6,3x), ')' )
-  9021 format ( 1x, a, 3(f10.6,1x,f10.6,3x), a )
+  9021 format ( 1x, a1, 3(f10.6,1x,f10.6,3x), a1 )
 
   end subroutine readPhmodes
 
