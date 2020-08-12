@@ -9,6 +9,7 @@ module epcoup
     complex(kind=DP), allocatable, dimension(:,:,:,:,:) :: epmat
     complex(kind=DP), allocatable, dimension(:,:,:,:) :: phmodes
     real(kind=DP), allocatable, dimension(:,:) :: qpoints
+    real(kind=DP), allocatable, dimension(:,:) :: freq
     real(kind=DP), allocatable, dimension(:,:,:) :: displ
     ! Phonon projection of displacement in MD.
     real(kind=DP), allocatable, dimension(:,:,:) :: phproj
@@ -83,6 +84,7 @@ module epcoup
     naxis = 3 ! 3 dimension in xyz space.
     allocate(epc%phmodes(nqs, nmodes, nat, naxis))
     allocate(epc%qpoints(nqs, naxis))
+    allocate(epc%freq(nqs, nmodes))
     allocate(atompos(nat, naxis))
 
     atompos(1,:) = (/0.0, 0.0, 0.5/)
@@ -91,23 +93,25 @@ module epcoup
     do iq=1,nqs
       read(unit=909, fmt=*)
       read(unit=909, fmt=*)
-      read(unit=909, fmt=9019) charac, charac, (epc%qpoints(iq, iaxis), &
+      read(unit=909, fmt=9019) charac, (epc%qpoints(iq, iaxis), &
                                                 iaxis=1,naxis)
-      ! write(*,'(3f12.4)') epc%qpoints(iq,:)
+      ! write(*, 9019) charac, epc%qpoints(iq,:)
       read(unit=909, fmt=*)
       do imode=1,nmodes
-        read(unit=909, fmt=*)
+        read(unit=909, fmt=9011) charac, epc%freq(iq, imode)
+        ! write(*,9011) charac, epc%freq(iq, imode)
         do iatom=1,nat
           read(unit=909, fmt=9021) bra, (epc%phmodes(iq, imode, iatom, iaxis), &
                                          iaxis=1,naxis), ket
-          ! write(*, 9020) (epc%phmodes(iq, imode, iatom, iaxis), iaxis=1,naxis)
+          ! write(*, 9021) bra, (epc%phmodes(iq, imode, iatom, iaxis), &
+          !                      iaxis=1,naxis), ket
         end do
       end do
       read(unit=909, fmt=*)
     end do
 
-  9019 format ( 1x, a1, 1x, a1, 1x, 3f12.4)
-  9020 format ( 1x, '(', 3(f10.6,1x,f10.6,3x), ')' )
+  9011 format ( 5x, a14, f15.6 )
+  9019 format ( 1x, a4, 3f12.4 )
   9021 format ( 1x, a1, 3(f10.6,1x,f10.6,3x), a1 )
 
   end subroutine readPhmodes
