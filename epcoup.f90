@@ -8,7 +8,6 @@ module epcoup
   type epCoupling
     complex(kind=DP), allocatable, dimension(:,:,:,:,:) :: epmat
     complex(kind=DP), allocatable, dimension(:,:,:,:) :: phmodes
-    real(kind=DP), allocatable, dimension(:,:,:,:) :: phmodesR
     real(kind=DP), allocatable, dimension(:,:) :: qpoints
     real(kind=DP), allocatable, dimension(:,:,:) :: displ
     ! Phonon projection of displacement in MD.
@@ -83,7 +82,6 @@ module epcoup
     nat = 2
     naxis = 3 ! 3 dimension in xyz space.
     allocate(epc%phmodes(nqs, nmodes, nat, naxis))
-    allocate(epc%phmodesR(nqs, nmodes, nat, naxis))
     allocate(epc%qpoints(nqs, naxis))
     allocate(atompos(nat, naxis))
 
@@ -103,16 +101,6 @@ module epcoup
           read(unit=909, fmt=9021) bra, (epc%phmodes(iq, imode, iatom, iaxis), &
                                          iaxis=1,naxis), ket
           ! write(*, 9020) (epc%phmodes(iq, imode, iatom, iaxis), iaxis=1,naxis)
-          do iaxis=1,naxis
-            temp = epc%phmodes(iq, imode, iatom, iaxis)
-            if (abs(real(temp)) >= abs(aimag(temp))) then
-              epc%phmodesR(iq, imode, iatom, iaxis) &
-              = abs(temp) * sign(1.0d0, real(temp))
-            else
-              epc%phmodesR(iq, imode, iatom, iaxis) &
-              = abs(temp) * sign(1.0d0, aimag(temp))
-            end if
-          end do
         end do
       end do
       read(unit=909, fmt=*)
@@ -158,7 +146,7 @@ module epcoup
         do imode=1,nmodes
           proj = 0.0d0
           do iatom=1,nat
-          proj = proj + dot_product( epc%phmodesR(iq, imode, iatom, :), &
+          proj = proj + dot_product( epc%phmodes(iq, imode, iatom, :), &
                                      epc%displ(time, iatom, :))
           end do
           epc%phproj(time, imode, iq) = proj
