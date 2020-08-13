@@ -11,6 +11,7 @@ module epcoup
     real(kind=DP), allocatable, dimension(:,:) :: qpoints
     real(kind=DP), allocatable, dimension(:,:) :: freq
     real(kind=DP), allocatable, dimension(:,:,:) :: displ
+    real(kind=DP), allocatable, dimension(:,:,:) :: vel
     ! Phonon projection of displacement in MD.
     real(kind=DP), allocatable, dimension(:,:,:) :: phproj
   end type
@@ -122,6 +123,43 @@ module epcoup
     type(namdInfo), intent(in) :: inp
     type(epCoupling), intent(inout) :: epc
   end subroutine readDISPL
+
+  subroutine phDecomp(inp, epc)
+    ! Project the atomic motion from an MD simulation to phonon modes.
+    implicit none
+
+    type(namdInfo), intent(in) :: inp
+    type(epCoupling), intent(inout) :: epc
+
+    ! The normal mode coordinate and its derivative.
+    complex(kind=DP) :: q, dq
+    ! The potential and kinetic energies of the normal mode.
+    real(kind=DP) :: U, T
+    integer :: iq, imode, iatom, iaxis, time
+    integer :: nqs, nmodes, nat, naxis
+
+    call readPhmodes(inp, epc)
+    call readDISPL(inp, epc)
+
+    do time=1,inp%NSW
+      do iq=1,nqs
+        do imode=1,nmodes
+          q = (0.0, 0.0)
+          dq = (0.0, 0.0)
+          do iatom=1,nat
+          q = q + dot_product( CONJG(epc%phmodes(iq, imode, iatom, :)), &
+                               epc%displ(time, iatom, :) )
+          dq = dq + dot_product( CONJG(epc%phmodes(iq, imode, iatom, :)), &
+                                 epc%vel(time, iatom, :) )
+          end do
+          U = 0.5 * epc%freq(iq, imode)**2 * CONJG(q) * q
+          T = 0.5 * CONJG(dq) * dq
+          epc%phproj(time, iq, imode) = (U + T) / epc%freq(iq, imode)
+        end do
+      end do
+    end do
+
+  end subroutine phDecomp
 
   subroutine TDepCoupIJ(inp, epc, olap)
     implicit none
