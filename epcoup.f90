@@ -141,6 +141,8 @@ module epcoup
     call readPhmodes(inp, epc)
     call readDISPL(inp, epc)
 
+    allocate(epc%phproj(inp%NSW, nmodes, nqs))
+
     do time=1,inp%NSW
       do iq=1,nqs
         do imode=1,nmodes
@@ -180,21 +182,6 @@ module epcoup
     nmodes = 6
     nat = 2
     naxis = 3
-
-    allocate(epc%phproj(inp%NSW, nmodes, nqs))
-
-    do time=1,inp%NSW
-      do iq=1,nqs
-        do imode=1,nmodes
-          proj = 0.0d0
-          do iatom=1,nat
-          proj = proj + dot_product( epc%phmodes(iq, imode, iatom, :), &
-                                     epc%displ(time, iatom, :))
-          end do
-          epc%phproj(time, imode, iq) = proj
-        end do
-      end do
-    end do
 
   end subroutine TDepCoupIJ
 
