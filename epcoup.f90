@@ -122,6 +122,44 @@ module epcoup
 
     type(namdInfo), intent(in) :: inp
     type(epCoupling), intent(inout) :: epc
+
+    real(kind=q) :: scal
+    real(kind=q), allocatable, dimension(:,:) :: supercell
+    character(24) :: filename
+    integer :: ierr, i, iaxis, iatom, time
+    integer :: nat, naxis
+
+    filename = 'XDATCAR'
+
+    open(unit=33, file=filename, status='unknown', action='read', iostat=ierr)
+    if (ierr /= 0) then
+      write(*,*) "XDATCAR file does NOT exist!"
+      stop
+    end if
+
+    naxis = 3
+    allocate(supercell(naxis,naxis))
+
+    read(unit=33, fmt=*)
+    read(unit=33, fmt=*) scal
+    do i=1,naxis
+      read(unit=33, fmt=*) (supercell(i, iaxis), iaxis=1,naxis)
+      supercell(i,:) = supercell(i,:) * scal
+    end do
+    read(unit=33, fmt=*)
+    read(unit=33, fmt=*) nat
+
+    allocate(epc%displ(200, nat, naxis))
+    do time=1,200
+      read(unit=33, fmt=*)
+      do iatom=1,nat
+        read(unit=33, fmt=*) (epc%displ(time, iatom, iaxis), iaxis=1, naxis)
+        ! write(*,*) epc%displ(time, iatom, :)
+      end do
+    end do
+
+    close(33)
+
   end subroutine readDISPL
 
   subroutine phDecomp(inp, epc)
@@ -163,25 +201,50 @@ module epcoup
 
   end subroutine phDecomp
 
-  subroutine TDepCoupIJ(inp, epc, olap)
+  subroutine TDepCoupIJ(olap, olap_sec, inp, epc)
     implicit none
 
     type(namdInfo), intent(in) :: inp
     type(epCoupling), intent(inout) :: epc
     type(overlap), intent(inout) :: olap
+    type(overlap), intent(inout) :: olap_sec
 
     real(kind=DP) :: proj
-    integer :: iq, imode, iatom, iaxis, time
+    integer :: iq, imode, iatom, iaxis
     integer :: nqs, nmodes, nat, naxis
+    integer :: time, ik, jk, iband, jband
+    complex(kind=q) :: temp
+
+    ! Initialization
+    olap%NBANDS = inp%NBANDS
+    olap%TSTEPS = inp%NSW
+    olap%dt = inp%POTIM
+    allocate(olap%Dij(olap%NBANDS, olap%NBANDS, olap%TSTEPS-1))
+    allocate(olap%Eig(olap%NBANDS, olap%TSTEPS-1))
 
     call readEPMat(inp, epc)
-    call readPhmodes(inp, epc)
-    call readDISPL(inp, epc)
+    call phDecomp(inp, epc)
 
-    nqs = 10
-    nmodes = 6
-    nat = 2
-    naxis = 3
+    do time=1,inp%NSW-1
+      do ik=1,inp%NKPOINTS
+        do jk=1,inp%NKPOINTS
+          do iband=1,inp%NBANDS
+            do jband=1,inp%NBANDS
+              do iq=1, nqs
+                if (iq==(jk-ik)) then
+                  temp = (0.0, 0.0)
+                  do imode=1,nmodes
+                    temp = temp + epc%phproj(time, iq, imode) * &
+                           epc%epmat(iband, jband, imode, ik, iq)
+                  end do
+                  olap%Dij(iband*(ik-1), jband*(jk-1), time) = temp
+                end if
+              end do
+            end do
+          end do
+        end do
+      end do
+    end do
 
   end subroutine TDepCoupIJ
 
