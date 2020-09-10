@@ -6,7 +6,7 @@ module epcoup
   implicit none
 
   type epCoupling
-    integer :: nbands, nkpts, nmodes, nqpts, natoms
+    integer :: nbands, nkpts, nmodes, nqpts, natepc, natmd
     real(kind=DP), allocatable, dimension(:,:) :: cellepc
     real(kind=DP), allocatable, dimension(:,:) :: kptsepc
     real(kind=DP), allocatable, dimension(:,:) :: qptsepc
@@ -52,7 +52,7 @@ module epcoup
     epc%nkpts  = nk
     epc%nmodes = nm
     epc%nqpts  = nq
-    epc%natoms = na
+    epc%natepc = na
     allocate(epc%cellepc(na+3,3), &
              epc%kptsepc(nk,3), &
              epc%qptsepc(nq,3), &
@@ -209,8 +209,9 @@ module epcoup
     real(kind=q), allocatable, dimension(:,:) :: supercell
     character(24) :: filename
     integer :: ierr, i, iaxis, iatom, time
-    integer :: nat, naxis
+    integer :: nat, naxis, mdtime
 
+    mdtime = 200
     filename = 'XDATCAR'
 
     open(unit=33, file=filename, status='unknown', action='read', iostat=ierr)
@@ -230,15 +231,27 @@ module epcoup
     end do
     read(unit=33, fmt=*)
     read(unit=33, fmt=*) nat
+    epc%natmd = nat
 
-    allocate(epc%displ(200, nat, naxis))
-    do time=1,200
+    allocate(epc%displ(mdtime, nat, naxis))
+    do time=1,mdtime
       read(unit=33, fmt=*)
       do iatom=1,nat
         read(unit=33, fmt=*) (epc%displ(time, iatom, iaxis), iaxis=1, naxis)
-        ! write(*,*) epc%displ(time, iatom, :)
       end do
     end do
+
+    allocate(epc%cellmd(nat+naxis, naxis))
+    epc%cellmd(1:3,:) = supercell
+    do iatom=1,nat
+      do iaxis=1,naxis
+        epc%cellmd(iatom+3,iaxis) = SUM(epc%displ(:,iatom, iaxis)) / mdtime
+      enddo
+    enddo
+
+    do i=1,nat+3
+      write(*,'(3f12.7)') (epc%cellmd(i,iaxis), iaxis=1,3)
+    enddo
 
     close(33)
 
