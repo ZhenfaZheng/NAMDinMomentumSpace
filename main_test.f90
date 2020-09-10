@@ -8,6 +8,6 @@ Program main
   type(namdInfo) :: inp
   type(epCoupling) :: epc
 
-  call ReadPhmodes(inp, epc)
+  call ReadEPC(inp, epc)
 
 end Program

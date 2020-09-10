@@ -6,17 +6,103 @@ module epcoup
   implicit none
 
   type epCoupling
+    integer :: nbands, nkpts, nmodes, nqpts, natoms
+    real(kind=DP), allocatable, dimension(:,:) :: cellepc
+    real(kind=DP), allocatable, dimension(:,:) :: kptsepc
+    real(kind=DP), allocatable, dimension(:,:) :: qptsepc
+    real(kind=DP), allocatable, dimension(:,:) :: energy
     complex(kind=DP), allocatable, dimension(:,:,:,:,:) :: epmat
-    complex(kind=DP), allocatable, dimension(:,:,:,:) :: phmodes
-    real(kind=DP), allocatable, dimension(:,:) :: qpoints
     real(kind=DP), allocatable, dimension(:,:) :: freq
+    real(kind=DP), allocatable, dimension(:,:) :: qptsph
+    complex(kind=DP), allocatable, dimension(:,:,:,:) :: phmodes
+    real(kind=DP), allocatable, dimension(:,:) :: cellmd
     real(kind=DP), allocatable, dimension(:,:,:) :: displ
     real(kind=DP), allocatable, dimension(:,:,:) :: vel
-    ! Phonon projection of displacement in MD.
     real(kind=DP), allocatable, dimension(:,:,:) :: phproj
+    ! Phonon projection of displacement in MD.
   end type
 
   contains
+
+  subroutine readEPC(inp, epc)
+    ! Read informations about e-p couplings from .epc file.
+    ! Including cell for epc, k, q points, eigen energies and e-p matrix.
+
+    implicit none
+
+    type(namdInfo), intent(in) :: inp
+    type(epCoupling), intent(inout) :: epc
+
+    integer :: ierr, i, j
+    integer :: nb, nk, nm, nq, na
+    integer :: iband, jband, ikpt, imode, iqpt
+    character(len=72) :: filepc
+    
+    filepc = 'graphene.epc'
+
+    open(unit=90, file=filepc, status='unknown', action='read', iostat=ierr)
+    if (ierr /= 0) then
+      write(*,*) "epc file does NOT exist!"
+      stop
+    end if
+
+    read(unit=90, fmt=*)
+    read(unit=90, fmt=*) nb, nk, nm, nq, na
+    epc%nbands = nb
+    epc%nkpts  = nk
+    epc%nmodes = nm
+    epc%nqpts  = nq
+    epc%natoms = na
+    allocate(epc%cellepc(na+3,3), &
+             epc%kptsepc(nk,3), &
+             epc%qptsepc(nq,3), &
+             epc%energy(nk,nb), &
+             epc%epmdat(nb,nb,nk,nm,nq))
+
+    read(unit=90, fmt=*)
+    do i=1,3
+      read(unit=90, fmt=*) (epc%cellepc(i,j), j=1,3)
+    enddo
+    read(unit=90, fmt=*)
+    do i=1,na
+      read(unit=90, fmt=*) (epc%cellepc(i+3,j), j=1,3)
+    enddo
+
+    read(unit=90, fmt=*)
+    do i=1,nk
+      read(unit=90, fmt=*) (epc%kptsepc(i,j), j=1,3)
+    enddo
+
+    read(unit=90, fmt=*)
+    do i=1,nq
+      read(unit=90, fmt=*) (epc%qptsepc(i,j), j=1,3)
+    enddo
+
+    read(unit=90, fmt=*)
+    do i=1,nk
+      read(unit=90, fmt=*) (epc%energy(i,j), j=1,nb)
+    enddo
+
+    read(unit=90, fmt=*)
+    do iband=1,nb
+      do jband=1,nb
+        do ikpt=1,nk
+          do imode=1,nm
+            do iqpt=1,nq
+              read(unit=908, fmt=*) epc%epmat(iband,jband,ikpt,imode,iq)
+            end do
+          end do
+        end do
+      end do
+    end do
+
+    close(90)
+
+    ! write(*,*)
+    write(*,*) epc%qptsepc(35,:)
+    write(*,*) epc%epmdat(12,12,36,6,32)
+
+  end subroutine readEPC
 
   subroutine readEPMat(inp, epc)
     implicit none
@@ -84,7 +170,7 @@ module epcoup
     nat = 2
     naxis = 3 ! 3 dimension in xyz space.
     allocate(epc%phmodes(nqs, nmodes, nat, naxis))
-    allocate(epc%qpoints(nqs, naxis))
+    allocate(epc%qptsph(nqs, naxis))
     allocate(epc%freq(nqs, nmodes))
     allocate(atompos(nat, naxis))
 
@@ -94,9 +180,9 @@ module epcoup
     do iq=1,nqs
       read(unit=909, fmt=*)
       read(unit=909, fmt=*)
-      read(unit=909, fmt=9019) charac, (epc%qpoints(iq, iaxis), &
+      read(unit=909, fmt=9019) charac, (epc%qptsph(iq, iaxis), &
                                                 iaxis=1,naxis)
-      ! write(*, 9019) charac, epc%qpoints(iq,:)
+      ! write(*, 9019) charac, epc%qptsph(iq,:)
       read(unit=909, fmt=*)
       do imode=1,nmodes
         read(unit=909, fmt=9011) charac, epc%freq(iq, imode)
