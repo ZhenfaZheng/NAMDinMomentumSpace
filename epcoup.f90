@@ -57,7 +57,7 @@ module epcoup
              epc%kptsepc(nk,3), &
              epc%qptsepc(nq,3), &
              epc%energy(nk,nb), &
-             epc%epmdat(nb,nb,nk,nm,nq))
+             epc%epmat(nb,nb,nk,nm,nq))
 
     read(unit=90, fmt=*)
     do i=1,3
@@ -89,7 +89,7 @@ module epcoup
         do ikpt=1,nk
           do imode=1,nm
             do iqpt=1,nq
-              read(unit=908, fmt=*) epc%epmat(iband,jband,ikpt,imode,iq)
+              read(unit=90, fmt='(2f15.10)') epc%epmat(iband,jband,ikpt,imode,iqpt)
             end do
           end do
         end do
@@ -97,10 +97,6 @@ module epcoup
     end do
 
     close(90)
-
-    ! write(*,*)
-    write(*,*) epc%qptsepc(35,:)
-    write(*,*) epc%epmdat(12,12,36,6,32)
 
   end subroutine readEPC
 
