@@ -153,7 +153,6 @@ module epcoup
     character(len=255) :: filphmodes, fmtDISPL
     character(len=24) :: charac, bra, ket
     complex(kind=DP) :: temp
-    real(kind=DP), allocatable, dimension(:,:) :: atompos
 
     filphmodes = 'graphene.matdyn.modes'
 
@@ -163,17 +162,13 @@ module epcoup
       stop
     end if
 
-    nqs = 241
-    nmodes = 6
-    nat = 2
+    nat = epc%natepc
+    nmodes = epc%nmodes
+    nqs = epc%nqpts
     naxis = 3 ! 3 dimension in xyz space.
     allocate(epc%phmodes(nqs, nmodes, nat, naxis))
     allocate(epc%qptsph(nqs, naxis))
     allocate(epc%freq(nqs, nmodes))
-    allocate(atompos(nat, naxis))
-
-    atompos(1,:) = (/0.0, 0.0, 0.5/)
-    atompos(2,:) = (/0.333333333, 0.666666667, 0.5/)
 
     do iq=1,nqs
       read(unit=909, fmt=*)
