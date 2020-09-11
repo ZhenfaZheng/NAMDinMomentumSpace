@@ -1,5 +1,6 @@
 module epcoup
   use prec
+  use constants
   use fileio
   use couplings
 
@@ -235,6 +236,12 @@ module epcoup
       read(unit=33, fmt=*)
       do iatom=1,nat
         read(unit=33, fmt=*) (epc%displ(time, iatom, iaxis), iaxis=1, naxis)
+        if (time==1) then
+          epc%vel(time,iatom,:) = 0
+        else
+          epc%vel(time,iatom,:) &
+          = ( epc%displ(time, iatom, :) - epc%displ(time-1, iatom, :) ) / inp%POTIM
+        endif
       end do
     end do
 
@@ -305,24 +312,29 @@ module epcoup
     complex(kind=DP) :: Q, dQ
     ! The potential and kinetic energies of the normal mode.
     real(kind=DP) :: U, T
+    real(kind=DP) :: theta
     integer :: iq, imode, iatom, iaxis, time
     integer :: nqs, nmodes, nat, naxis
 
     call readPhmodes(inp, epc)
     call readDISPL(inp, epc)
+    call cellPROJ(epc)
 
     allocate(epc%phproj(inp%NSW, nmodes, nqs))
 
     do time=1,inp%NSW
-      do iq=1,nqs
-        do imode=1,nmodes
+      do iq=1,epc%nqpts
+        do imode=1,epc%nmodes
           Q = (0.0, 0.0)
           dQ = (0.0, 0.0)
           do iatom=1,nat
-          Q = Q + dot_product( CONJG(epc%phmodes(iq, imode, iatom, :)), &
-                               epc%displ(time, iatom, :) )
-          dQ = dQ + dot_product( CONJG(epc%phmodes(iq, imode, iatom, :)), &
-                                 epc%vel(time, iatom, :) )
+            theta = 2 * PI * DOT_PRODUCT( epc%qptsph(iq,:), epc%R(iatom,:) )
+            Q = Q + EXP(uno*theta) &
+                  + DOT_PRODUCT( CONJG(epc%phmodes(iq, imode, iatom, :)), &
+                                 epc%displ(time, iatom, :) )
+            dQ = dQ + EXP(uno*theta) &
+                    + DOT_PRODUCT( CONJG(epc%phmodes(iq, imode, iatom, :)), &
+                                   epc%vel(time, iatom, :) )
           end do
           U = 0.5 * epc%freq(iq, imode)**2 * CONJG(Q) * Q
           T = 0.5 * CONJG(dQ) * dQ
