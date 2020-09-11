@@ -247,12 +247,8 @@ module epcoup
     end do
 
     allocate(epc%cellmd(nat+naxis, naxis))
-    epc%cellmd(1:3,:) = supercell
-    do iatom=1,nat
-      do iaxis=1,naxis
-        epc%cellmd(iatom+3,iaxis) = SUM(epc%displ(:,iatom, iaxis)) / mdtime
-      enddo
-    enddo
+    epc%cellmd(:3,:) = supercell
+    epc%cellmd(4:,:) = epc%displ(1,:,:)
 
     close(33)
 
@@ -283,13 +279,13 @@ module epcoup
     do iatom=1,epc%natmd
       temp1 = 9999.9
       do jatom=1,epc%natepc
-        dr = epc%cellmd(iatom,:) * N - epc%cellepc(jatom,:)
+        dr = epc%cellmd(iatom+naxis,:) * N - epc%cellepc(jatom+naxis,:)
         do iaxis=1,naxis
           temp2(iaxis) = ABS( dr(iaxis) - NINT(dr(iaxis)) )
         enddo
         if (SUM(temp2)<SUM(temp1)) then
           temp1 = temp2
-          epc%R(iatom,:) = (/(NINT(dr(i)), i=1,naxis)/)
+          epc%R(iatom,:) = (/(MOD(NINT(dr(i)),N(i)), i=1,naxis)/)
         endif
       enddo
     enddo
