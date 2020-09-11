@@ -7,6 +7,8 @@ module epcoup
 
   type epCoupling
     integer :: nbands, nkpts, nmodes, nqpts, natepc, natmd
+    integer, allocatable, dimension(:,:) :: R
+    !! cell numbers for each atoms of md cell
     real(kind=DP), allocatable, dimension(:,:) :: cellepc
     real(kind=DP), allocatable, dimension(:,:) :: kptsepc
     real(kind=DP), allocatable, dimension(:,:) :: qptsepc
@@ -257,6 +259,46 @@ module epcoup
 
   end subroutine readDISPL
 
+  subroutine cellPROJ(epc)
+    ! Calculate cell numbers for each atom of md cell
+    ! Project from phonon cell to md cell.
+    implicit none
+
+    integer :: naxis
+    integer :: iaxis, iatom, jatom
+    integer, allocatable, dimension(:) :: N
+    !! scale numbers of md cell compared with phonon cell
+    real(kind=DP), allocatable, dimension(:) :: dr
+    real(kind=DP), allocatable, dimension(:) :: temp1, temp2
+
+    type(epCoupling), intent(inout) :: epc
+
+    naxis = 3
+    allocate(R(epc%natmd,naxis), N(naxis), &
+             dr(naxis), temp1(naxis), temp2(naxis))
+
+    do iaxis=1,naxis
+      N(iaxis) = NINT( SUM(epc%cellmd(iaixs,:)) / SUM(epc%cellepc(iaixs,:)) )
+    enddo
+
+    do iatom=1,epc%natmd
+      temp1 = 9999.9
+      do jatom=1,epc%natepc
+        dr = epc%cellmd(iatom,:) * N - epc%cellepc(jatom,:)
+        do iaxis=1,naxis
+          temp2(iaxis) = ABS( dr(iaxis) - NINT(dr(axis)) )
+        enddo
+        if (SUM(temp2)<SUM(temp1)) then
+          temp1 = temp2
+          R(iatom,:) = (NINT(dr(i)), i=1,naxis)
+        endif
+      enddo
+    enddo
+
+    deallocate(N, dr, temp1, temp2)
+
+  end subroutine cellPROJ
+
   subroutine phDecomp(inp, epc)
     ! Project the atomic motion from an MD simulation to phonon modes.
     implicit none
@@ -265,7 +307,7 @@ module epcoup
     type(epCoupling), intent(inout) :: epc
 
     ! The normal mode coordinate and its derivative.
-    complex(kind=DP) :: q, dq
+    complex(kind=DP) :: Q, dQ
     ! The potential and kinetic energies of the normal mode.
     real(kind=DP) :: U, T
     integer :: iq, imode, iatom, iaxis, time
@@ -279,16 +321,16 @@ module epcoup
     do time=1,inp%NSW
       do iq=1,nqs
         do imode=1,nmodes
-          q = (0.0, 0.0)
-          dq = (0.0, 0.0)
+          Q = (0.0, 0.0)
+          dQ = (0.0, 0.0)
           do iatom=1,nat
-          q = q + dot_product( CONJG(epc%phmodes(iq, imode, iatom, :)), &
+          Q = Q + dot_product( CONJG(epc%phmodes(iq, imode, iatom, :)), &
                                epc%displ(time, iatom, :) )
-          dq = dq + dot_product( CONJG(epc%phmodes(iq, imode, iatom, :)), &
+          dQ = dQ + dot_product( CONJG(epc%phmodes(iq, imode, iatom, :)), &
                                  epc%vel(time, iatom, :) )
           end do
-          U = 0.5 * epc%freq(iq, imode)**2 * CONJG(q) * q
-          T = 0.5 * CONJG(dq) * dq
+          U = 0.5 * epc%freq(iq, imode)**2 * CONJG(Q) * Q
+          T = 0.5 * CONJG(dQ) * dQ
           epc%phproj(time, iq, imode) = (U + T) / epc%freq(iq, imode)
         end do
       end do
