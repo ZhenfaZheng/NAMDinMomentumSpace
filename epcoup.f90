@@ -231,7 +231,8 @@ module epcoup
     read(unit=33, fmt=*) nat
     epc%natmd = nat
 
-    allocate(epc%displ(mdtime, nat, naxis))
+    allocate(epc%displ(mdtime, nat, naxis), &
+             epc%vel(mdtime, nat, naxis))
     do time=1,mdtime
       read(unit=33, fmt=*)
       do iatom=1,nat
@@ -253,10 +254,6 @@ module epcoup
       enddo
     enddo
 
-    do i=1,nat+3
-      write(*,'(3f12.7)') (epc%cellmd(i,iaxis), iaxis=1,3)
-    enddo
-
     close(33)
 
   end subroutine readDISPL
@@ -267,7 +264,7 @@ module epcoup
     implicit none
 
     integer :: naxis
-    integer :: iaxis, iatom, jatom
+    integer :: iaxis, iatom, jatom, i
     integer, allocatable, dimension(:) :: N
     !! scale numbers of md cell compared with phonon cell
     real(kind=DP), allocatable, dimension(:) :: dr
@@ -276,11 +273,11 @@ module epcoup
     type(epCoupling), intent(inout) :: epc
 
     naxis = 3
-    allocate(R(epc%natmd,naxis), N(naxis), &
+    allocate(epc%R(epc%natmd,naxis), N(naxis), &
              dr(naxis), temp1(naxis), temp2(naxis))
 
     do iaxis=1,naxis
-      N(iaxis) = NINT( SUM(epc%cellmd(iaixs,:)) / SUM(epc%cellepc(iaixs,:)) )
+      N(iaxis) = NINT( SUM(epc%cellmd(iaxis,:)) / SUM(epc%cellepc(iaxis,:)) )
     enddo
 
     do iatom=1,epc%natmd
@@ -288,11 +285,11 @@ module epcoup
       do jatom=1,epc%natepc
         dr = epc%cellmd(iatom,:) * N - epc%cellepc(jatom,:)
         do iaxis=1,naxis
-          temp2(iaxis) = ABS( dr(iaxis) - NINT(dr(axis)) )
+          temp2(iaxis) = ABS( dr(iaxis) - NINT(dr(iaxis)) )
         enddo
         if (SUM(temp2)<SUM(temp1)) then
           temp1 = temp2
-          R(iatom,:) = (NINT(dr(i)), i=1,naxis)
+          epc%R(iatom,:) = (/(NINT(dr(i)), i=1,naxis)/)
         endif
       enddo
     enddo
