@@ -331,7 +331,7 @@ module epcoup
           end do
           U = 0.5 * epc%freq(iq, imode)**2 * CONJG(Q) * Q
           T = 0.5 * CONJG(dQ) * dQ
-          epc%phproj(time, iq, imode) = (U + T) / epc%freq(iq, imode)
+          epc%phproj(time, imode, iq) = (U + T) / epc%freq(iq, imode)
         end do
       end do
     end do
@@ -346,35 +346,54 @@ module epcoup
     type(overlap), intent(inout) :: olap
     type(overlap), intent(inout) :: olap_sec
 
-    real(kind=DP) :: proj
-    integer :: iq, imode, iatom, iaxis
+    real(kind=DP) :: proj, norm
+    real(kind=DP), allocatable, dimension(:) :: dkq, dq
+    integer :: iq, jq, imode, iatom, iaxis
     integer :: nqs, nmodes, nat, naxis
     integer :: time, ik, jk, iband, jband
     complex(kind=q) :: temp
 
     ! Initialization
-    olap%NBANDS = inp%NBANDS
+    olap%NBANDS = inp%NBANDS * inp%NKPOINTS
     olap%TSTEPS = inp%NSW
     olap%dt = inp%POTIM
     allocate(olap%Dij(olap%NBANDS, olap%NBANDS, olap%TSTEPS-1))
     allocate(olap%Eig(olap%NBANDS, olap%TSTEPS-1))
 
-    call readEPMat(inp, epc)
+    olap_sec%NBANDS = inp%NBASIS
+    olap_sec%TSTEPS = inp%NSW
+    olap_sec%dt = inp%POTIM
+    allocate(olap_sec%Dij(olap_sec%NBANDS, olap_sec%NBANDS, olap_sec%TSTEPS-1))
+    allocate(olap_sec%Eig(olap_sec%NBANDS, olap_sec%TSTEPS-1))
+
+    call readEPC(inp, epc)
     call phDecomp(inp, epc)
 
+    naxis = 3
+    norm = 0.001
+    allocate(dkq(naxis), dq(naxis))
+
     do time=1,inp%NSW-1
-      do ik=1,inp%NKPOINTS
-        do jk=1,inp%NKPOINTS
-          do iband=1,inp%NBANDS
-            do jband=1,inp%NBANDS
-              do iq=1, nqs
-                if (iq==(jk-ik)) then
-                  temp = (0.0, 0.0)
-                  do imode=1,nmodes
-                    temp = temp + epc%phproj(time, iq, imode) * &
-                           epc%epmat(iband, jband, imode, ik, iq)
+      do iband=1,inp%NBANDS
+        do jband=1,inp%NBANDS
+          do ik=1,inp%NKPOINTS
+            do jk=1,inp%NKPOINTS
+              do iq=1,epc%nqpts
+                dkq = epc%kptsepc(jk,:) - epc%kptsepc(ik,:) - epc%qptsepc(iq,:)
+                dkq = (/(ABS(dkq(iaxis)), iaxis=1,naxis)/)
+                if (SUM(dkq)<Norm) then
+                  do jq=1,epc%nqpts
+                    dq = epc%qptsepc(iq,:) - epc%qptsph(jq,:)
+                    dq = (/(ABS(dq(iaxis)), iaxis=1,naxis)/)
+                    if (SUM(dq)<Norm) then
+                      temp = (0.0, 0.0)
+                      do imode=1,nmodes
+                        temp = temp + epc%phproj(time, imode, jq) * &
+                               epc%epmat(iband, jband, ik, imode, iq)
+                      end do
+                      olap%Dij(iband*(ik-1), jband*(jk-1), time) = temp
+                    end if
                   end do
-                  olap%Dij(iband*(ik-1), jband*(jk-1), time) = temp
                 end if
               end do
             end do
@@ -382,6 +401,24 @@ module epcoup
         end do
       end do
     end do
+
+    do iband=1,inp%NBANDS
+      do ik=2,inp%NKPOINTS
+        olap%Eig(iband*(ik-1),:) = epc%energy(ik,iband)
+      enddo
+    enddo
+
+    do iband=1,inp%BMAX-inp%BMIN
+      do jband=1,inp%BMAX-inp%BMIN
+        do ik=1,inp%NKPOINTS
+          olap_sec%Eig(iband*(ik-1),:) = olap%Eig((iband+inp%BMIN)*(ik-1),:)
+          do jk=1,inp%NKPOINTS
+            olap_sec%Dij(iband*(ik-1), jband*(jk-1), :) &
+            = olap%Dij((iband+inp%BMIN)*(ik-1), (jband+inp%BMIN)*(jk-1), :)
+          end do
+        end do
+      enddo
+    enddo
 
   end subroutine TDepCoupIJ
 
