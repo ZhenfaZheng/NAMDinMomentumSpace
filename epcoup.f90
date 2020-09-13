@@ -8,6 +8,8 @@ module epcoup
 
   type epCoupling
     integer :: nbands, nkpts, nmodes, nqpts, natepc, natmd
+    integer, allocatable, dimension(:) :: atnum
+    !! atom number of each md cell atom in phonon cell
     integer, allocatable, dimension(:,:) :: R
     !! cell numbers for each atoms of md cell
     real(kind=DP), allocatable, dimension(:,:) :: cellepc
@@ -269,8 +271,8 @@ module epcoup
     type(epCoupling), intent(inout) :: epc
 
     naxis = 3
-    allocate(epc%R(epc%natmd,naxis), N(naxis), &
-             dr(naxis), temp1(naxis), temp2(naxis))
+    allocate(epc%R(epc%natmd,naxis), epc%atnum(epc%natmd), &
+             N(naxis), dr(naxis), temp1(naxis), temp2(naxis))
 
     do iaxis=1,naxis
       N(iaxis) = NINT( SUM(epc%cellmd(iaxis,:)) / SUM(epc%cellepc(iaxis,:)) )
@@ -285,6 +287,7 @@ module epcoup
         enddo
         if (SUM(temp2)<SUM(temp1)) then
           temp1 = temp2
+          epc%atnum(iatom) = jatom
           epc%R(iatom,:) = (/(MOD(NINT(dr(i)),N(i)), i=1,naxis)/)
         endif
       enddo
@@ -320,14 +323,14 @@ module epcoup
         do imode=1,epc%nmodes
           Q = (0.0, 0.0)
           dQ = (0.0, 0.0)
-          do iatom=1,nat
+          do iatom=1,epc%natmd
             theta = 2 * PI * DOT_PRODUCT( epc%qptsph(iq,:), epc%R(iatom,:) )
-            Q = Q + EXP(uno*theta) &
-                  + DOT_PRODUCT( CONJG(epc%phmodes(iq, imode, iatom, :)), &
-                                 epc%displ(time, iatom, :) )
-            dQ = dQ + EXP(uno*theta) &
-                    + DOT_PRODUCT( CONJG(epc%phmodes(iq, imode, iatom, :)), &
-                                   epc%vel(time, iatom, :) )
+            Q  =  Q + EXP(uno*theta) * DOT_PRODUCT( &
+                      CONJG(epc%phmodes(iq, imode, epc%atnum(iatom), :)), &
+                            epc%displ(time, iatom, :) )
+            dQ = dQ + EXP(uno*theta) * DOT_PRODUCT( &
+                      CONJG(epc%phmodes(iq, imode, epc%atnum(iatom), :)), &
+                            epc%vel(time, iatom, :) )
           end do
           U = 0.5 * epc%freq(iq, imode)**2 * CONJG(Q) * Q
           T = 0.5 * CONJG(dQ) * dQ
@@ -359,6 +362,8 @@ module epcoup
     olap%dt = inp%POTIM
     allocate(olap%Dij(olap%NBANDS, olap%NBANDS, olap%TSTEPS-1))
     allocate(olap%Eig(olap%NBANDS, olap%TSTEPS-1))
+    olap%Dij = cero
+    olap%EIg = cero
 
     olap_sec%NBANDS = inp%NBASIS
     olap_sec%TSTEPS = inp%NSW
@@ -387,11 +392,11 @@ module epcoup
                     dq = (/(ABS(dq(iaxis)), iaxis=1,naxis)/)
                     if (SUM(dq)<Norm) then
                       temp = (0.0, 0.0)
-                      do imode=1,nmodes
+                      do imode=1,epc%nmodes
                         temp = temp + epc%phproj(time, imode, jq) * &
                                epc%epmat(iband, jband, ik, imode, iq)
                       end do
-                      olap%Dij(iband*(ik-1), jband*(jk-1), time) = temp
+                      olap%Dij(inp%NBANDS*(ik-1)+iband, jband+inp%NBANDS*(jk-1), time) = temp
                     end if
                   end do
                 end if
@@ -403,22 +408,26 @@ module epcoup
     end do
 
     do iband=1,inp%NBANDS
-      do ik=2,inp%NKPOINTS
-        olap%Eig(iband*(ik-1),:) = epc%energy(ik,iband)
+      do ik=1,inp%NKPOINTS
+        olap%Eig(iband+inp%NBANDS*(ik-1),:) = epc%energy(ik,iband)
       enddo
     enddo
 
-    do iband=1,inp%BMAX-inp%BMIN
-      do jband=1,inp%BMAX-inp%BMIN
+    do iband=1,inp%BMAX-inp%BMIN+1
+      do jband=1,inp%BMAX-inp%BMIN+1
         do ik=1,inp%NKPOINTS
-          olap_sec%Eig(iband*(ik-1),:) = olap%Eig((iband+inp%BMIN)*(ik-1),:)
+          olap_sec%Eig(iband+inp%NBASIS/36*(ik-1),:) = olap%Eig((iband+inp%BMIN-1)+inp%NBANDS*(ik-1),:)
           do jk=1,inp%NKPOINTS
-            olap_sec%Dij(iband*(ik-1), jband*(jk-1), :) &
-            = olap%Dij((iband+inp%BMIN)*(ik-1), (jband+inp%BMIN)*(jk-1), :)
+            olap_sec%Dij(iband+inp%NBASIS/36*(ik-1), jband+inp%NBASIS/36*(jk-1), :) &
+            = olap%Dij((iband+inp%BMIN-1)+inp%NBANDS*(ik-1), (jband+inp%BMIN-1)+inp%NBANDS*(jk-1), :)
           end do
         end do
       enddo
     enddo
+
+    ! After reading, write the couplings to disk
+    call CoupToFile(olap)
+    call writeNaEig(olap, inp)
 
   end subroutine TDepCoupIJ
 
