@@ -365,7 +365,7 @@ module epcoup
     olap%Dij = cero
     olap%EIg = cero
 
-    olap_sec%NBANDS = inp%NBASIS
+    olap_sec%NBANDS = inp%NBASIS * inp%NKPOINTS
     olap_sec%TSTEPS = inp%NSW
     olap_sec%dt = inp%POTIM
     allocate(olap_sec%Dij(olap_sec%NBANDS, olap_sec%NBANDS, olap_sec%TSTEPS-1))
@@ -416,9 +416,9 @@ module epcoup
     do iband=1,inp%BMAX-inp%BMIN+1
       do jband=1,inp%BMAX-inp%BMIN+1
         do ik=1,inp%NKPOINTS
-          olap_sec%Eig(iband+inp%NBASIS/36*(ik-1),:) = olap%Eig((iband+inp%BMIN-1)+inp%NBANDS*(ik-1),:)
+          olap_sec%Eig(iband+inp%NBASIS*(ik-1),:) = olap%Eig((iband+inp%BMIN-1)+inp%NBANDS*(ik-1),:)
           do jk=1,inp%NKPOINTS
-            olap_sec%Dij(iband+inp%NBASIS/36*(ik-1), jband+inp%NBASIS/36*(jk-1), :) &
+            olap_sec%Dij(iband+inp%NBASIS*(ik-1), jband+inp%NBASIS*(jk-1), :) &
             = olap%Dij((iband+inp%BMIN-1)+inp%NBANDS*(ik-1), (jband+inp%BMIN-1)+inp%NBANDS*(jk-1), :)
           end do
         end do

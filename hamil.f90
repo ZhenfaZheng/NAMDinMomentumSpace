@@ -51,8 +51,8 @@ module hamil
     integer :: i, j, N
 
     ! memory allocation
-    ks%ndim = inp%NBASIS
-    N = inp%NBASIS
+    ks%ndim = inp%NBASIS * inp%NKPOINTS
+    N = inp%NBASIS * inp%NKPOINTS
 
     if (.NOT. ks%LALLO) then
       allocate(ks%psi_c(N))

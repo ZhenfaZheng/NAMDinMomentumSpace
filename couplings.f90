@@ -225,13 +225,13 @@ module couplings
 
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     ! Initialization
-    olap%NBANDS = inp%NBANDS
+    olap%NBANDS = inp%NBANDS * inp%NKPOINTS
     olap%TSTEPS = inp%NSW
     olap%dt = inp%POTIM
     allocate(olap%Dij(olap%NBANDS, olap%NBANDS, olap%TSTEPS-1))
     allocate(olap%Eig(olap%NBANDS, olap%TSTEPS-1))
 
-    olap_sec%NBANDS = inp%NBASIS
+    olap_sec%NBANDS = inp%NBASIS * inp%NKPOINTS
     olap_sec%TSTEPS = inp%NSW
     olap_sec%dt = inp%POTIM
     allocate(olap_sec%Dij(olap_sec%NBANDS, olap_sec%NBANDS, olap_sec%TSTEPS-1))
@@ -339,11 +339,11 @@ module couplings
 
     N = inp%NSW - 1
     do j=1, N
-      read(unit=22, fmt=*) (olap_sec%Eig(i,j), i=1, inp%NBASIS)
+      read(unit=22, fmt=*) (olap_sec%Eig(i,j), i=1, inp%NBASIS * inp%NKPOINTS)
     end do
     do k=1, N
-      read(unit=23, fmt=*) ((olap_sec%Dij(i,j, k), j=1, inp%NBASIS), &
-                                                   i=1, inp%NBASIS)
+      read(unit=23, fmt=*) ((olap_sec%Dij(i,j, k), j=1, inp%NBASIS * inp%NKPOINTS), &
+                                                   i=1, inp%NBASIS * inp%NKPOINTS)
     end do
 
     close(unit=23)
