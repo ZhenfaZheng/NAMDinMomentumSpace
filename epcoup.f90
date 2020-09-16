@@ -205,7 +205,7 @@ module epcoup
     type(namdInfo), intent(in) :: inp
     type(epCoupling), intent(inout) :: epc
 
-    real(kind=q) :: scal
+    real(kind=q) :: scal, dr
     real(kind=q), allocatable, dimension(:,:) :: supercell
     character(24) :: filename
     integer :: ierr, i, iaxis, iatom, time
@@ -242,6 +242,15 @@ module epcoup
         if (time==1) then
           epc%vel(time,iatom,:) = 0
         else
+          ! Fix atom position if atom moves to other cell.
+          do iaxis=1,naxis
+            dr = epc%displ(time, iatom, iaxis) - epc%displ(time-1, iatom, iaxis)
+            if (dr>0.9) then
+              epc%displ(time, iatom, iaxis) = epc%displ(time, iatom, iaxis) - 1
+            else if (dr<-0.9) then
+              epc%displ(time, iatom, iaxis) = epc%displ(time, iatom, iaxis) + 1
+            endif
+          enddo
           epc%vel(time,iatom,:) &
           = ( epc%displ(time, iatom, :) - epc%displ(time-1, iatom, :) ) / inp%POTIM
         endif
@@ -250,7 +259,19 @@ module epcoup
 
     allocate(epc%cellmd(nat+naxis, naxis))
     epc%cellmd(:3,:) = supercell
-    epc%cellmd(4:,:) = epc%displ(1,:,:)
+    ! epc%cellmd(4:,:) = epc%displ(1,:,:)
+    do iatom=1,nat
+      do iaxis=2,naxis
+        epc%cellmd(iatom+naxis, iaxis) = SUM(epc%displ(:, iatom, iaxis)) / mdtime
+      end do
+    end do
+
+    do time=1,mdtime
+      do iatom=1,nat
+        epc%displ(time,iatom,:) &
+        = epc%displ(time,iatom,:) - epc%cellmd(iatom+naxis, :)
+      end do
+    end do
 
     close(33)
 
