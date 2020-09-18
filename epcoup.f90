@@ -261,7 +261,7 @@ module epcoup
     epc%cellmd(:3,:) = supercell
     ! epc%cellmd(4:,:) = epc%displ(1,:,:)
     do iatom=1,nat
-      do iaxis=2,naxis
+      do iaxis=1,naxis
         epc%cellmd(iatom+naxis, iaxis) = SUM(epc%displ(:, iatom, iaxis)) / mdtime
       end do
     end do
@@ -330,6 +330,7 @@ module epcoup
     ! The potential and kinetic energies of the normal mode.
     real(kind=DP) :: U, T
     real(kind=DP) :: theta
+    real(kind=DP), allocatable, dimension(:) :: displ, vel
     integer :: iq, imode, iatom, iaxis, time
     integer :: nqs, nmodes, nat, naxis
 
@@ -337,7 +338,10 @@ module epcoup
     call readDISPL(inp, epc)
     call cellPROJ(epc)
 
-    allocate(epc%phproj(inp%NSW, nmodes, nqs))
+    naxis = 3
+    nmodes = epc%nmodes
+    nqs = epc%nqpts
+    allocate(epc%phproj(inp%NSW, nmodes, nqs), displ(naxis), vel(naxis))
 
     do time=1,inp%NSW
       do iq=1,epc%nqpts
@@ -345,17 +349,30 @@ module epcoup
           Q = (0.0, 0.0)
           dQ = (0.0, 0.0)
           do iatom=1,epc%natmd
+            displ = 0.0; vel = 0.0
+            do iaxis=1,naxis
+              displ = displ + epc%displ(time, iatom, iaxis) * epc%cellmd(iaxis, :) 
+              vel = vel + epc%vel(time, iatom, iaxis) * epc%cellmd(iaxis, :) 
+            end do
             theta = 2 * PI * DOT_PRODUCT( epc%qptsph(iq,:), epc%R(iatom,:) )
-            Q  =  Q + EXP(uno*theta) * DOT_PRODUCT( &
-                      CONJG(epc%phmodes(iq, imode, epc%atnum(iatom), :)), &
-                            epc%displ(time, iatom, :) )
-            dQ = dQ + EXP(uno*theta) * DOT_PRODUCT( &
-                      CONJG(epc%phmodes(iq, imode, epc%atnum(iatom), :)), &
-                            epc%vel(time, iatom, :) )
+            Q  =  Q + EXP(imgUnit*theta) * DOT_PRODUCT( &
+                      CONJG(epc%phmodes(iq, imode, epc%atnum(iatom), :)), displ )
+            dQ = dQ + EXP(imgUnit*theta) * DOT_PRODUCT( &
+                      CONJG(epc%phmodes(iq, imode, epc%atnum(iatom), :)), vel )
           end do
-          U = 0.5 * epc%freq(iq, imode)**2 * CONJG(Q) * Q
-          T = 0.5 * CONJG(dQ) * dQ
-          epc%phproj(time, imode, iq) = (U + T) / epc%freq(iq, imode)
+          ! mass of C = 12.011
+          U = 0.5 * 12.011 * epc%freq(iq, imode)**2 * CONJG(Q) * Q / epc%natmd &
+            * 1.66 * 6.2415 / 100000
+          T = 0.5 * 12.011 * CONJG(dQ) * dQ / epc%natmd &
+            * 1.66 * 6.2415 * 10
+          epc%phproj(time, imode, iq) = (U + T) / ( hbar * epc%freq(iq, imode) / 1000 )
+          !if (epc%phproj(time, imode, iq) > 5) then
+          !write(*,'(3I4)') time,iq, imode
+          !write(*,'(4f16.7)') Q,dQ
+          !write(*,'(2f19.10)') U,T
+          !write(*,'(2f15.10)') epc%phproj(time, imode, iq), epc%freq(iq, imode)
+          !write(*,*)
+          !end if
         end do
       end do
     end do

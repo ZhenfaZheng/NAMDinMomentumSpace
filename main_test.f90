@@ -16,9 +16,8 @@ Program main
   type(overlap) :: olap, olap_sec
   type(epCoupling) :: epc
 
-  call readEPC(inp,epc)
-  call readDISPL(inp, epc)
-  call cellPROJ(epc)
+  call getUserInp(inp)
+  call TDepCoupIJ(olap, olap_sec, inp, epc)
 
 
 end Program
