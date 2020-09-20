@@ -250,9 +250,9 @@ module couplings
         call readNaEig(olap_sec, inp)
       else
         call CoupFromFile(olap)
-        call writeNaEig(olap, inp)
         olap_sec%Eig(:,:) = olap%Eig(inp%BMIN:inp%BMAX, :)
         olap_sec%Dij(:,:,:) = olap%Dij(inp%BMIN:inp%BMAX, inp%BMIN:inp%BMAX, :)
+        call writeNaEig(olap_sec, inp)
       end if
     else
       ! create the couplings from the wavefunctions
@@ -279,7 +279,7 @@ module couplings
       olap_sec%Dij(:,:,:) = olap%Dij(inp%BMIN:inp%BMAX, inp%BMIN:inp%BMAX, :)
       ! After reading, write the couplings to disk
       call CoupToFile(olap)
-      call writeNaEig(olap, inp)
+      call writeNaEig(olap_sec, inp)
     end if
 
     deallocate(olap%Dij, olap%Eig)
@@ -296,23 +296,24 @@ module couplings
 
   ! end subroutine
 
-  subroutine writeNaEig(olap, inp)
+  subroutine writeNaEig(olap_sec, inp)
     implicit none
 
-    type(overlap), intent(in) :: olap
+    type(overlap), intent(in) :: olap_sec
     type(namdInfo), intent(in) :: inp
-    integer :: i, j, k, N
+    integer :: i, j, k, N, NB
 
     open(unit=22, file='EIGTXT', status='unknown', action='write')
     open(unit=23, file='NATXT', status='unknown', action='write')
 
     N = inp%NSW - 1
+    NB = inp%NBASIS * inp%NKPOINTS
     do j=1, N
-      write(unit=22, fmt=*) (olap%Eig(i,j), i=inp%BMIN, inp%BMAX)
+      write(unit=22, fmt='(*(f12.6))') (olap_sec%Eig(i,j), i=1, NB)
     end do
     do k=1, N
-      write(unit=23, fmt=*) ((olap%Dij(i,j, k), j=inp%BMIN, inp%BMAX), &
-                                                i=inp%BMIN, inp%BMAX)
+      write(unit=23, fmt='(*(f15.9))') ((olap_sec%Dij(i,j, k), j=1, NB), &
+                                                                     i=1, NB)
     end do
 
     close(unit=23)

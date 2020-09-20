@@ -465,7 +465,8 @@ module epcoup
 
     ! After reading, write the couplings to disk
     call CoupToFile(olap)
-    call writeNaEig(olap, inp)
+    call writeNaEig(olap_sec, inp)
+    call readNaEig(olap_sec, inp)
 
   end subroutine TDepCoupIJ
 
