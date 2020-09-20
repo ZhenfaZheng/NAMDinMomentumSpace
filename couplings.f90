@@ -325,7 +325,7 @@ module couplings
 
     type(overlap), intent(inout) :: olap_sec
     type(namdInfo), intent(in) :: inp
-    integer :: i, j, k, N, ierr
+    integer :: i, j, k, N, NB, ierr
 
     open(unit=22, file='EIGTXT', status='unknown', action='read', iostat=ierr)
     if (ierr /= 0) then
@@ -339,12 +339,13 @@ module couplings
     end if
 
     N = inp%NSW - 1
+    NB = inp%NBASIS * inp%NKPOINTS
     do j=1, N
-      read(unit=22, fmt=*) (olap_sec%Eig(i,j), i=1, inp%NBASIS * inp%NKPOINTS)
+      read(unit=22, fmt=*) (olap_sec%Eig(i,j), i=1, NB)
     end do
     do k=1, N
-      read(unit=23, fmt=*) ((olap_sec%Dij(i,j, k), j=1, inp%NBASIS * inp%NKPOINTS), &
-                                                   i=1, inp%NBASIS * inp%NKPOINTS)
+      read(unit=23, fmt='(*(f15.9))') ((olap_sec%Dij(i,j, k), j=1, NB), &
+                                                            i=1, NB)
     end do
 
     close(unit=23)
