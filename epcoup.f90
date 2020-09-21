@@ -393,6 +393,7 @@ module epcoup
     integer :: nqs, nmodes, nat, naxis
     integer :: time, ik, jk, iband, jband
     complex(kind=q) :: temp
+    logical :: lcoup
 
     ! Initialization
     olap%NBANDS = inp%NBANDS * inp%NKPOINTS
@@ -409,65 +410,92 @@ module epcoup
     allocate(olap_sec%Dij(olap_sec%NBANDS, olap_sec%NBANDS, olap_sec%TSTEPS-1))
     allocate(olap_sec%Eig(olap_sec%NBANDS, olap_sec%TSTEPS-1))
 
-    call readEPC(inp, epc)
-    call phDecomp(inp, epc)
-
-    naxis = 3
-    norm = 0.001
-    allocate(dkq(naxis), dq(naxis))
-
-    do time=1,inp%NSW-1
-      do iband=1,inp%NBANDS
-        do jband=1,inp%NBANDS
-          do ik=1,inp%NKPOINTS
-            do jk=1,inp%NKPOINTS
-              do iq=1,epc%nqpts
-                dkq = epc%kptsepc(jk,:) - epc%kptsepc(ik,:) - epc%qptsepc(iq,:)
-                dkq = (/(ABS(dkq(iaxis)), iaxis=1,naxis)/)
-                if (SUM(dkq)<Norm) then
-                  do jq=1,epc%nqpts
-                    dq = epc%qptsepc(iq,:) - epc%qptsph(jq,:)
-                    dq = (/(ABS(dq(iaxis)), iaxis=1,naxis)/)
-                    if (SUM(dq)<Norm) then
-                      temp = (0.0, 0.0)
-                      do imode=1,epc%nmodes
-                        temp = temp + epc%phproj(time, imode, jq) * &
-                               epc%epmat(iband, jband, ik, imode, iq)
-                      end do
-                      olap%Dij(inp%NBANDS*(ik-1)+iband, jband+inp%NBANDS*(jk-1), time) = temp
-                    end if
-                  end do
-                end if
+    inquire(file='COUPCAR', exist=lcoup)
+    if (lcoup) then
+      ! file containing couplings exists, then read it
+      if (inp%LCPTXT) then
+        call readNaEig(olap_sec, inp)
+      else
+        call CoupFromFile(olap)
+        call copyToSec(olap, olap_sec, inp)
+        call writeNaEig(olap_sec, inp)
+      end if
+    else
+      call readEPC(inp, epc)
+      call phDecomp(inp, epc)
+     
+      naxis = 3
+      norm = 0.001
+      allocate(dkq(naxis), dq(naxis))
+     
+      do time=1,inp%NSW-199
+        do iband=1,inp%NBANDS
+          do jband=1,inp%NBANDS
+            do ik=1,inp%NKPOINTS
+              do jk=1,inp%NKPOINTS
+                do iq=1,epc%nqpts
+                  dkq = epc%kptsepc(jk,:) - epc%kptsepc(ik,:) - epc%qptsepc(iq,:)
+                  dkq = (/(ABS(dkq(iaxis)), iaxis=1,naxis)/)
+                  if (SUM(dkq)<Norm) then
+                    write(*,'(3I4)') ik, jk, iq
+                    write(*,'(6f12.7)') epc%kptsepc(ik,:),epc%kptsepc(jk,:)
+                    write(*,'(6f12.7)') epc%qptsepc(iq,:)
+                    do jq=1,epc%nqpts
+                      dq = epc%qptsepc(iq,:) - epc%qptsph(jq,:)
+                      dq = (/(ABS(dq(iaxis)), iaxis=1,naxis)/)
+                      if (SUM(dq)<Norm) then
+                        write(*,'(I4, 3f10.6)') jq, epc%qptsph(jq,:)
+                        write(*,*)
+                        temp = (0.0, 0.0)
+                        do imode=1,epc%nmodes
+                          temp = temp + epc%phproj(time, imode, jq) * &
+                                 epc%epmat(iband, jband, ik, imode, iq)
+                        end do
+                        olap%Dij(inp%NBANDS*(ik-1)+iband, jband+inp%NBANDS*(jk-1), time) = temp
+                      end if
+                    end do
+                  end if
+                end do
               end do
             end do
           end do
         end do
       end do
-    end do
-
-    do iband=1,inp%NBANDS
-      do ik=1,inp%NKPOINTS
-        olap%Eig(iband+inp%NBANDS*(ik-1),:) = epc%energy(ik,iband)
-      enddo
-    enddo
-
-    do iband=1,inp%BMAX-inp%BMIN+1
-      do jband=1,inp%BMAX-inp%BMIN+1
+     
+      do iband=1,inp%NBANDS
         do ik=1,inp%NKPOINTS
-          olap_sec%Eig(iband+inp%NBASIS*(ik-1),:) = olap%Eig((iband+inp%BMIN-1)+inp%NBANDS*(ik-1),:)
-          do jk=1,inp%NKPOINTS
-            olap_sec%Dij(iband+inp%NBASIS*(ik-1), jband+inp%NBASIS*(jk-1), :) &
-            = olap%Dij((iband+inp%BMIN-1)+inp%NBANDS*(ik-1), (jband+inp%BMIN-1)+inp%NBANDS*(jk-1), :)
-          end do
-        end do
+          olap%Eig(iband+inp%NBANDS*(ik-1),:) = epc%energy(ik,iband)
+        enddo
       enddo
-    enddo
-
-    ! After reading, write the couplings to disk
-    call CoupToFile(olap)
-    call writeNaEig(olap_sec, inp)
-    call readNaEig(olap_sec, inp)
+     
+      call copyToSec(olap, olap_sec, inp)
+      call CoupToFile(olap)
+      call writeNaEig(olap_sec, inp)
+    end if
 
   end subroutine TDepCoupIJ
+
+  subroutine copyToSec(olap, olap_sec, inp)
+    implicit none
+    type(overlap), intent(inout) :: olap_sec
+    type(overlap), intent(in) :: olap
+    type(namdInfo), intent(in) :: inp
+
+    integer :: ik, jk, NB, NBas
+
+    NB = inp%NBANDS
+    NBas = inp%NBASIS
+    do ik=1,inp%NKPOINTS
+      olap_sec%Eig((ik-1)*NBas+1:ik*NBas, :) = &
+      olap%Eig((ik-1)*NB+inp%BMIN:(ik-1)*NB+inp%BMAX, :)
+      do jk=1,inp%NKPOINTS
+        olap_sec%Dij((ik-1)*NBas+1:ik*NBas,(jk-1)*NBas+1:jk*NBas, :) = &
+        olap%Dij((ik-1)*NB+inp%BMIN:(ik-1)*NB+inp%BMAX, &
+                 (jk-1)*NB+inp%BMIN:(jk-1)*NB+inp%BMAX, :)
+      end do
+    end do
+
+  end subroutine copyToSec
+
 
 end module epcoup
