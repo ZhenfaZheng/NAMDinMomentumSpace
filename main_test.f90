@@ -18,6 +18,8 @@ Program main
 
   call getUserInp(inp)
   call TDepCoupIJ(olap, olap_sec, inp, epc)
+  !call readEPC(inp, epc)
+  !call phDecomp(inp, epc)
 
 
 end Program

@@ -156,6 +156,8 @@ module epcoup
     character(len=255) :: filphmodes, fmtDISPL
     character(len=24) :: charac, bra, ket
     complex(kind=DP) :: temp
+    real(kind=DP), allocatable, dimension(:) :: qpt
+    real(kind=DP), allocatable, dimension(:,:) :: at
 
     filphmodes = 'graphene.matdyn.modes'
 
@@ -172,12 +174,19 @@ module epcoup
     allocate(epc%phmodes(nqs, nmodes, nat, naxis))
     allocate(epc%qptsph(nqs, naxis))
     allocate(epc%freq(nqs, nmodes))
+    allocate(qpt(naxis), at(naxis, naxis))
+
+    at = epc%cellepc(1:naxis,1:naxis) / epc%cellepc(1,1)
+    ! write(*,'(3f12.7)') ((at(i,iaxis),i=1,3), iaxis=1,3)
 
     do iq=1,nqs
       read(unit=909, fmt=*)
       read(unit=909, fmt=*)
-      read(unit=909, fmt=9019) charac, (epc%qptsph(iq, iaxis), &
-                                                iaxis=1,naxis)
+      read(unit=909, fmt=9019) charac, (qpt(iaxis), iaxis=1,naxis)
+      do iaxis=1,naxis
+        epc%qptsph(iq,iaxis) = at(iaxis,1)*qpt(1) + at(iaxis,2)*qpt(2) &
+                             + at(iaxis,3)*qpt(3)
+      end do
       ! write(*, 9019) charac, epc%qptsph(iq,:)
       read(unit=909, fmt=*)
       do imode=1,nmodes
@@ -421,39 +430,48 @@ module epcoup
         call writeNaEig(olap_sec, inp)
       end if
     else
+
+      write(*,'(A)') "------------------------------------------------------------"
+      write(*,*) "Calculating couplings from e-p matrix..."
+
       call readEPC(inp, epc)
       call phDecomp(inp, epc)
      
       naxis = 3
-      norm = 0.001
+      norm = 0.01
       allocate(dkq(naxis), dq(naxis))
      
-      do time=1,inp%NSW-199
+      do time=1,inp%NSW-1
         do iband=1,inp%NBANDS
           do jband=1,inp%NBANDS
             do ik=1,inp%NKPOINTS
               do jk=1,inp%NKPOINTS
                 do iq=1,epc%nqpts
-                  dkq = epc%kptsepc(jk,:) - epc%kptsepc(ik,:) - epc%qptsepc(iq,:)
-                  dkq = (/(ABS(dkq(iaxis)), iaxis=1,naxis)/)
+                  dkq = epc%kptsepc(ik,:) - epc%kptsepc(jk,:) - epc%qptsepc(iq,:)
+                  do iaxis=1,naxis
+                    dkq(iaxis) = ABS(dkq(iaxis)-NINT(dkq(iaxis)))
+                  end do
                   if (SUM(dkq)<Norm) then
-                    write(*,'(3I4)') ik, jk, iq
-                    write(*,'(6f12.7)') epc%kptsepc(ik,:),epc%kptsepc(jk,:)
-                    write(*,'(6f12.7)') epc%qptsepc(iq,:)
                     do jq=1,epc%nqpts
                       dq = epc%qptsepc(iq,:) - epc%qptsph(jq,:)
-                      dq = (/(ABS(dq(iaxis)), iaxis=1,naxis)/)
+                      do iaxis=1,naxis
+                        dq(iaxis) = ABS(dq(iaxis)-NINT(dq(iaxis)))
+                      end do
                       if (SUM(dq)<Norm) then
-                        write(*,'(I4, 3f10.6)') jq, epc%qptsph(jq,:)
-                        write(*,*)
                         temp = (0.0, 0.0)
                         do imode=1,epc%nmodes
                           temp = temp + epc%phproj(time, imode, jq) * &
                                  epc%epmat(iband, jband, ik, imode, iq)
                         end do
                         olap%Dij(inp%NBANDS*(ik-1)+iband, jband+inp%NBANDS*(jk-1), time) = temp
+                        exit
+                      else if (jq==epc%nqpts .and. SUM(dq)>Norm) then
+                        write(*,'(A)') "Not matched jq point!!!"
                       end if
                     end do
+                    exit
+                  else if (iq==epc%nqpts .and. SUM(dkq)>Norm) then
+                    write(*,'(A)') "Not matched q point!!!"
                   end if
                 end do
               end do
@@ -467,10 +485,14 @@ module epcoup
           olap%Eig(iband+inp%NBANDS*(ik-1),:) = epc%energy(ik,iband)
         enddo
       enddo
+
+      write(*,*) "Done..."
+      write(*,'(A)') "------------------------------------------------------------"
      
       call copyToSec(olap, olap_sec, inp)
       call CoupToFile(olap)
       call writeNaEig(olap_sec, inp)
+
     end if
 
   end subroutine TDepCoupIJ
