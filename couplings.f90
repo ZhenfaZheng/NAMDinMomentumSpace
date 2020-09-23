@@ -225,13 +225,13 @@ module couplings
 
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
     ! Initialization
-    olap%NBANDS = inp%NBANDS * inp%NKPOINTS
+    olap%NBANDS = inp%NBANDS
     olap%TSTEPS = inp%NSW
     olap%dt = inp%POTIM
     allocate(olap%Dij(olap%NBANDS, olap%NBANDS, olap%TSTEPS-1))
     allocate(olap%Eig(olap%NBANDS, olap%TSTEPS-1))
 
-    olap_sec%NBANDS = inp%NBASIS * inp%NKPOINTS
+    olap_sec%NBANDS = inp%NBASIS
     olap_sec%TSTEPS = inp%NSW
     olap_sec%dt = inp%POTIM
     allocate(olap_sec%Dij(olap_sec%NBANDS, olap_sec%NBANDS, olap_sec%TSTEPS-1))
@@ -306,8 +306,8 @@ module couplings
     open(unit=22, file='EIGTXT', status='unknown', action='write')
     open(unit=23, file='NATXT', status='unknown', action='write')
 
-    N = inp%NSW - 1
-    NB = inp%NBASIS * inp%NKPOINTS
+    NB = olap_sec%NBANDS
+    N  = olap_sec%TSTEPS - 1
     do j=1, N
       write(unit=22, fmt='(*(f12.6))') (olap_sec%Eig(i,j), i=1, NB)
     end do
@@ -338,8 +338,8 @@ module couplings
       stop
     end if
 
-    N = inp%NSW - 1
-    NB = inp%NBASIS * inp%NKPOINTS
+    NB = olap_sec%NBANDS
+    N  = olap_sec%TSTEPS - 1
     do j=1, N
       read(unit=22, fmt=*) (olap_sec%Eig(i,j), i=1, NB)
     end do
