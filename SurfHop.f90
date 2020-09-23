@@ -84,7 +84,9 @@ module shop
     else
       do i=1, ks%ndim
         dE = ks%eigKs(i,tion) - ks%eigKs(cstat, tion)
-        if (dE>0) then
+        if (ks%eigKs(i,tion)<-2.0) then
+          ks%sh_prop(i,tion) = 0.0
+        else if (dE>0) then
           ks%sh_prop(i,tion) = ks%sh_prop(i,tion) * exp(-dE / kbT)
         end if
       end do
@@ -168,6 +170,7 @@ module shop
       write(io,'(A,A12,A3,L5)') '#', 'LSHP',     ' = ', inp%LSHP
       write(io,'(A,A12,A3,L5)') '#', 'LCPTXT',   ' = ', inp%LCPTXT
       write(io,'(A,A12,A3,L5)') '#', 'LGAMMA',   ' = ', inp%LGAMMA
+      write(io,'(A,A12,A3,L5)') '#', 'LEPC',     ' = ', inp%LEPC
       write(io,'(A,A12,A3,A)')  '#', 'RUNDIR',   ' = ', TRIM(ADJUSTL(inp%rundir))
     end do
 

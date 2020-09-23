@@ -34,6 +34,9 @@ module fileio
     ! NA coupling = <psi_i(t)| d/dt |(psi_j(t))>
     logical :: LGAMMA
 
+    ! whether to use e-p matrix as NA couplings
+    logical :: LEPC
+
     ! running directories
     character(len=256) :: RUNDIR
     character(len=256) :: TBINIT
@@ -68,6 +71,7 @@ module fileio
       logical :: lshp
       logical :: lcpext
       logical :: lgamma
+      logical :: lepc
       ! running directories
       character(len=256) :: rundir
       character(len=256) :: tbinit
@@ -77,8 +81,8 @@ module fileio
                           nbands, nkpoints,   &
                           potim, ntraj, nelm, &
                           temp, rundir,       &
-                          lhole, lshp,        &
-                          lcpext, lgamma,     &
+                          lhole, lshp, lcpext,&
+                          lgamma, lepc,       &
                           namdtime,           &
                           nsample, tbinit
 
@@ -103,6 +107,7 @@ module fileio
       temp = 300.
       lcpext = .FALSE.
       lgamma = .TRUE.
+      lepc = .FALSE.
 
       ! if No. of k-points more than 1, lgamma automatically set to False.
       if ( nkpoints > 1) then
@@ -170,6 +175,7 @@ module fileio
       inp%POTIM    = potim
       inp%LCPTXT   = lcpext
       inp%LGAMMA   = lgamma
+      inp%LEPC     = lepc
       inp%TEMP     = temp
     end subroutine
 
@@ -198,6 +204,7 @@ module fileio
       write(*,'(A30,A3,L5)') 'LSHP',     ' = ', inp%LSHP
       write(*,'(A30,A3,L5)') 'LCPTXT',   ' = ', inp%LCPTXT
       write(*,'(A30,A3,L5)') 'LGAMMA',   ' = ', inp%LGAMMA
+      write(*,'(A30,A3,L5)') 'LEPC',     ' = ', inp%LEPC
       write(*,'(A30,A3,A)')  'RUNDIR',   ' = ', TRIM(ADJUSTL(inp%rundir))
 
       write(*,'(A)') "------------------------------------------------------------"
