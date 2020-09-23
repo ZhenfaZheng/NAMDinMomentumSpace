@@ -10,11 +10,13 @@ module fileio
     integer :: NBANDS      ! No. of band of the system
     integer :: NKPOINTS    ! No. of k-points of the system
     integer :: INIBAND     ! inititial adiabatic state of excited electron/hole
+    integer :: INIKPT      ! inititial k point of excited electron/hole
     integer :: NSW         ! No. of MD steps
     integer :: NAMDTINI    ! Initial time step of NAMD
     integer :: NAMDTIME    ! No. of steps of NAMD
     integer, allocatable, dimension(:) :: NAMDTINI_A    ! No. of steps of NAMD
     integer, allocatable, dimension(:) :: INIBAND_A     ! No. of steps of NAMD
+    integer, allocatable, dimension(:) :: INIKPT_A      ! No. of steps of NAMD
     integer :: NTRAJ       ! No. of surface hopping trajectories
     integer :: NELM        ! No. of steps of electron wave propagation
     integer :: NSAMPLE     ! No. of steps of electron wave propagation
@@ -109,11 +111,6 @@ module fileio
       lgamma = .TRUE.
       lepc = .FALSE.
 
-      ! if No. of k-points more than 1, lgamma automatically set to False.
-      if ( nkpoints > 1) then
-          lgamma = .FALSE.
-      end if
-
       open(file="inp", unit=8, status='unknown', action='read', iostat=ierr)
       if ( ierr /= 0 ) then
         write(*,*) "I/O error with input file: 'inp'"
@@ -122,15 +119,29 @@ module fileio
       read(unit=8, nml=NAMDPARA)
       close(unit=8)
 
+      ! if No. of k-points more than 1, lgamma automatically set to False.
+      if ( nkpoints > 1) then
+          lgamma = .FALSE.
+      end if
+
       allocate(inp%INIBAND_A(nsample), inp%NAMDTINI_A(nsample))
+      allocate(inp%INIKPT_A(nsample))
+
       inquire(file=tbinit, exist=lext)
       if (.NOT. lext) then
         write(*,*) "File containing initial conditions does NOT exist!"
       else
         open(unit=9, file=tbinit, action='read')
-        do i=1, nsample
-          read(unit=9,fmt=*) inp%NAMDTINI_A(i), inp%INIBAND_A(i)
-        end do
+        if (lepc) then
+          do i=1, nsample
+            read(unit=9,fmt=*) inp%NAMDTINI_A(i), inp%INIBAND_A(i), inp%INIKPT_A(i)
+          end do
+        else
+          inp%INIKPT_A = 1
+          do i=1, nsample
+            read(unit=9,fmt=*) inp%NAMDTINI_A(i), inp%INIBAND_A(i)
+          end do
+        end if
         close(9)
       end if
 
@@ -163,7 +174,7 @@ module fileio
       inp%NBASIS   = bmax - bmin + 1
       inp%NSW      = nsw
       inp%NBANDS   = nbands
-      inp%NKPOINTS   = nkpoints
+      inp%NKPOINTS = nkpoints
       inp%NAMDTIME = namdtime
       inp%NTRAJ    = ntraj
       inp%NELM     = nelm
@@ -188,6 +199,7 @@ module fileio
       write(*,'(A30,A3,I5)') 'BMIN',     ' = ', inp%BMIN
       write(*,'(A30,A3,I5)') 'BMAX',     ' = ', inp%BMAX
       write(*,'(A30,A3,I5)') 'INIBAND',  ' = ', inp%INIBAND
+      write(*,'(A30,A3,I5)') 'INIKPT',   ' = ', inp%INIKPT
       write(*,'(A30,A3,I5)') 'NBANDS',   ' = ', inp%NBANDS
       write(*,'(A30,A3,I5)') 'NKPOINTS', ' = ', inp%NKPOINTS
 

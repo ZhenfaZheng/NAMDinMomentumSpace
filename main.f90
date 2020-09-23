@@ -45,6 +45,7 @@ Program main
   do ns=1, inp%NSAMPLE
     inp%NAMDTINI = inp%NAMDTINI_A(ns)
     inp%INIBAND  = inp%INIBAND_A(ns)
+    inp%INIKPT  = inp%INIKPT_A(ns)
     call printUserInp(inp)
     ! initiate KS matrix
     call cpu_time(start)

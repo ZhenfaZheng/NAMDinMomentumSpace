@@ -89,7 +89,7 @@ module hamil
     ! ks%ham_c = cero
     ! ks%ham_p = cero
     ! ks%ham_n = cero
-    ks%psi_c(inp%INIBAND - inp%BMIN + 1) = uno
+    ks%psi_c((inp%INIKPT-1)*inp%NBASIS + inp%INIBAND - inp%BMIN + 1) = uno
 
     do i=1, inp%NAMDTIME
       ! We don't need all the information, only a section of it
