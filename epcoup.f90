@@ -12,6 +12,10 @@ module epcoup
     !! atom number of each md cell atom in phonon cell
     integer, allocatable, dimension(:,:) :: R
     !! cell numbers for each atoms of md cell
+    integer, allocatable, dimension(:) :: qqmap
+    !! map q points in phonon calculation to q points in e-p calcultion.
+    integer, allocatable, dimension(:,:,:) :: kkqmap
+    !! map ik & jk of electronic states to q or -q of e-p matrix.
     real(kind=DP), allocatable, dimension(:,:) :: cellepc
     real(kind=DP), allocatable, dimension(:,:) :: kptsepc
     real(kind=DP), allocatable, dimension(:,:) :: qptsepc
@@ -388,6 +392,54 @@ module epcoup
 
   end subroutine phDecomp
 
+  subroutine kqMatch(epc)
+    implicit none
+
+    type(epCoupling), intent(inout) :: epc
+
+    real(kind=DP) :: Norm
+    real(kind=DP) :: dkq1(3), dkq2(3), dq(3)
+    integer :: ik, jk, iq, jq, iaxis, naxis
+
+    naxis = 3
+    Norm = 0.001
+
+    allocate(epc%kkqmap(epc%nkpts,epc%nkpts,2), epc%qqmap(epc%nqpts))
+
+    epc%kkqmap = -1
+    epc%qqmap = -1
+
+    do ik=1,epc%nkpts
+      do jk=1,epc%nkpts
+        do iq=1,epc%nqpts
+          dkq1 = epc%kptsepc(ik,:) - epc%kptsepc(jk,:) - epc%qptsepc(iq,:)
+          dkq2 = epc%kptsepc(ik,:) - epc%kptsepc(jk,:) + epc%qptsepc(iq,:)
+          do iaxis=1,naxis
+            dkq1(iaxis) = ABS(dkq1(iaxis)-NINT(dkq1(iaxis)))
+            dkq2(iaxis) = ABS(dkq2(iaxis)-NINT(dkq2(iaxis)))
+          end do
+          if (SUM(dkq1)<Norm) epc%kkqmap(ik,jk,1) = iq
+          if (SUM(dkq2)<Norm) epc%kkqmap(ik,jk,2) = iq
+          if (epc%kkqmap(ik,jk,1)>0 .and. epc%kkqmap(ik,jk,2)>0) exit
+        end do
+      end do
+    end do
+
+    do iq=1,epc%nqpts
+      do jq=1,epc%nqpts
+        dq = epc%qptsepc(iq,:) - epc%qptsph(jq,:)
+        do iaxis=1,naxis
+          dq(iaxis) = ABS(dq(iaxis)-NINT(dq(iaxis)))
+        end do
+        if (SUM(dq)<Norm) then
+          epc%qqmap(iq) = jq
+          exit
+        end if
+      end do
+    end do
+
+  end subroutine kqMatch
+
   subroutine TDepCoupIJ(olap, olap_sec, inp, epc)
     implicit none
 
@@ -396,9 +448,9 @@ module epcoup
     type(overlap), intent(inout) :: olap
     type(overlap), intent(inout) :: olap_sec
 
-    real(kind=DP) :: proj, norm
+    real(kind=DP) :: proj, norm, phn1, phn2
     real(kind=DP), allocatable, dimension(:) :: dkq, dq
-    integer :: iq, jq, imode, iatom, iaxis
+    integer :: iq, jq1, jq2, imode, iatom, iaxis
     integer :: nqs, nmodes, nat, naxis
     integer :: time, ik, jk, iband, jband
     complex(kind=q) :: temp
@@ -436,44 +488,36 @@ module epcoup
 
       call readEPC(inp, epc)
       call phDecomp(inp, epc)
+      call kqMatch(epc)
      
       naxis = 3
       norm = 0.01
       allocate(dkq(naxis), dq(naxis))
      
       do time=1,inp%NSW-1
-        do iband=1,inp%NBANDS
-          do jband=1,inp%NBANDS
-            do ik=1,inp%NKPOINTS
-              do jk=1,inp%NKPOINTS
-                do iq=1,epc%nqpts
-                  dkq = epc%kptsepc(ik,:) - epc%kptsepc(jk,:) - epc%qptsepc(iq,:)
-                  do iaxis=1,naxis
-                    dkq(iaxis) = ABS(dkq(iaxis)-NINT(dkq(iaxis)))
-                  end do
-                  if (SUM(dkq)<Norm) then
-                    do jq=1,epc%nqpts
-                      dq = epc%qptsepc(iq,:) - epc%qptsph(jq,:)
-                      do iaxis=1,naxis
-                        dq(iaxis) = ABS(dq(iaxis)-NINT(dq(iaxis)))
-                      end do
-                      if (SUM(dq)<Norm) then
-                        temp = (0.0, 0.0)
-                        do imode=1,epc%nmodes
-                          temp = temp + epc%phproj(time, imode, jq) * &
-                                 epc%epmat(iband, jband, ik, imode, iq)
-                        end do
-                        olap%Dij(inp%NBANDS*(ik-1)+iband, jband+inp%NBANDS*(jk-1), time) = temp
-                        exit
-                      else if (jq==epc%nqpts .and. SUM(dq)>Norm) then
-                        write(*,'(A)') "Not matched jq point!!!"
-                      end if
-                    end do
-                    exit
-                  else if (iq==epc%nqpts .and. SUM(dkq)>Norm) then
-                    write(*,'(A)') "Not matched q point!!!"
-                  end if
+        do iband=1,inp%NBANDS-0
+          do jband=1,inp%NBANDS-0
+            do ik=1,inp%NKPOINTS-0
+              do jk=1,inp%NKPOINTS-0
+
+                iq = epc%kkqmap(ik,jk,1)
+                if (iq<0) exit
+
+                temp = (0.0, 0.0)
+                jq1 = epc%qqmap(epc%kkqmap(ik,jk,1)) ! ik-jk =  q
+                jq2 = epc%qqmap(epc%kkqmap(ik,jk,2)) ! ik-jk = -q
+
+                do imode=1,epc%nmodes
+                  phn1 = ABS(epc%phproj(time, imode, jq1))
+                  phn2 = ABS(epc%phproj(time, imode, jq2))
+                  temp = temp + ( SQRT(phn1) + SQRT(phn2+1) ) &
+                              * epc%epmat(iband, jband, jk, imode, iq)
                 end do
+
+                temp = temp / SQRT(1.0 * epc%natmd / epc%natepc) &
+                       * 2 * inp%POTIM * imgUnit / hbar
+                olap%Dij(inp%NBANDS*(ik-1)+iband, jband+inp%NBANDS*(jk-1), time) = temp
+
               end do
             end do
           end do
