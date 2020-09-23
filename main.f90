@@ -3,6 +3,7 @@ Program main
   use lattice
   use wavecar
   use couplings
+  use epcoup
   use hamil
   use shop
   use fileio
@@ -13,6 +14,7 @@ Program main
   type(namdInfo) :: inp
   type(TDKS) :: ks
   type(overlap) :: olap, olap_sec
+  type(epCoupling) :: epc
 
   real(kind=q) :: start, fin
   integer :: ns
@@ -33,7 +35,11 @@ Program main
   ! we may skip the huge binary file and read the plain text file instead. This
   ! is done in the subroutine 'initTDKS'.
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  call TDCoupIJ(trim(inp%rundir), olap, olap_sec, inp)
+  if (inp%LEPC) then
+    call TDepCoupIJ(olap, olap_sec, inp, epc)
+  else
+    call TDCoupIJ(trim(inp%rundir), olap, olap_sec, inp)
+  end if
   ! write(*,*) "T_coup: ", fin - start
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   do ns=1, inp%NSAMPLE
