@@ -33,6 +33,7 @@ module epcoup
 
   contains
 
+
   subroutine readEPC(inp, epc)
     ! Read informations about e-p couplings from .epc file.
     ! Including cell for epc, k, q points, eigen energies and e-p matrix.
@@ -44,7 +45,7 @@ module epcoup
 
     integer :: ierr, i, j
     integer :: nb, nk, nm, nq, na
-    integer :: iband, jband, ikpt, imode, iqpt
+    integer :: ib, jb, ik, im, iq
     character(len=72) :: filepc
     
     filepc = 'graphene.epc'
@@ -93,12 +94,12 @@ module epcoup
     enddo
 
     read(unit=90, fmt=*)
-    do iband=1,nb
-      do jband=1,nb
-        do ikpt=1,nk
-          do imode=1,nm
-            do iqpt=1,nq
-              read(unit=90, fmt='(2f15.10)') epc%epmat(iband,jband,ikpt,imode,iqpt)
+    do ib=1,nb
+      do jb=1,nb
+        do ik=1,nk
+          do im=1,nm
+            do iq=1,nq
+              read(unit=90, fmt='(2f15.10)') epc%epmat(ib,jb,ik,im,iq)
             end do
           end do
         end do
@@ -109,6 +110,7 @@ module epcoup
 
   end subroutine readEPC
 
+
   subroutine readEPMat(inp, epc)
     implicit none
 
@@ -117,7 +119,7 @@ module epcoup
 
     integer :: ierr, line
     integer :: nbands, nkpts, nmodes, nqs
-    integer :: iband, jband, ikpt, imode, iq
+    integer :: ib, jb, ik, im, iq
     character(len=255) :: epmdat, hash
 
     epmdat = "epmatwp.dat"
@@ -134,12 +136,12 @@ module epcoup
     read(unit=908, fmt=*) hash, nbands, nkpts, nmodes, nqs
 
     allocate(epc%epmat(nbands, nbands, nkpts, nmodes, nqs))
-    do iband=1,nbands
-      do jband=1,nbands
-        do ikpt=1,nkpts
-          do imode=1,nmodes
+    do ib=1,nbands
+      do jb=1,nbands
+        do ik=1,nkpts
+          do im=1,nmodes
             do iq=1,nqs
-              read(unit=908, fmt=*) epc%epmat(iband, jband, ikpt, imode, iq)
+              read(unit=908, fmt=*) epc%epmat(ib, jb, ik, im, iq)
             end do
           end do
         end do
@@ -148,6 +150,7 @@ module epcoup
 
   end subroutine readEPMat
 
+
   subroutine readPhmodes(inp, epc)
     implicit none
 
@@ -155,8 +158,8 @@ module epcoup
     type(epCoupling), intent(inout) :: epc
 
     integer :: ierr, i
-    integer :: iq, imode, iatom, iaxis
-    integer :: nqs, nmodes, nat, naxis
+    integer :: iq, im, ia, iax
+    integer :: nqs, nmodes, nat
     character(len=255) :: filphmodes, fmtDISPL
     character(len=24) :: charac, bra, ket
     complex(kind=DP) :: temp
@@ -174,33 +177,32 @@ module epcoup
     nat = epc%natepc
     nmodes = epc%nmodes
     nqs = epc%nqpts
-    naxis = 3 ! 3 dimension in xyz space.
-    allocate(epc%phmodes(nqs, nmodes, nat, naxis))
-    allocate(epc%qptsph(nqs, naxis))
+    allocate(epc%phmodes(nqs, nmodes, nat, 3))
+    allocate(epc%qptsph(nqs, 3))
     allocate(epc%freq(nqs, nmodes))
-    allocate(qpt(naxis), at(naxis, naxis))
+    allocate(qpt(3), at(3, 3))
 
-    at = epc%cellepc(1:naxis,1:naxis) / epc%cellepc(1,1)
-    ! write(*,'(3f12.7)') ((at(i,iaxis),i=1,3), iaxis=1,3)
+    at = epc%cellepc(1:3,1:3) / epc%cellepc(1,1)
+    ! write(*,'(3f12.7)') ((at(i,iax),i=1,3), iax=1,3)
 
     do iq=1,nqs
       read(unit=909, fmt=*)
       read(unit=909, fmt=*)
-      read(unit=909, fmt=9019) charac, (qpt(iaxis), iaxis=1,naxis)
-      do iaxis=1,naxis
-        epc%qptsph(iq,iaxis) = at(iaxis,1)*qpt(1) + at(iaxis,2)*qpt(2) &
-                             + at(iaxis,3)*qpt(3)
+      read(unit=909, fmt=9019) charac, (qpt(iax), iax=1,3)
+      do iax=1,3
+        epc%qptsph(iq,iax) = at(iax,1)*qpt(1) + at(iax,2)*qpt(2) &
+                             + at(iax,3)*qpt(3)
       end do
       ! write(*, 9019) charac, epc%qptsph(iq,:)
       read(unit=909, fmt=*)
-      do imode=1,nmodes
-        read(unit=909, fmt=9011) charac, epc%freq(iq, imode)
-        ! write(*,9011) charac, epc%freq(iq, imode)
-        do iatom=1,nat
-          read(unit=909, fmt=9021) bra, (epc%phmodes(iq, imode, iatom, iaxis), &
-                                         iaxis=1,naxis), ket
-          ! write(*, 9021) bra, (epc%phmodes(iq, imode, iatom, iaxis), &
-          !                      iaxis=1,naxis), ket
+      do im=1,nmodes
+        read(unit=909, fmt=9011) charac, epc%freq(iq, im)
+        ! write(*,9011) charac, epc%freq(iq, im)
+        do ia=1,nat
+          read(unit=909, fmt=9021) bra, (epc%phmodes(iq, im, ia, iax), &
+                                         iax=1,3), ket
+          ! write(*, 9021) bra, (epc%phmodes(iq, im, ia, iax), &
+          !                      iax=1,3), ket
         end do
       end do
       read(unit=909, fmt=*)
@@ -212,6 +214,7 @@ module epcoup
 
   end subroutine readPhmodes
 
+
   subroutine readDISPL(inp, epc)
     implicit none
 
@@ -221,8 +224,8 @@ module epcoup
     real(kind=q) :: scal, dr
     real(kind=q), allocatable, dimension(:,:) :: supercell
     character(24) :: filename
-    integer :: ierr, i, iaxis, iatom, time
-    integer :: nat, naxis, mdtime
+    integer :: ierr, i, iax, ia, t
+    integer :: nat, mdtime
 
     mdtime = 200
     filename = 'XDATCAR'
@@ -233,56 +236,55 @@ module epcoup
       stop
     end if
 
-    naxis = 3
-    allocate(supercell(naxis,naxis))
+    allocate(supercell(3,3))
 
     read(unit=33, fmt=*)
     read(unit=33, fmt=*) scal
-    do i=1,naxis
-      read(unit=33, fmt=*) (supercell(i, iaxis), iaxis=1,naxis)
+    do i=1,3
+      read(unit=33, fmt=*) (supercell(i, iax), iax=1,3)
       supercell(i,:) = supercell(i,:) * scal
     end do
     read(unit=33, fmt=*)
     read(unit=33, fmt=*) nat
     epc%natmd = nat
 
-    allocate(epc%displ(mdtime, nat, naxis), &
-             epc%vel(mdtime, nat, naxis))
-    do time=1,mdtime
+    allocate(epc%displ(mdtime, nat, 3), &
+             epc%vel(mdtime, nat, 3))
+    do t=1,mdtime
       read(unit=33, fmt=*)
-      do iatom=1,nat
-        read(unit=33, fmt=*) (epc%displ(time, iatom, iaxis), iaxis=1, naxis)
-        if (time==1) then
-          epc%vel(time,iatom,:) = 0
+      do ia=1,nat
+        read(unit=33, fmt=*) (epc%displ(t, ia, iax), iax=1, 3)
+        if (t==1) then
+          epc%vel(t,ia,:) = 0
         else
           ! Fix atom position if atom moves to other cell.
-          do iaxis=1,naxis
-            dr = epc%displ(time, iatom, iaxis) - epc%displ(time-1, iatom, iaxis)
+          do iax=1,3
+            dr = epc%displ(t, ia, iax) - epc%displ(t-1, ia, iax)
             if (dr>0.9) then
-              epc%displ(time, iatom, iaxis) = epc%displ(time, iatom, iaxis) - 1
+              epc%displ(t, ia, iax) = epc%displ(t, ia, iax) - 1
             else if (dr<-0.9) then
-              epc%displ(time, iatom, iaxis) = epc%displ(time, iatom, iaxis) + 1
+              epc%displ(t, ia, iax) = epc%displ(t, ia, iax) + 1
             endif
           enddo
-          epc%vel(time,iatom,:) &
-          = ( epc%displ(time, iatom, :) - epc%displ(time-1, iatom, :) ) / inp%POTIM
+          epc%vel(t,ia,:) &
+          = ( epc%displ(t, ia, :) - epc%displ(t-1, ia, :) ) / inp%POTIM
         endif
       end do
     end do
 
-    allocate(epc%cellmd(nat+naxis, naxis))
+    allocate(epc%cellmd(nat+3, 3))
     epc%cellmd(:3,:) = supercell
     ! epc%cellmd(4:,:) = epc%displ(1,:,:)
-    do iatom=1,nat
-      do iaxis=1,naxis
-        epc%cellmd(iatom+naxis, iaxis) = SUM(epc%displ(:, iatom, iaxis)) / mdtime
+    do ia=1,nat
+      do iax=1,3
+        epc%cellmd(ia+3, iax) = SUM(epc%displ(:, ia, iax)) / mdtime
       end do
     end do
 
-    do time=1,mdtime
-      do iatom=1,nat
-        epc%displ(time,iatom,:) &
-        = epc%displ(time,iatom,:) - epc%cellmd(iatom+naxis, :)
+    do t=1,mdtime
+      do ia=1,nat
+        epc%displ(t,ia,:) &
+        = epc%displ(t,ia,:) - epc%cellmd(ia+3, :)
       end do
     end do
 
@@ -290,13 +292,13 @@ module epcoup
 
   end subroutine readDISPL
 
+
   subroutine cellPROJ(epc)
     ! Calculate cell numbers for each atom of md cell
     ! Project from phonon cell to md cell.
     implicit none
 
-    integer :: naxis
-    integer :: iaxis, iatom, jatom, i
+    integer :: iax, ia, ja, i
     integer, allocatable, dimension(:) :: N
     !! scale numbers of md cell compared with phonon cell
     real(kind=DP), allocatable, dimension(:) :: dr
@@ -304,25 +306,24 @@ module epcoup
 
     type(epCoupling), intent(inout) :: epc
 
-    naxis = 3
-    allocate(epc%R(epc%natmd,naxis), epc%atnum(epc%natmd), &
-             N(naxis), dr(naxis), temp1(naxis), temp2(naxis))
+    allocate(epc%R(epc%natmd,3), epc%atnum(epc%natmd), &
+             N(3), dr(3), temp1(3), temp2(3))
 
-    do iaxis=1,naxis
-      N(iaxis) = NINT( SUM(epc%cellmd(iaxis,:)) / SUM(epc%cellepc(iaxis,:)) )
+    do iax=1,3
+      N(iax) = NINT( SUM(epc%cellmd(iax,:)) / SUM(epc%cellepc(iax,:)) )
     enddo
 
-    do iatom=1,epc%natmd
+    do ia=1,epc%natmd
       temp1 = 9999.9
-      do jatom=1,epc%natepc
-        dr = epc%cellmd(iatom+naxis,:) * N - epc%cellepc(jatom+naxis,:)
-        do iaxis=1,naxis
-          temp2(iaxis) = ABS( dr(iaxis) - NINT(dr(iaxis)) )
+      do ja=1,epc%natepc
+        dr = epc%cellmd(ia+3,:) * N - epc%cellepc(ja+3,:)
+        do iax=1,3
+          temp2(iax) = ABS( dr(iax) - NINT(dr(iax)) )
         enddo
         if (SUM(temp2)<SUM(temp1)) then
           temp1 = temp2
-          epc%atnum(iatom) = jatom
-          epc%R(iatom,:) = (/(MOD(NINT(dr(i)),N(i)), i=1,naxis)/)
+          epc%atnum(ia) = ja
+          epc%R(ia,:) = (/(MOD(NINT(dr(i)),N(i)), i=1,3)/)
         endif
       enddo
     enddo
@@ -330,6 +331,7 @@ module epcoup
     deallocate(N, dr, temp1, temp2)
 
   end subroutine cellPROJ
+
 
   subroutine phDecomp(inp, epc)
     ! Project the atomic motion from an MD simulation to phonon modes.
@@ -341,56 +343,49 @@ module epcoup
     ! The normal mode coordinate and its derivative.
     complex(kind=DP) :: Q, dQ
     ! The potential and kinetic energies of the normal mode.
-    real(kind=DP) :: U, T
+    real(kind=DP) :: Eu, Ek
     real(kind=DP) :: theta
     real(kind=DP), allocatable, dimension(:) :: displ, vel
-    integer :: iq, imode, iatom, iaxis, time
-    integer :: nqs, nmodes, nat, naxis
+    integer :: iq, im, ia, iax, t
+    integer :: nqs, nmodes, nat
 
     call readPhmodes(inp, epc)
     call readDISPL(inp, epc)
     call cellPROJ(epc)
 
-    naxis = 3
     nmodes = epc%nmodes
     nqs = epc%nqpts
-    allocate(epc%phproj(inp%NSW, nmodes, nqs), displ(naxis), vel(naxis))
+    allocate(epc%phproj(inp%NSW, nmodes, nqs), displ(3), vel(3))
 
-    do time=1,inp%NSW
+    do t=1,inp%NSW
       do iq=1,epc%nqpts
-        do imode=1,epc%nmodes
+        do im=1,epc%nmodes
           Q = (0.0, 0.0)
           dQ = (0.0, 0.0)
-          do iatom=1,epc%natmd
+          do ia=1,epc%natmd
             displ = 0.0; vel = 0.0
-            do iaxis=1,naxis
-              displ = displ + epc%displ(time, iatom, iaxis) * epc%cellmd(iaxis, :) 
-              vel = vel + epc%vel(time, iatom, iaxis) * epc%cellmd(iaxis, :) 
+            do iax=1,3
+              displ = displ + epc%displ(t, ia, iax) * epc%cellmd(iax, :) 
+              vel = vel + epc%vel(t, ia, iax) * epc%cellmd(iax, :) 
             end do
-            theta = 2 * PI * DOT_PRODUCT( epc%qptsph(iq,:), epc%R(iatom,:) )
+            theta = 2 * PI * DOT_PRODUCT( epc%qptsph(iq,:), epc%R(ia,:) )
             Q  =  Q + EXP(imgUnit*theta) * DOT_PRODUCT( &
-                      CONJG(epc%phmodes(iq, imode, epc%atnum(iatom), :)), displ )
+                      CONJG(epc%phmodes(iq, im, epc%atnum(ia), :)), displ )
             dQ = dQ + EXP(imgUnit*theta) * DOT_PRODUCT( &
-                      CONJG(epc%phmodes(iq, imode, epc%atnum(iatom), :)), vel )
+                      CONJG(epc%phmodes(iq, im, epc%atnum(ia), :)), vel )
           end do
           ! mass of C = 12.011
-          U = 0.5 * 12.011 * epc%freq(iq, imode)**2 * CONJG(Q) * Q / epc%natmd &
+          Eu = 0.5 * 12.011 * epc%freq(iq, im)**2 * CONJG(Q) * Q / epc%natmd &
             * 1.66 * 6.2415 / 100000
-          T = 0.5 * 12.011 * CONJG(dQ) * dQ / epc%natmd &
+          Ek = 0.5 * 12.011 * CONJG(dQ) * dQ / epc%natmd &
             * 1.66 * 6.2415 * 10
-          epc%phproj(time, imode, iq) = (U + T) / ( hbar * epc%freq(iq, imode) / 1000 )
-          !if (epc%phproj(time, imode, iq) > 5) then
-          !write(*,'(3I4)') time,iq, imode
-          !write(*,'(4f16.7)') Q,dQ
-          !write(*,'(2f19.10)') U,T
-          !write(*,'(2f15.10)') epc%phproj(time, imode, iq), epc%freq(iq, imode)
-          !write(*,*)
-          !end if
+          epc%phproj(t, im, iq) = (Eu + Ek) / ( hbar * epc%freq(iq, im) / 1000 )
         end do
       end do
     end do
 
   end subroutine phDecomp
+
 
   subroutine kqMatch(epc)
     implicit none
@@ -399,9 +394,8 @@ module epcoup
 
     real(kind=DP) :: norm
     real(kind=DP) :: dkq1(3), dkq2(3), dq(3)
-    integer :: ik, jk, iq, jq, iaxis, naxis
+    integer :: ik, jk, iq, jq, iax
 
-    naxis = 3
     norm = 0.005
     ! If k1-k2 < norm, recognize k1 and k2 as same k point.
     ! So, number of kx, ky, kz or qx, qy, qz must not supass 1/norm = 200
@@ -416,9 +410,9 @@ module epcoup
         do iq=1,epc%nqpts
           dkq1 = epc%kptsepc(ik,:) - epc%kptsepc(jk,:) - epc%qptsepc(iq,:)
           dkq2 = epc%kptsepc(ik,:) - epc%kptsepc(jk,:) + epc%qptsepc(iq,:)
-          do iaxis=1,naxis
-            dkq1(iaxis) = ABS(dkq1(iaxis)-NINT(dkq1(iaxis)))
-            dkq2(iaxis) = ABS(dkq2(iaxis)-NINT(dkq2(iaxis)))
+          do iax=1,3
+            dkq1(iax) = ABS(dkq1(iax)-NINT(dkq1(iax)))
+            dkq2(iax) = ABS(dkq2(iax)-NINT(dkq2(iax)))
           end do
           if (SUM(dkq1)<norm) epc%kkqmap(ik,jk,1) = iq
           if (SUM(dkq2)<norm) epc%kkqmap(ik,jk,2) = iq
@@ -430,8 +424,8 @@ module epcoup
     do iq=1,epc%nqpts
       do jq=1,epc%nqpts
         dq = epc%qptsepc(iq,:) - epc%qptsph(jq,:)
-        do iaxis=1,naxis
-          dq(iaxis) = ABS(dq(iaxis)-NINT(dq(iaxis)))
+        do iax=1,3
+          dq(iax) = ABS(dq(iax)-NINT(dq(iax)))
         end do
         if (SUM(dq)<norm) then
           epc%qqmap(iq) = jq
@@ -441,6 +435,7 @@ module epcoup
     end do
 
   end subroutine kqMatch
+
 
   subroutine TDepCoupIJ(olap, olap_sec, inp, epc)
     implicit none
@@ -452,9 +447,9 @@ module epcoup
 
     real(kind=DP) :: proj, norm, phn
     real(kind=DP), allocatable, dimension(:) :: dkq, dq
-    integer :: iq, jq1, jq2, imode, iatom, iaxis
-    integer :: nqs, nmodes, nat, naxis
-    integer :: time, ik, jk, iband, jband
+    integer :: iq, jq1, jq2, im
+    integer :: nqs, nmodes, nat
+    integer :: t, ik, jk, ib, jb
     complex(kind=q) :: temp
     logical :: lcoup
 
@@ -492,14 +487,13 @@ module epcoup
       call phDecomp(inp, epc)
       call kqMatch(epc)
      
-      naxis = 3
-      allocate(dkq(naxis), dq(naxis))
+      allocate(dkq(3), dq(3))
      
-      do time=1,inp%NSW-1
-        do iband=1,inp%NBANDS-0
-          do jband=1,inp%NBANDS-0
-            do ik=1,inp%NKPOINTS-0
-              do jk=1,inp%NKPOINTS-0
+      do t=1,inp%NSW-1
+        do ib=1,inp%NBANDS
+          do jb=1,inp%NBANDS
+            do ik=1,inp%NKPOINTS
+              do jk=1,inp%NKPOINTS
 
                 iq = epc%kkqmap(ik,jk,1)
 
@@ -510,22 +504,22 @@ module epcoup
                   jq2 = epc%qqmap(epc%kkqmap(ik,jk,2)) ! ik-jk = -q
 
                   if (jq1>0) then
-                    do imode=1,epc%nmodes
-                      phn = ABS(epc%phproj(time, imode, jq1))
-                      temp = temp + SQRT(phn) * epc%epmat(iband, jband, jk, imode, iq)
+                    do im=1,epc%nmodes
+                      phn = ABS(epc%phproj(t, im, jq1))
+                      temp = temp + SQRT(phn) * epc%epmat(ib, jb, jk, im, iq)
                     end do
                   end if
                  
                   if (jq2>0) then
-                    do imode=1,epc%nmodes
-                      phn = ABS(epc%phproj(time, imode, jq2))
-                      temp = temp + SQRT(phn+1) * epc%epmat(iband, jband, jk, imode, iq)
+                    do im=1,epc%nmodes
+                      phn = ABS(epc%phproj(t, im, jq2))
+                      temp = temp + SQRT(phn+1) * epc%epmat(ib, jb, jk, im, iq)
                     end do
                   end if
                  
                   temp = temp / SQRT(1.0 * epc%natmd / epc%natepc) &
                          * 2 * inp%POTIM * imgUnit / hbar
-                  olap%Dij(inp%NBANDS*(ik-1)+iband, jband+inp%NBANDS*(jk-1), time) = temp
+                  olap%Dij(inp%NBANDS*(ik-1)+ib, jb+inp%NBANDS*(jk-1), t) = temp
 
                 end if
 
@@ -535,9 +529,9 @@ module epcoup
         end do
       end do
      
-      do iband=1,inp%NBANDS
+      do ib=1,inp%NBANDS
         do ik=1,inp%NKPOINTS
-          olap%Eig(iband+inp%NBANDS*(ik-1),:) = epc%energy(ik,iband)
+          olap%Eig(ib+inp%NBANDS*(ik-1),:) = epc%energy(ik,ib)
         enddo
       enddo
 
@@ -551,6 +545,7 @@ module epcoup
     end if
 
   end subroutine TDepCoupIJ
+
 
   subroutine copyToSec(olap, olap_sec, inp)
     implicit none
