@@ -397,12 +397,14 @@ module epcoup
 
     type(epCoupling), intent(inout) :: epc
 
-    real(kind=DP) :: Norm
+    real(kind=DP) :: norm
     real(kind=DP) :: dkq1(3), dkq2(3), dq(3)
     integer :: ik, jk, iq, jq, iaxis, naxis
 
     naxis = 3
-    Norm = 0.001
+    norm = 0.005
+    ! If k1-k2 < norm, recognize k1 and k2 as same k point.
+    ! So, number of kx, ky, kz or qx, qy, qz must not supass 1/norm = 200
 
     allocate(epc%kkqmap(epc%nkpts,epc%nkpts,2), epc%qqmap(epc%nqpts))
 
@@ -418,8 +420,8 @@ module epcoup
             dkq1(iaxis) = ABS(dkq1(iaxis)-NINT(dkq1(iaxis)))
             dkq2(iaxis) = ABS(dkq2(iaxis)-NINT(dkq2(iaxis)))
           end do
-          if (SUM(dkq1)<Norm) epc%kkqmap(ik,jk,1) = iq
-          if (SUM(dkq2)<Norm) epc%kkqmap(ik,jk,2) = iq
+          if (SUM(dkq1)<norm) epc%kkqmap(ik,jk,1) = iq
+          if (SUM(dkq2)<norm) epc%kkqmap(ik,jk,2) = iq
           if (epc%kkqmap(ik,jk,1)>0 .and. epc%kkqmap(ik,jk,2)>0) exit
         end do
       end do
@@ -431,7 +433,7 @@ module epcoup
         do iaxis=1,naxis
           dq(iaxis) = ABS(dq(iaxis)-NINT(dq(iaxis)))
         end do
-        if (SUM(dq)<Norm) then
+        if (SUM(dq)<norm) then
           epc%qqmap(iq) = jq
           exit
         end if
@@ -448,7 +450,7 @@ module epcoup
     type(overlap), intent(inout) :: olap
     type(overlap), intent(inout) :: olap_sec
 
-    real(kind=DP) :: proj, norm, phn1, phn2
+    real(kind=DP) :: proj, norm, phn
     real(kind=DP), allocatable, dimension(:) :: dkq, dq
     integer :: iq, jq1, jq2, imode, iatom, iaxis
     integer :: nqs, nmodes, nat, naxis
@@ -491,7 +493,6 @@ module epcoup
       call kqMatch(epc)
      
       naxis = 3
-      norm = 0.01
       allocate(dkq(naxis), dq(naxis))
      
       do time=1,inp%NSW-1
@@ -501,22 +502,32 @@ module epcoup
               do jk=1,inp%NKPOINTS-0
 
                 iq = epc%kkqmap(ik,jk,1)
-                if (iq<0) exit
 
-                temp = (0.0, 0.0)
-                jq1 = epc%qqmap(epc%kkqmap(ik,jk,1)) ! ik-jk =  q
-                jq2 = epc%qqmap(epc%kkqmap(ik,jk,2)) ! ik-jk = -q
+                if (iq>0) then
 
-                do imode=1,epc%nmodes
-                  phn1 = ABS(epc%phproj(time, imode, jq1))
-                  phn2 = ABS(epc%phproj(time, imode, jq2))
-                  temp = temp + ( SQRT(phn1) + SQRT(phn2+1) ) &
-                              * epc%epmat(iband, jband, jk, imode, iq)
-                end do
+                  temp = (0.0, 0.0)
+                  jq1 = epc%qqmap(epc%kkqmap(ik,jk,1)) ! ik-jk =  q
+                  jq2 = epc%qqmap(epc%kkqmap(ik,jk,2)) ! ik-jk = -q
 
-                temp = temp / SQRT(1.0 * epc%natmd / epc%natepc) &
-                       * 2 * inp%POTIM * imgUnit / hbar
-                olap%Dij(inp%NBANDS*(ik-1)+iband, jband+inp%NBANDS*(jk-1), time) = temp
+                  if (jq1>0) then
+                    do imode=1,epc%nmodes
+                      phn = ABS(epc%phproj(time, imode, jq1))
+                      temp = temp + SQRT(phn) * epc%epmat(iband, jband, jk, imode, iq)
+                    end do
+                  end if
+                 
+                  if (jq2>0) then
+                    do imode=1,epc%nmodes
+                      phn = ABS(epc%phproj(time, imode, jq2))
+                      temp = temp + SQRT(phn+1) * epc%epmat(iband, jband, jk, imode, iq)
+                    end do
+                  end if
+                 
+                  temp = temp / SQRT(1.0 * epc%natmd / epc%natepc) &
+                         * 2 * inp%POTIM * imgUnit / hbar
+                  olap%Dij(inp%NBANDS*(ik-1)+iband, jband+inp%NBANDS*(jk-1), time) = temp
+
+                end if
 
               end do
             end do
