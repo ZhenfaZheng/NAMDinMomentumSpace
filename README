@@ -3,3 +3,8 @@ This project is designed to perform non-adiabatic molecular dynamics (NAMD) simu
 
 The code is based on the namd code written by Qijing Zheng from USTC.
 For more information please visit https://github.com/QijingZheng/Hefei-NAMD
+
+Version 1.0.0
+Read epc data from QE & EPW package, Read MD trajectory from VASP for phonon decomposition.
+Then caculate couplings from e-p interation to replace the NA couplings.
+To use e-p couplings, you need set LEPC=.TRUE. and NKPOINTS in inp file, and for INICON file, you should add a third line to specify initial k point.
