@@ -42,6 +42,9 @@ module fileio
     ! running directories
     character(len=256) :: RUNDIR
     character(len=256) :: TBINIT
+    character(len=256) :: FILEPC  ! epc file from EPW package, if LEPC=.TRUE.
+    character(len=256) :: FILPH   ! phonon modes file from QE-PH, if LEPC=.TRUE.
+    character(len=256) :: FILMD   ! MD trajetory (XDATCAR) from VASP, if LEPC=.TRUE.
 
   end type
 
@@ -77,15 +80,18 @@ module fileio
       ! running directories
       character(len=256) :: rundir
       character(len=256) :: tbinit
+      ! files for e-p coupling calculation, if LEPC=.TRUE.
+      character(len=256) :: filepc, filph, filmd
 
 
-      namelist /NAMDPARA/ bmin, bmax, nsw,    &
-                          nbands, nkpoints,   &
-                          potim, ntraj, nelm, &
-                          temp, rundir,       &
-                          lhole, lshp, lcpext,&
-                          lgamma, lepc,       &
-                          namdtime,           &
+      namelist /NAMDPARA/ bmin, bmax, nsw,      &
+                          nbands, nkpoints,     &
+                          potim, ntraj, nelm,   &
+                          temp, rundir,         &
+                          lhole, lshp, lcpext,  &
+                          lgamma, lepc,         &
+                          filepc, filph, filmd, &
+                          namdtime,             &
                           nsample, tbinit
 
       integer :: ierr, i
@@ -110,6 +116,9 @@ module fileio
       lcpext = .FALSE.
       lgamma = .TRUE.
       lepc = .FALSE.
+      filepc = 'prefix.epc'
+      filph = 'prefix.matdyn.modes'
+      filmd = 'XDATCAR'
 
       open(file="inp", unit=8, status='unknown', action='read', iostat=ierr)
       if ( ierr /= 0 ) then
@@ -188,6 +197,9 @@ module fileio
       inp%LGAMMA   = lgamma
       inp%LEPC     = lepc
       inp%TEMP     = temp
+      inp%FILEPC   = trim(filepc)
+      inp%FILPH    = trim(filph)
+      inp%FILMD    = trim(filmd)
     end subroutine
 
     ! Need a subroutine to print out all the input parameters

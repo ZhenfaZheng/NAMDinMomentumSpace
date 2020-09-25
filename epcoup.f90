@@ -46,11 +46,8 @@ module epcoup
     integer :: ierr, i, j
     integer :: nb, nk, nm, nq, na
     integer :: ib, jb, ik, im, iq
-    character(len=72) :: filepc
-    
-    filepc = 'graphene.epc'
 
-    open(unit=90, file=filepc, status='unknown', action='read', iostat=ierr)
+    open(unit=90, file=inp%FILEPC, status='unknown', action='read', iostat=ierr)
     if (ierr /= 0) then
       write(*,*) "epc file does NOT exist!"
       stop
@@ -160,15 +157,12 @@ module epcoup
     integer :: ierr, i
     integer :: iq, im, ia, iax
     integer :: nqs, nmodes, nat
-    character(len=255) :: filphmodes, fmtDISPL
     character(len=24) :: charac, bra, ket
     complex(kind=DP) :: temp
     real(kind=DP), allocatable, dimension(:) :: qpt
     real(kind=DP), allocatable, dimension(:,:) :: at
 
-    filphmodes = 'graphene.matdyn.modes'
-
-    open(unit=909, file=filphmodes, status='unknown', action='read', iostat=ierr)
+    open(unit=909, file=inp%FILPH, status='unknown', action='read', iostat=ierr)
     if (ierr /= 0) then
       write(*,*) "phonon modes file does NOT exist!"
       stop
@@ -223,14 +217,12 @@ module epcoup
 
     real(kind=q) :: scal, dr
     real(kind=q), allocatable, dimension(:,:) :: supercell
-    character(24) :: filename
     integer :: ierr, i, iax, ia, t
     integer :: nat, mdtime
 
-    mdtime = 200
-    filename = 'XDATCAR'
+    mdtime = inp%NSW
 
-    open(unit=33, file=filename, status='unknown', action='read', iostat=ierr)
+    open(unit=33, file=inp%FILMD, status='unknown', action='read', iostat=ierr)
     if (ierr /= 0) then
       write(*,*) "XDATCAR file does NOT exist!"
       stop
