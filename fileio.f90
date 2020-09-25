@@ -38,6 +38,9 @@ module fileio
 
     ! whether to use e-p matrix as NA couplings
     logical :: LEPC
+    integer :: KMIN
+    integer :: KMAX
+    integer :: NKSEL    ! No. of selected k-points for surface hopping
 
     ! running directories
     character(len=256) :: RUNDIR
@@ -82,6 +85,8 @@ module fileio
       character(len=256) :: tbinit
       ! files for e-p coupling calculation, if LEPC=.TRUE.
       character(len=256) :: filepc, filph, filmd
+      integer :: kmin
+      integer :: kmax
 
 
       namelist /NAMDPARA/ bmin, bmax, nsw,      &
@@ -91,6 +96,7 @@ module fileio
                           lhole, lshp, lcpext,  &
                           lgamma, lepc,         &
                           filepc, filph, filmd, &
+                          kmin, kmax,           &
                           namdtime,             &
                           nsample, tbinit
 
@@ -119,6 +125,8 @@ module fileio
       filepc = 'prefix.epc'
       filph = 'prefix.matdyn.modes'
       filmd = 'XDATCAR'
+      kmin = 1
+      kmax = nkpoints
 
       open(file="inp", unit=8, status='unknown', action='read', iostat=ierr)
       if ( ierr /= 0 ) then
@@ -200,6 +208,9 @@ module fileio
       inp%FILEPC   = trim(filepc)
       inp%FILPH    = trim(filph)
       inp%FILMD    = trim(filmd)
+      inp%KMIN     = kmin
+      inp%KMAX     = kmax
+      inp%NKSEL    = kmax - kmin + 1
     end subroutine
 
     ! Need a subroutine to print out all the input parameters
@@ -230,6 +241,8 @@ module fileio
       write(*,'(A30,A3,L5)') 'LGAMMA',   ' = ', inp%LGAMMA
       write(*,'(A30,A3,L5)') 'LEPC',     ' = ', inp%LEPC
       write(*,'(A30,A3,A)')  'RUNDIR',   ' = ', TRIM(ADJUSTL(inp%rundir))
+      write(*,'(A30,A3,I5)') 'KMIN',     ' = ', inp%KMIN
+      write(*,'(A30,A3,I5)') 'KMAX',     ' = ', inp%KMAX
 
       write(*,'(A)') "------------------------------------------------------------"
     end subroutine 

@@ -109,7 +109,7 @@ module shop
 
     ks%sh_pops = 0
     ks%sh_prop = 0
-    istat = (inp%INIKPT-1)*inp%NBASIS + inp%INIBAND - inp%BMIN + 1
+    istat = (inp%INIKPT-inp%KMIN)*inp%NBASIS + inp%INIBAND - inp%BMIN + 1
 
     ! initialize the random seed for ramdom number production
     call init_random_seed()
@@ -173,6 +173,8 @@ module shop
       write(io,'(A,A12,A3,L5)') '#', 'LGAMMA',   ' = ', inp%LGAMMA
       write(io,'(A,A12,A3,L5)') '#', 'LEPC',     ' = ', inp%LEPC
       write(io,'(A,A12,A3,A)')  '#', 'RUNDIR',   ' = ', TRIM(ADJUSTL(inp%rundir))
+      write(io,'(A,A12,A3,I5)') '#', 'KMIN',     ' = ', inp%KMIN
+      write(io,'(A,A12,A3,I5)') '#', 'KMAX',     ' = ', inp%KMAX
     end do
 
     do tion=1, inp%NAMDTIME

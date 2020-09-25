@@ -55,8 +55,8 @@ module hamil
     ks%ndim = inp%NBASIS
 
     if (inp%LEPC) then
-      N = N * inp%NKPOINTS
-      ks%ndim = ks%ndim * inp%NKPOINTS
+      N = N * inp%NKSEL
+      ks%ndim = ks%ndim * inp%NKSEL
     end if
 
     if (.NOT. ks%LALLO) then
@@ -89,7 +89,7 @@ module hamil
     ! ks%ham_c = cero
     ! ks%ham_p = cero
     ! ks%ham_n = cero
-    ks%psi_c((inp%INIKPT-1)*inp%NBASIS + inp%INIBAND - inp%BMIN + 1) = uno
+    ks%psi_c( (inp%INIKPT-inp%KMIN)*inp%NBASIS + inp%INIBAND - inp%BMIN + 1 ) = uno
 
     do i=1, inp%NAMDTIME
       ! We don't need all the information, only a section of it

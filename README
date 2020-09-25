@@ -11,3 +11,6 @@ To use e-p couplings, you need set LEPC=.TRUE. and NKPOINTS in inp file, and for
 
 Version 1.0.2
 Add FILEPC, FILPH, FILMD tags, to specify files for reading epc data.
+
+Version 1.1.0
+Add KMIN, KMAX tags to choose k points for surface hopping simulation.

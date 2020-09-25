@@ -413,7 +413,7 @@ module epcoup
     olap%Dij = cero
     olap%EIg = cero
 
-    olap_sec%NBANDS = inp%NBASIS * inp%NKPOINTS
+    olap_sec%NBANDS = inp%NBASIS * inp%NKSEL
     olap_sec%TSTEPS = inp%NSW
     olap_sec%dt = inp%POTIM
     allocate(olap_sec%Dij(olap_sec%NBANDS, olap_sec%NBANDS, olap_sec%TSTEPS-1))
@@ -508,14 +508,16 @@ module epcoup
 
     NB = inp%NBANDS
     NBas = inp%NBASIS
-    do ik=1,inp%NKPOINTS
-      olap_sec%Eig((ik-1)*NBas+1:ik*NBas, :) = &
-      olap%Eig((ik-1)*NB+inp%BMIN:(ik-1)*NB+inp%BMAX, :)
-      do jk=1,inp%NKPOINTS
-        olap_sec%Dij((ik-1)*NBas+1:ik*NBas,(jk-1)*NBas+1:jk*NBas, :) = &
-        olap%Dij((ik-1)*NB+inp%BMIN:(ik-1)*NB+inp%BMAX, &
-                 (jk-1)*NB+inp%BMIN:(jk-1)*NB+inp%BMAX, :)
+
+    do ik=inp%KMIN,inp%KMAX
+      do jk=inp%KMIN,inp%KMAX
+        olap_sec%Dij( (ik-inp%KMIN)*NBas+1:(ik-inp%KMIN+1)*NBas, &
+                      (jk-inp%KMIN)*NBas+1:(jk-inp%KMIN+1)*NBas, : ) = &
+            olap%Dij( (ik-1)*NB+inp%BMIN:(ik-1)*NB+inp%BMAX, &
+                      (jk-1)*NB+inp%BMIN:(jk-1)*NB+inp%BMAX, : )
       end do
+      olap_sec%Eig( (ik-inp%KMIN)*NBas+1:(ik-inp%KMIN+1)*NBas, : ) = &
+          olap%Eig( (ik-1)*NB+inp%BMIN:(ik-1)*NB+inp%BMAX, : )
     end do
 
   end subroutine copyToSec
