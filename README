@@ -8,3 +8,6 @@ Version 1.0.0
 Read epc data from QE & EPW package, Read MD trajectory from VASP for phonon decomposition.
 Then caculate couplings from e-p interation to replace the NA couplings.
 To use e-p couplings, you need set LEPC=.TRUE. and NKPOINTS in inp file, and for INICON file, you should add a third line to specify initial k point.
+
+Version 1.0.2
+Add FILEPC, FILPH, FILMD tags, to specify files for reading epc data.
