@@ -3,7 +3,6 @@
 module prec
   integer, parameter :: q =SELECTED_real_KIND(10)
   integer, parameter :: qs=SELECTED_real_KIND(5)
-  integer, parameter :: DP=SELECTED_real_KIND(14,200)
 end module
 
 

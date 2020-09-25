@@ -16,18 +16,18 @@ module epcoup
     !! map q points in phonon calculation to q points in e-p calcultion.
     integer, allocatable, dimension(:,:,:) :: kkqmap
     !! map ik & jk of electronic states to q or -q of e-p matrix.
-    real(kind=DP), allocatable, dimension(:,:) :: cellepc
-    real(kind=DP), allocatable, dimension(:,:) :: kptsepc
-    real(kind=DP), allocatable, dimension(:,:) :: qptsepc
-    real(kind=DP), allocatable, dimension(:,:) :: energy
-    complex(kind=DP), allocatable, dimension(:,:,:,:,:) :: epmat
-    real(kind=DP), allocatable, dimension(:,:) :: freq
-    real(kind=DP), allocatable, dimension(:,:) :: qptsph
-    complex(kind=DP), allocatable, dimension(:,:,:,:) :: phmodes
-    real(kind=DP), allocatable, dimension(:,:) :: cellmd
-    real(kind=DP), allocatable, dimension(:,:,:) :: displ
-    real(kind=DP), allocatable, dimension(:,:,:) :: vel
-    real(kind=DP), allocatable, dimension(:,:,:) :: phproj
+    real(kind=q), allocatable, dimension(:,:) :: cellepc
+    real(kind=q), allocatable, dimension(:,:) :: kptsepc
+    real(kind=q), allocatable, dimension(:,:) :: qptsepc
+    real(kind=q), allocatable, dimension(:,:) :: energy
+    complex(kind=q), allocatable, dimension(:,:,:,:,:) :: epmat
+    real(kind=q), allocatable, dimension(:,:) :: freq
+    real(kind=q), allocatable, dimension(:,:) :: qptsph
+    complex(kind=q), allocatable, dimension(:,:,:,:) :: phmodes
+    real(kind=q), allocatable, dimension(:,:) :: cellmd
+    real(kind=q), allocatable, dimension(:,:,:) :: displ
+    real(kind=q), allocatable, dimension(:,:,:) :: vel
+    real(kind=q), allocatable, dimension(:,:,:) :: phproj
     ! Phonon projection of displacement in MD.
   end type
 
@@ -158,9 +158,9 @@ module epcoup
     integer :: iq, im, ia, iax
     integer :: nqs, nmodes, nat
     character(len=24) :: charac, bra, ket
-    complex(kind=DP) :: temp
-    real(kind=DP), allocatable, dimension(:) :: qpt
-    real(kind=DP), allocatable, dimension(:,:) :: at
+    complex(kind=q) :: temp
+    real(kind=q), allocatable, dimension(:) :: qpt
+    real(kind=q), allocatable, dimension(:,:) :: at
 
     open(unit=909, file=inp%FILPH, status='unknown', action='read', iostat=ierr)
     if (ierr /= 0) then
@@ -293,8 +293,8 @@ module epcoup
     integer :: iax, ia, ja, i
     integer, allocatable, dimension(:) :: N
     !! scale numbers of md cell compared with phonon cell
-    real(kind=DP), allocatable, dimension(:) :: dr
-    real(kind=DP), allocatable, dimension(:) :: temp1, temp2
+    real(kind=q), allocatable, dimension(:) :: dr
+    real(kind=q), allocatable, dimension(:) :: temp1, temp2
 
     type(epCoupling), intent(inout) :: epc
 
@@ -333,11 +333,11 @@ module epcoup
     type(epCoupling), intent(inout) :: epc
 
     ! The normal mode coordinate and its derivative.
-    complex(kind=DP) :: Q, dQ
+    complex(kind=q) :: Qn, dQn
     ! The potential and kinetic energies of the normal mode.
-    real(kind=DP) :: Eu, Ek
-    real(kind=DP) :: theta
-    real(kind=DP), allocatable, dimension(:) :: displ, vel
+    real(kind=q) :: Eu, Ek
+    real(kind=q) :: theta
+    real(kind=q), allocatable, dimension(:) :: displ, vel
     integer :: iq, im, ia, iax, t
     integer :: nqs, nmodes, nat
 
@@ -352,8 +352,7 @@ module epcoup
     do t=1,inp%NSW
       do iq=1,epc%nqpts
         do im=1,epc%nmodes
-          Q = (0.0, 0.0)
-          dQ = (0.0, 0.0)
+          Qn = cero; dQn = cero
           do ia=1,epc%natmd
             displ = 0.0; vel = 0.0
             do iax=1,3
@@ -361,15 +360,15 @@ module epcoup
               vel = vel + epc%vel(t, ia, iax) * epc%cellmd(iax, :) 
             end do
             theta = 2 * PI * DOT_PRODUCT( epc%qptsph(iq,:), epc%R(ia,:) )
-            Q  =  Q + EXP(imgUnit*theta) * DOT_PRODUCT( &
+            Qn  =  Qn + EXP(imgUnit*theta) * DOT_PRODUCT( &
                       CONJG(epc%phmodes(iq, im, epc%atnum(ia), :)), displ )
-            dQ = dQ + EXP(imgUnit*theta) * DOT_PRODUCT( &
+            dQn = dQn + EXP(imgUnit*theta) * DOT_PRODUCT( &
                       CONJG(epc%phmodes(iq, im, epc%atnum(ia), :)), vel )
           end do
           ! mass of C = 12.011
-          Eu = 0.5 * 12.011 * epc%freq(iq, im)**2 * CONJG(Q) * Q / epc%natmd &
+          Eu = 0.5 * 12.011 * epc%freq(iq, im)**2 * CONJG(Qn) * Qn / epc%natmd &
             * 1.66 * 6.2415 / 100000
-          Ek = 0.5 * 12.011 * CONJG(dQ) * dQ / epc%natmd &
+          Ek = 0.5 * 12.011 * CONJG(dQn) * dQn / epc%natmd &
             * 1.66 * 6.2415 * 10
           epc%phproj(t, im, iq) = (Eu + Ek) / ( hbar * epc%freq(iq, im) / 1000 )
         end do
@@ -384,8 +383,8 @@ module epcoup
 
     type(epCoupling), intent(inout) :: epc
 
-    real(kind=DP) :: norm
-    real(kind=DP) :: dkq1(3), dkq2(3), dq(3)
+    real(kind=q) :: norm
+    real(kind=q) :: dkq1(3), dkq2(3), dq(3)
     integer :: ik, jk, iq, jq, iax
 
     norm = 0.005
@@ -437,8 +436,8 @@ module epcoup
     type(overlap), intent(inout) :: olap
     type(overlap), intent(inout) :: olap_sec
 
-    real(kind=DP) :: proj, norm, phn
-    real(kind=DP), allocatable, dimension(:) :: dkq, dq
+    real(kind=q) :: proj, norm, phn
+    real(kind=q), allocatable, dimension(:) :: dkq, dq
     integer :: iq, jq1, jq2, im
     integer :: nqs, nmodes, nat
     integer :: t, ik, jk, ib, jb
