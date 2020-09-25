@@ -108,46 +108,6 @@ module epcoup
   end subroutine readEPC
 
 
-  subroutine readEPMat(inp, epc)
-    implicit none
-
-    type(namdInfo), intent(in) :: inp
-    type(epCoupling), intent(inout) :: epc
-
-    integer :: ierr, line
-    integer :: nbands, nkpts, nmodes, nqs
-    integer :: ib, jb, ik, im, iq
-    character(len=255) :: epmdat, hash
-
-    epmdat = "epmatwp.dat"
-    
-    open(unit=908, file=epmdat, status='unknown', action='read', iostat=ierr)
-    if (ierr /= 0) then
-      write(*,*) "epmatwp.dat does NOT exist!"
-      stop
-    end if
-
-    do line=1,2
-      read(unit=908, fmt=*)
-    end do
-    read(unit=908, fmt=*) hash, nbands, nkpts, nmodes, nqs
-
-    allocate(epc%epmat(nbands, nbands, nkpts, nmodes, nqs))
-    do ib=1,nbands
-      do jb=1,nbands
-        do ik=1,nkpts
-          do im=1,nmodes
-            do iq=1,nqs
-              read(unit=908, fmt=*) epc%epmat(ib, jb, ik, im, iq)
-            end do
-          end do
-        end do
-      end do
-    end do
-
-  end subroutine readEPMat
-
-
   subroutine readPhmodes(inp, epc)
     implicit none
 
