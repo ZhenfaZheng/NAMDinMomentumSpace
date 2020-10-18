@@ -336,7 +336,29 @@ module epcoup
       end do
     end do
 
+    call savePhp(inp, epc)
+
   end subroutine phDecomp
+
+
+  subroutine savePhp(inp, epc)
+    implicit none
+
+    type(namdInfo), intent(in) :: inp
+    type(epCoupling), intent(in) :: epc
+
+    character(len=72) :: filename
+    integer :: t, iq, im
+
+    filename = 'phproj.dat'
+    open(unit=38, file=filename, status='unknown', action='write')
+
+    do t=1, inp%NSW
+      write(unit=38, fmt='(*(f12.6))') &
+          ((epc%phproj(t, im, iq), iq=1,epc%nqpts), im=1,epc%nmodes)
+    end do
+
+  end subroutine savePhp
 
 
   subroutine kqMatch(epc)
