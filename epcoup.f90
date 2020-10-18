@@ -151,6 +151,7 @@ module epcoup
       read(unit=909, fmt=*)
       do im=1,nmodes
         read(unit=909, fmt=9011) charac, epc%freq(iq, im)
+        if (epc%freq(iq,im)==0.0) epc%freq(iq,im) = 0.00000001
         ! write(*,9011) charac, epc%freq(iq, im)
         do ia=1,nat
           read(unit=909, fmt=9021) bra, (epc%phmodes(iq, im, ia, iax), &
