@@ -45,15 +45,17 @@ module epcoup
     type(overlap), intent(inout) :: olap
 
     integer :: ierr
-    integer :: bndmin, bndmax
+    integer :: bndmin, bndmax, nb
     integer :: nk1, nk2, nk3, nktot, nk
-    integer :: ik, ib, iq, im
+    integer :: ik, jk, ib, jb, iq, im
+    integer :: ipool, npool, pool
+    integer :: ikf, nkf
     real(kind=q) :: ef
-    character(len=72) :: filegnv, filfreq, filephmat
+    complex(kind=q) :: eptemp
+    character(len=72) :: filegnv, filfreq, filephmat, tag
 
     filegnv = trim(inp%FILEPC) // '/egnv'
     filfreq = trim(inp%FILEPC) // '/freq'
-    filephmat = trim(inp%FILEPC) // '/ephmat'
 
     open(unit=31, file=filegnv, action='read', iostat=ierr)
     if (ierr /= 0) then
@@ -66,6 +68,7 @@ module epcoup
 
     epc%nkpts = nk
     epc%nbands = bndmax - bndmin + 1
+    nb = bndmax - bndmin + 1
     allocate(epc%kptsepc(nk,3), epc%energy(nk,epc%nbands))
 
     do ik=1,nk
@@ -76,7 +79,12 @@ module epcoup
     end do
 
     close(31)
-
+     
+    do ib=1,nk
+      do ik=1,nb
+        olap%Eig(ib+nb*(ik-1),:) = epc%energy(ik,ib)
+      enddo
+    enddo
 
     open(unit=32, file=filfreq, action='read', iostat=ierr)
     if (ierr /= 0) then
@@ -97,6 +105,45 @@ module epcoup
 
     close(32)
 
+    npool = 16
+    olap%Dij = cero
+    do ipool=1,npool
+
+      if (npool==1) then
+        filephmat = trim(inp%FILEPC) // '/ephmat'
+      else
+        write(tag, *) ipool
+        filephmat = trim(inp%FILEPC) // '/ephmat' // trim(tag)
+      end if
+
+      open(unit=33, file=filephmat, action='read', iostat=ierr)
+      if (ierr /= 0) then
+        write(*,*) "ephmat file does NOT exist!"
+        stop
+      end if
+
+      read(unit=33, fmt=*) pool, nkf
+
+      do ikf=1,nkf
+
+        read(unit=33, fmt=*) ik, jk, iq
+        write(*,*) ik, jk, iq
+        do im=1,epc%nmodes
+          do ib=1,epc%nbands
+            do jb=1,epc%nbands
+              read(unit=33, fmt='(2ES20.10)') eptemp
+              olap%Dij(nb*(ik-1)+ib, jb+nb*(jk-1), :) &
+              = olap%Dij(nb*(ik-1)+ib, jb+nb*(jk-1), :) + eptemp 
+              write(*,'(2f15.6)') eptemp
+            end do
+          end do
+        end do
+        
+      end do
+
+      close(33)
+
+    end do
 
   end subroutine readEPCf
 
