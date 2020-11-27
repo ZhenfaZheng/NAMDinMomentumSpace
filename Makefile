@@ -12,7 +12,7 @@ MAKE = make
 #-------------------------------------------------------------------------------
 
 SRC = prec.f90 lattice.f90 wave.f90 fileio.f90 couplings.f90 epcoup.f90 hamil.f90 \
-   	TimeProp.f90 SurfHop.f90  main.f90
+   	TimeProp.f90 SurfHop.f90  main_test.f90
 
 
 OBJ = $(SRC:.f90=.o)

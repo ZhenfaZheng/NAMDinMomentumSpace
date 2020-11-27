@@ -44,6 +44,60 @@ module epcoup
     type(epCoupling), intent(inout) :: epc
     type(overlap), intent(inout) :: olap
 
+    integer :: ierr
+    integer :: bndmin, bndmax
+    integer :: nk1, nk2, nk3, nktot, nk
+    integer :: ik, ib, iq, im
+    real(kind=q) :: ef
+    character(len=72) :: filegnv, filfreq, filephmat
+
+    filegnv = trim(inp%FILEPC) // '/egnv'
+    filfreq = trim(inp%FILEPC) // '/freq'
+    filephmat = trim(inp%FILEPC) // '/ephmat'
+
+    open(unit=31, file=filegnv, action='read', iostat=ierr)
+    if (ierr /= 0) then
+      write(*,*) "egnv file does NOT exist!"
+      stop
+    end if
+
+    read(unit=31, fmt=*) nktot, nk1, nk2, nk3, nk
+    read(unit=31, fmt=*) bndmin, bndmax, ef
+
+    epc%nkpts = nk
+    epc%nbands = bndmax - bndmin + 1
+    allocate(epc%kptsepc(nk,3), epc%energy(nk,epc%nbands))
+
+    do ik=1,nk
+      read(unit=31, fmt=*) epc%kptsepc(ik,:)
+      do ib=1,epc%nbands
+        read(unit=31, fmt=*) epc%energy(ik,ib)
+      end do
+    end do
+
+    close(31)
+
+
+    open(unit=32, file=filfreq, action='read', iostat=ierr)
+    if (ierr /= 0) then
+      write(*,*) "freq file does NOT exist!"
+      stop
+    end if
+
+    read(unit=32, fmt=*) epc%nqpts, epc%nmodes
+
+    allocate(epc%qptsepc(epc%nqpts,3), epc%freq(epc%nqpts,epc%nmodes))
+
+    do iq=1,epc%nqpts
+      read(unit=32, fmt=*) epc%qptsepc(iq,:)
+      do im=1,epc%nmodes
+        read(unit=32, fmt=*) epc%freq(iq,im)
+      end do
+    end do
+
+    close(32)
+
+
   end subroutine readEPCf
 
 
