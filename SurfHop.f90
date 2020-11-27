@@ -167,12 +167,13 @@ module shop
       write(io,'(A,A12,A3,I5)') '#', 'NTRAJ',    ' = ', inp%NTRAJ
       write(io,'(A,A12,A3,I5)') '#', 'NELM',     ' = ', inp%NELM
 
+      write(io,'(A,A12,A3,A)')  '#', 'RUNDIR',   ' = ', TRIM(ADJUSTL(inp%rundir))
       write(io,'(A,A12,A3,L5)') '#', 'LHOLE',    ' = ', inp%LHOLE
       write(io,'(A,A12,A3,L5)') '#', 'LSHP',     ' = ', inp%LSHP
       write(io,'(A,A12,A3,L5)') '#', 'LCPTXT',   ' = ', inp%LCPTXT
       write(io,'(A,A12,A3,L5)') '#', 'LGAMMA',   ' = ', inp%LGAMMA
       write(io,'(A,A12,A3,L5)') '#', 'LEPC',     ' = ', inp%LEPC
-      write(io,'(A,A12,A3,A)')  '#', 'RUNDIR',   ' = ', TRIM(ADJUSTL(inp%rundir))
+      write(io,'(A,A12,A3,I5)') '#', 'EPCTYPE',  ' = ', inp%EPCTYPE
       write(io,'(A,A12,A3,I5)') '#', 'KMIN',     ' = ', inp%KMIN
       write(io,'(A,A12,A3,I5)') '#', 'KMAX',     ' = ', inp%KMAX
     end do

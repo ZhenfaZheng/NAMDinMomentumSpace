@@ -38,6 +38,7 @@ module fileio
 
     ! whether to use e-p matrix as NA couplings
     logical :: LEPC
+    integer :: EPCTYPE
     integer :: KMIN
     integer :: KMAX
     integer :: NKSEL    ! No. of selected k-points for surface hopping
@@ -85,6 +86,7 @@ module fileio
       character(len=256) :: tbinit
       ! files for e-p coupling calculation, if LEPC=.TRUE.
       character(len=256) :: filepc, filph, filmd
+      integer :: epctype
       integer :: kmin
       integer :: kmax
 
@@ -94,7 +96,7 @@ module fileio
                           potim, ntraj, nelm,   &
                           temp, rundir,         &
                           lhole, lshp, lcpext,  &
-                          lgamma, lepc,         &
+                          lgamma, lepc, epctype,&
                           filepc, filph, filmd, &
                           kmin, kmax,           &
                           namdtime,             &
@@ -122,6 +124,7 @@ module fileio
       lcpext = .FALSE.
       lgamma = .TRUE.
       lepc = .FALSE.
+      epctype = 1
       filepc = 'prefix.epc'
       filph = 'prefix.matdyn.modes'
       filmd = 'XDATCAR'
@@ -204,6 +207,7 @@ module fileio
       inp%LCPTXT   = lcpext
       inp%LGAMMA   = lgamma
       inp%LEPC     = lepc
+      inp%EPCTYPE  = epctype
       inp%TEMP     = temp
       inp%FILEPC   = trim(filepc)
       inp%FILPH    = trim(filph)
@@ -235,12 +239,13 @@ module fileio
       write(*,'(A30,A3,I5)') 'NTRAJ',    ' = ', inp%NTRAJ
       write(*,'(A30,A3,I5)') 'NELM',     ' = ', inp%NELM
 
+      write(*,'(A30,A3,A)')  'RUNDIR',   ' = ', TRIM(ADJUSTL(inp%rundir))
       write(*,'(A30,A3,L5)') 'LHOLE',    ' = ', inp%LHOLE
       write(*,'(A30,A3,L5)') 'LSHP',     ' = ', inp%LSHP
       write(*,'(A30,A3,L5)') 'LCPTXT',   ' = ', inp%LCPTXT
       write(*,'(A30,A3,L5)') 'LGAMMA',   ' = ', inp%LGAMMA
       write(*,'(A30,A3,L5)') 'LEPC',     ' = ', inp%LEPC
-      write(*,'(A30,A3,A)')  'RUNDIR',   ' = ', TRIM(ADJUSTL(inp%rundir))
+      write(*,'(A30,A3,I5)') 'EPCTYPE',  ' = ', inp%EPCTYPE
       write(*,'(A30,A3,I5)') 'KMIN',     ' = ', inp%KMIN
       write(*,'(A30,A3,I5)') 'KMAX',     ' = ', inp%KMAX
 
