@@ -33,6 +33,19 @@ module epcoup
 
   contains
 
+  subroutine readEPCf(inp, epc, olap)
+    ! Read informations about e-p couplings from files in epc/.
+    ! Folder epc/ include egnv (band energies), freq (phonon frequencies)
+    ! and ephmat* (inteploted e-p matrix in dense k q mesh) files.
+
+    implicit none
+
+    type(namdInfo), intent(in) :: inp
+    type(epCoupling), intent(inout) :: epc
+    type(overlap), intent(inout) :: olap
+
+  end subroutine readEPCf
+
 
   subroutine readEPC(inp, epc)
     ! Read informations about e-p couplings from .epc file.
