@@ -80,8 +80,8 @@ module epcoup
 
     close(31)
      
-    do ib=1,nk
-      do ik=1,nb
+    do ik=1,nk
+      do ib=1,nb
         olap%Eig(ib+nb*(ik-1),:) = epc%energy(ik,ib)
       enddo
     enddo
@@ -113,7 +113,7 @@ module epcoup
         filephmat = trim(inp%FILEPC) // '/ephmat'
       else
         write(tag, *) ipool
-        filephmat = trim(inp%FILEPC) // '/ephmat' // trim(tag)
+        filephmat = trim(inp%FILEPC) // '/ephmat' // trim(adjustl(tag))
       end if
 
       open(unit=33, file=filephmat, action='read', iostat=ierr)
@@ -124,7 +124,7 @@ module epcoup
 
       read(unit=33, fmt=*) pool, nkf
 
-      do ikf=1,nkf
+      do ikf=1,nkf*nk
 
         read(unit=33, fmt=*) ik, jk, iq
         write(*,*) ik, jk, iq
@@ -566,6 +566,17 @@ module epcoup
         call copyToSec(olap, olap_sec, inp)
         call writeNaEig(olap_sec, inp)
       end if
+
+    else if (inp%EPCTYPE==1) then
+
+      write(*,'(A)') "------------------------------------------------------------"
+      write(*,*) "Calculating couplings from dense e-p matrix..."
+
+      call readEPCf(inp, epc, olap)
+      call copyToSec(olap, olap_sec, inp)
+      call CoupToFile(olap)
+      call writeNaEig(olap_sec, inp)
+
     else
 
       write(*,'(A)') "------------------------------------------------------------"
@@ -656,6 +667,10 @@ module epcoup
       olap_sec%Eig( (ik-inp%KMIN)*NBas+1:(ik-inp%KMIN+1)*NBas, : ) = &
           olap%Eig( (ik-1)*NB+inp%BMIN:(ik-1)*NB+inp%BMAX, : )
     end do
+
+    ! do ik=1,NBas*(inp%KMAX-inp%KMIN+1)
+    !   olap_sec%Dij(ik,ik,:) = cero
+    ! end do
 
   end subroutine copyToSec
 
