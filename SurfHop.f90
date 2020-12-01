@@ -61,14 +61,20 @@ module shop
     integer, intent(in) :: tion
     integer, intent(in) :: cstat
 
-    integer :: i, j
+    integer :: i, j, xtion
     real(kind=q) :: Akk
     real(kind=q) :: dE, kbT
 
     Akk = CONJG(ks%psi_a(cstat, tion)) * ks%psi_a(cstat, tion)
+
+    ! Because the dimension of NAcoup is smaller than NSW-1, replace tion 
+    ! index as follow xtion.
+    ! If time step > NSW-1, use the couplings from initial time repeatedly.
+    xtion = MOD(tion,inp%NSW-1)
+    if (xtion==0) xtion=inp%NSW-1
     ! Bkm = REAL(CONJG(Akm) * Ckm)
     ks%Bkm = -2. * REAL(CONJG(ks%psi_a(cstat, tion)) * ks%psi_a(:, tion) * &
-                    ks%NAcoup(cstat, :, tion))
+                    ks%NAcoup(cstat, :, xtion))
 
     ks%sh_prop(:,tion) = ks%Bkm / Akk * inp%POTIM
 

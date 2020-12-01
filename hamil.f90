@@ -48,7 +48,7 @@ module hamil
     type(overlap), intent(in)  :: olap
     type(namdInfo), intent(in) :: inp
 
-    integer :: i, j, N
+    integer :: i, j, t, N
 
     ! memory allocation
     N = inp%NBASIS
@@ -71,7 +71,9 @@ module hamil
       allocate(ks%ham_c(N,N))
 
       allocate(ks%eigKs(N, inp%NAMDTIME))
-      allocate(ks%NAcoup(N,N, inp%NAMDTIME))
+      ! If NAMDTIME > NSW-1, set dimension of NAcoup as NSW in order to save memory.
+      ! For time step exceeded NSW-1, use the couplings from initial time repeatedly.
+      allocate(ks%NAcoup(N,N, MIN(inp%NAMDTIME, inp%NSW-1)))
 
       allocate(ks%sh_pops(N, inp%NAMDTIME))
       allocate(ks%sh_prop(N, inp%NAMDTIME))
@@ -91,12 +93,22 @@ module hamil
     ! ks%ham_n = cero
     ks%psi_c( (inp%INIKPT-inp%KMIN)*inp%NBASIS + inp%INIBAND - inp%BMIN + 1 ) = uno
 
-    do i=1, inp%NAMDTIME
+    do t=1, inp%NAMDTIME
+
+
+      ! Because the dimension of NAcoup is smaller than NSW-1, replace t index
+      ! as follow i.
+      i = MOD(t,inp%NSW-1)
+      ! If time step > NSW-1, use Eig & couplings from initial time repeatedly.
+      j = MOD(inp%NAMDTINI+t-1,inp%NSW-1)
+      if (i==0) i=inp%NSW-1
+      if (j==0) j=inp%NSW-1
+
       ! We don't need all the information, only a section of it
-      ks%eigKs(:,i) = olap%Eig(:, inp%NAMDTINI + i - 1)
+      ks%eigKs(:,t) = olap%Eig(:, j)
       ! Divide by 2 * POTIM here, because we didn't do this in the calculation
       ! of couplings
-      ks%NAcoup(:,:,i) = olap%Dij(:,:, inp%NAMDTINI + i - 1) / (2*inp%POTIM)
+      ks%NAcoup(:,:,i) = olap%Dij(:,:, j) / (2*inp%POTIM)
     end do
 
   end subroutine
@@ -110,14 +122,19 @@ module hamil
     type(namdInfo), intent(in) :: inp
     integer, intent(in) :: TION, TELE
 
-    integer :: i
+    integer :: i, XTION
 
     ! the hamiltonian contains two parts, which are obtained by interpolation
     ! method between two ionic tims step
 
     ! The non-adiabatic coupling part
-    ks%ham_c(:,:) = ks%NAcoup(:,:,TION) + &
-                   (ks%NAcoup(:,:,TION+1) - ks%NAcoup(:,:,TION)) * TELE / inp%NELM
+
+    ! If time step > NSW-1, use the couplings from initial time repeatedly.
+    XTION = MOD(TION,inp%NSW-1)
+    if (XTION==0) XTION=inp%NSW-1
+
+    ks%ham_c(:,:) = ks%NAcoup(:,:,XTION) + &
+                   (ks%NAcoup(:,:,XTION+1) - ks%NAcoup(:,:,XTION)) * TELE / inp%NELM
 
     ! multiply by -i * hbar
     ks%ham_c = -imgUnit * hbar * ks%ham_c 
