@@ -50,7 +50,7 @@ module epcoup
     integer :: ik, jk, ib, jb, iq, im
     integer :: ipool, npool, pool
     integer :: ikf, nkf
-    real(kind=q) :: ef
+    real(kind=q) :: ef, kbT, phn, dE
     complex(kind=q) :: eptemp
     character(len=72) :: filegnv, filfreq, filephmat, tag
 
@@ -124,6 +124,8 @@ module epcoup
 
       read(unit=33, fmt=*) pool, nkf
 
+      kbT = inp%TEMP * BOLKEV
+
       do ikf=1,nkf*nk
 
         read(unit=33, fmt=*) ik, jk, iq
@@ -132,9 +134,14 @@ module epcoup
           do ib=1,epc%nbands
             do jb=1,epc%nbands
               read(unit=33, fmt='(2ES20.10)') eptemp
+              phn = 1.0 / (exp(abs(epc%freq(iq,im)/8065.541)/kbT)-1)
+              eptemp = eptemp * (sqrt(phn) + sqrt(phn+1))
+              dE = epc%energy(ik,ib) - epc%energy(jk,jb) - epc%freq(iq,im)/8065.541
+              eptemp = eptemp * 0.015**2 / (dE**2 + 0.015**2) / PI / 6
+              if(epc%freq(iq,im)<5) eptemp = cero
               olap%Dij(nb*(ik-1)+ib, jb+nb*(jk-1), :) &
               = olap%Dij(nb*(ik-1)+ib, jb+nb*(jk-1), :) + eptemp 
-              write(*,'(2f15.6)') eptemp
+              !write(*,'(2f15.6)') eptemp
             end do
           end do
         end do
@@ -667,10 +674,6 @@ module epcoup
       olap_sec%Eig( (ik-inp%KMIN)*NBas+1:(ik-inp%KMIN+1)*NBas, : ) = &
           olap%Eig( (ik-1)*NB+inp%BMIN:(ik-1)*NB+inp%BMAX, : )
     end do
-
-    ! do ik=1,NBas*(inp%KMAX-inp%KMIN+1)
-    !   olap_sec%Dij(ik,ik,:) = cero
-    ! end do
 
   end subroutine copyToSec
 
