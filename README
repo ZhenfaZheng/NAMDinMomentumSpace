@@ -14,3 +14,18 @@ Add FILEPC, FILPH, FILMD tags, to specify files for reading epc data.
 
 Version 1.1.0
 Add KMIN, KMAX tags to choose k points for surface hopping simulation.
+
+Version 1.2.1
+Read interpolated e-p matrix of dense k & q mesh and use phonon number obey Bose-Einstein distribution to construct e-p couplings.
+Add a input parameter EPCTYPE to control methods for construct e-p couplings: 
+EPCTYPE = 1, e-p matrix is multiplied by phonon number obey Bose-Einstein distribution (Default). 
+   Need to set FILEPC as path of directory which contain infomation of e-p couplings. FILPH and FILMD is unnecessary.
+EPCTYPE = 2, e-p matrix is multiplied by normal coordinate of phonon modes calculated by phonon decomposition from MD trajectory.
+   Need to set FILEPC (informations of e-p coupling), FILPH (information of phonon modes) and FILMD (MD trajectory).
+
+Version 1.2.2
+For NAMDTIME > NSW-1, use NA couplings from initial time repeatedly.
+If use LEPC=.TRUE. and EPCTYPE=1, the couplings do not change by time, can set NSW = 2
+and set long NAMDTIME to reduce size of coupling files.
+For other case, we can use not so long NSW to simulate long NAMDTIME molecular dynamics.
+
