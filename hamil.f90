@@ -129,6 +129,14 @@ module hamil
 
     ! The non-adiabatic coupling part
 
+    if (inp%LEPC .and. inp%EPCTYPE==1) then
+      ks%ham_c(:,:) = ks%NAcoup(:,:,1)
+      do i=1, ks%ndim
+        ks%ham_c(i,i) = ks%ham_c(i,i) + ks%eigKs(i,1)
+      end do
+      return
+    end if
+
     ! If time step > NSW-1, use the couplings from initial time repeatedly.
     XTION = MOD(TION,inp%NSW-1)
     if (XTION==0) XTION=inp%NSW-1
