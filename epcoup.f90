@@ -16,13 +16,14 @@ module epcoup
     !! map q points in phonon calculation to q points in e-p calcultion.
     integer, allocatable, dimension(:,:,:) :: kkqmap
     !! map ik & jk of electronic states to q or -q of e-p matrix.
+    real(kind=q), allocatable, dimension(:,:) :: energy
     real(kind=q), allocatable, dimension(:,:) :: cellepc
     real(kind=q), allocatable, dimension(:,:) :: kptsepc
     real(kind=q), allocatable, dimension(:,:) :: qptsepc
-    real(kind=q), allocatable, dimension(:,:) :: energy
-    complex(kind=q), allocatable, dimension(:,:,:,:,:) :: epmat
-    real(kind=q), allocatable, dimension(:,:) :: freq
+    real(kind=q), allocatable, dimension(:,:) :: freqep
+    real(kind=q), allocatable, dimension(:,:) :: freqph
     real(kind=q), allocatable, dimension(:,:) :: qptsph
+    complex(kind=q), allocatable, dimension(:,:,:,:,:) :: epmat
     complex(kind=q), allocatable, dimension(:,:,:,:) :: phmodes
     real(kind=q), allocatable, dimension(:,:) :: cellmd
     real(kind=q), allocatable, dimension(:,:,:) :: displ
@@ -33,7 +34,7 @@ module epcoup
 
   contains
 
-  subroutine readEPCf(inp, epc, olap)
+  subroutine readEPC(inp, epc, olap)
     ! Read informations about e-p couplings from files in epc/.
     ! Folder epc/ include egnv (band energies), freq (phonon frequencies)
     ! and ephmat* (inteploted e-p matrix in dense k q mesh) files.
@@ -45,71 +46,97 @@ module epcoup
     type(overlap), intent(inout) :: olap
 
     integer :: ierr
+    integer :: nm, nq, na
     integer :: bndmin, bndmax, nb
     integer :: nk1, nk2, nk3, nktot, nk
-    integer :: ik, jk, ib, jb, iq, im
-    integer :: ipool, npool, pool
+    integer :: i, j, ik, jk, ib, jb, iq, im
+    integer :: ipool, npool, pool, lmpi
     integer :: ikf, nkf
+    integer, allocatable :: nkq(:)
     real(kind=q) :: ef, kbT, phn, dE
     complex(kind=q) :: eptemp
-    character(len=72) :: filegnv, filfreq, filephmat, tag
+    character(len=72) :: filinfo, filegnv, filfreq, filephmat, tag
 
+    filinfo = trim(inp%FILEPC) // '/info'
     filegnv = trim(inp%FILEPC) // '/egnv'
     filfreq = trim(inp%FILEPC) // '/freq'
 
+    open(unit=30, file=filinfo, action='read', iostat=ierr)
+    if (ierr /= 0) then
+      write(*,*) "info file does NOT exist!"
+      stop
+    end if
+
+    read(unit=30, fmt=*)
+    read(unit=30, fmt=*) ef
+    read(unit=30, fmt=*)
+    read(unit=30, fmt=*) bndmin, bndmax, nk, nm, nq, na, npool, lmpi
+    read(unit=30, fmt=*)
+    allocate(nkq(npool))
+    do ipool=1,npool
+      read(unit=30, fmt=*) nkq(ipool)
+    end do
+    allocate(epc%cellepc(na+3,3))
+    read(unit=30, fmt=*)
+    do i=1,3
+      read(unit=30, fmt=*) (epc%cellepc(i,j), j=1,3)
+    enddo
+    read(unit=30, fmt=*)
+    do i=1,na
+      read(unit=30, fmt=*) (epc%cellepc(i+3,j), j=1,3)
+    enddo
+
+    nb = bndmax - bndmin + 1
+    epc%nkpts  = nk
+    epc%nbands = nb
+    epc%nqpts  = nq
+    epc%nmodes = nm
+    epc%natepc = na
+
+    close(30)
+     
     open(unit=31, file=filegnv, action='read', iostat=ierr)
     if (ierr /= 0) then
       write(*,*) "egnv file does NOT exist!"
       stop
     end if
 
-    read(unit=31, fmt=*) nktot, nk1, nk2, nk3, nk
-    read(unit=31, fmt=*) bndmin, bndmax, ef
-
-    epc%nkpts = nk
-    epc%nbands = bndmax - bndmin + 1
-    nb = bndmax - bndmin + 1
-    allocate(epc%kptsepc(nk,3), epc%energy(nk,epc%nbands))
-
+    allocate(epc%kptsepc(nk,3), epc%energy(nk,nb))
+    read(unit=31, fmt=*)
     do ik=1,nk
+      read(unit=31, fmt=*)
       read(unit=31, fmt=*) epc%kptsepc(ik,:)
-      do ib=1,epc%nbands
+      do ib=1,nb
         read(unit=31, fmt=*) epc%energy(ik,ib)
+        olap%Eig(ib+nb*(ik-1),:) = epc%energy(ik,ib)
       end do
     end do
 
     close(31)
      
-    do ik=1,nk
-      do ib=1,nb
-        olap%Eig(ib+nb*(ik-1),:) = epc%energy(ik,ib)
-      enddo
-    enddo
-
     open(unit=32, file=filfreq, action='read', iostat=ierr)
     if (ierr /= 0) then
       write(*,*) "freq file does NOT exist!"
       stop
     end if
 
-    read(unit=32, fmt=*) epc%nqpts, epc%nmodes
-
-    allocate(epc%qptsepc(epc%nqpts,3), epc%freq(epc%nqpts,epc%nmodes))
-
+    allocate(epc%qptsepc(nq,3), epc%freqep(nq,nm))
+    read(unit=32, fmt=*)
     do iq=1,epc%nqpts
+      read(unit=32, fmt=*)
       read(unit=32, fmt=*) epc%qptsepc(iq,:)
       do im=1,epc%nmodes
-        read(unit=32, fmt=*) epc%freq(iq,im)
+        read(unit=32, fmt=*) epc%freqep(iq,im)
       end do
     end do
 
     close(32)
 
-    npool = 16
     olap%Dij = cero
+    allocate(epc%epmat(nb,nb,nk,nm,nq))
     do ipool=1,npool
 
-      if (npool==1) then
+      if (lmpi==0) then
         filephmat = trim(inp%FILEPC) // '/ephmat'
       else
         write(tag, *) ipool
@@ -122,26 +149,24 @@ module epcoup
         stop
       end if
 
-      read(unit=33, fmt=*) pool, nkf
+      read(unit=33, fmt=*) nkf
 
       kbT = inp%TEMP * BOLKEV
 
-      do ikf=1,nkf*nk
+      do ikf=1,nkq(ipool)
 
         read(unit=33, fmt=*) ik, jk, iq
-        write(*,*) ik, jk, iq
         do im=1,epc%nmodes
-          do ib=1,epc%nbands
-            do jb=1,epc%nbands
+          do jb=1,epc%nbands
+            do ib=1,epc%nbands
               read(unit=33, fmt='(2ES20.10)') eptemp
-              phn = 1.0 / (exp(abs(epc%freq(iq,im)/8065.541)/kbT)-1)
+              dE = epc%energy(ik,ib) - epc%energy(jk,jb) - epc%freqep(iq,im)/8065.541
+              eptemp = eptemp * 0.015**2 / (dE**2 + 0.015**2) / PI
+              epc%epmat(ib,jb,jk,im,iq) = eptemp
+              phn = 1.0 / (exp(abs(epc%freqep(iq,im)/8065.541)/kbT)-1)
               eptemp = eptemp * (sqrt(phn) + sqrt(phn+1))
-              dE = epc%energy(ik,ib) - epc%energy(jk,jb) - epc%freq(iq,im)/8065.541
-              eptemp = eptemp * 0.015**2 / (dE**2 + 0.015**2) / PI / 6
-              if(epc%freq(iq,im)<5) eptemp = cero
               olap%Dij(nb*(ik-1)+ib, jb+nb*(jk-1), :) &
               = olap%Dij(nb*(ik-1)+ib, jb+nb*(jk-1), :) + eptemp 
-              !write(*,'(2f15.6)') eptemp
             end do
           end do
         end do
@@ -152,10 +177,10 @@ module epcoup
 
     end do
 
-  end subroutine readEPCf
+  end subroutine readEPC
 
 
-  subroutine readEPC(inp, epc)
+  subroutine readEPCold(inp, epc)
     ! Read informations about e-p couplings from .epc file.
     ! Including cell for epc, k, q points, eigen energies and e-p matrix.
 
@@ -226,7 +251,7 @@ module epcoup
 
     close(90)
 
-  end subroutine readEPC
+  end subroutine readEPCold
 
 
   subroutine readPhmodes(inp, epc)
@@ -254,7 +279,7 @@ module epcoup
     nqs = epc%nqpts
     allocate(epc%phmodes(nqs, nmodes, nat, 3))
     allocate(epc%qptsph(nqs, 3))
-    allocate(epc%freq(nqs, nmodes))
+    allocate(epc%freqph(nqs, nmodes))
     allocate(qpt(3), at(3, 3))
 
     at = epc%cellepc(1:3,1:3) / epc%cellepc(1,1)
@@ -271,9 +296,9 @@ module epcoup
       ! write(*, 9019) charac, epc%qptsph(iq,:)
       read(unit=909, fmt=*)
       do im=1,nmodes
-        read(unit=909, fmt=9011) charac, epc%freq(iq, im)
-        if (epc%freq(iq,im)==0.0) epc%freq(iq,im) = 0.00000001
-        ! write(*,9011) charac, epc%freq(iq, im)
+        read(unit=909, fmt=9011) charac, epc%freqph(iq, im)
+        if (epc%freqph(iq,im)==0.0) epc%freqph(iq,im) = 0.00000001
+        ! write(*,9011) charac, epc%freqph(iq, im)
         do ia=1,nat
           read(unit=909, fmt=9021) bra, (epc%phmodes(iq, im, ia, iax), &
                                          iax=1,3), ket
@@ -448,11 +473,11 @@ module epcoup
                       CONJG(epc%phmodes(iq, im, epc%atnum(ia), :)), vel )
           end do
           ! mass of C = 12.011
-          Eu = 0.5 * 12.011 * epc%freq(iq, im)**2 * CONJG(Qn) * Qn / epc%natmd &
+          Eu = 0.5 * 12.011 * epc%freqph(iq, im)**2 * CONJG(Qn) * Qn / epc%natmd &
             * 1.66 * 6.2415 / 100000
           Ek = 0.5 * 12.011 * CONJG(dQn) * dQn / epc%natmd &
             * 1.66 * 6.2415 * 10
-          epc%phproj(t, im, iq) = (Eu + Ek) / ( hbar * epc%freq(iq, im) / 1000 )
+          epc%phproj(t, im, iq) = (Eu + Ek) / ( hbar * epc%freqph(iq, im) / 1000 )
         end do
       end do
     end do
@@ -579,7 +604,7 @@ module epcoup
       write(*,'(A)') "------------------------------------------------------------"
       write(*,*) "Calculating couplings from dense e-p matrix..."
 
-      call readEPCf(inp, epc, olap)
+      call readEPC(inp, epc, olap)
       call copyToSec(olap, olap_sec, inp)
       call CoupToFile(olap)
       call writeNaEig(olap_sec, inp)
@@ -589,7 +614,8 @@ module epcoup
       write(*,'(A)') "------------------------------------------------------------"
       write(*,*) "Calculating couplings from e-p matrix..."
 
-      call readEPC(inp, epc)
+      ! call readEPCold(inp, epc)
+      call readEPC(inp, epc, olap)
       call phDecomp(inp, epc)
       call kqMatch(epc)
      
