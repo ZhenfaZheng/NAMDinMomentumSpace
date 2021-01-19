@@ -17,9 +17,9 @@ module epcoup
     integer, allocatable, dimension(:,:,:) :: kkqmap
     !! map ik & jk of electronic states to q or -q of e-p matrix.
     real(kind=q), allocatable, dimension(:,:) :: energy
-    real(kind=q), allocatable, dimension(:,:) :: cellepc
-    real(kind=q), allocatable, dimension(:,:) :: kptsepc
-    real(kind=q), allocatable, dimension(:,:) :: qptsepc
+    real(kind=q), allocatable, dimension(:,:) :: cellep
+    real(kind=q), allocatable, dimension(:,:) :: kptsep
+    real(kind=q), allocatable, dimension(:,:) :: qptsep
     real(kind=q), allocatable, dimension(:,:) :: freqep
     real(kind=q), allocatable, dimension(:,:) :: freqph
     real(kind=q), allocatable, dimension(:,:) :: qptsph
@@ -33,6 +33,32 @@ module epcoup
   end type
 
   contains
+
+  subroutine releaseEPC(epc)
+    implicit none
+
+    type(epCoupling), intent(inout) :: epc
+
+    if ( allocated(epc%R) ) deallocate(epc%R)
+    if ( allocated(epc%atnum) ) deallocate(epc%atnum)
+    if ( allocated(epc%qqmap) ) deallocate(epc%qqmap)
+    if ( allocated(epc%kkqmap) ) deallocate(epc%kkqmap)
+    if ( allocated(epc%energy) ) deallocate(epc%energy)
+    if ( allocated(epc%cellep) ) deallocate(epc%cellep)
+    if ( allocated(epc%kptsep) ) deallocate(epc%kptsep)
+    if ( allocated(epc%qptsep) ) deallocate(epc%qptsep)
+    if ( allocated(epc%freqep) ) deallocate(epc%freqep)
+    if ( allocated(epc%freqph) ) deallocate(epc%freqph)
+    if ( allocated(epc%qptsph) ) deallocate(epc%qptsph)
+    if ( allocated(epc%epmat) ) deallocate(epc%epmat)
+    if ( allocated(epc%phmodes) ) deallocate(epc%phmodes)
+    if ( allocated(epc%cellmd) ) deallocate(epc%cellmd)
+    if ( allocated(epc%displ) ) deallocate(epc%displ)
+    if ( allocated(epc%vel) ) deallocate(epc%vel)
+    if ( allocated(epc%phproj) ) deallocate(epc%phproj)
+
+  end subroutine releaseEPC
+
 
   subroutine readEPC(inp, epc, olap)
     ! Read informations about e-p couplings from files in epc/.
@@ -76,14 +102,14 @@ module epcoup
     do ipool=1,npool
       read(unit=30, fmt=*) nkq(ipool)
     end do
-    allocate(epc%cellepc(na+3,3))
+    allocate(epc%cellep(na+3,3))
     read(unit=30, fmt=*)
     do i=1,3
-      read(unit=30, fmt=*) (epc%cellepc(i,j), j=1,3)
+      read(unit=30, fmt=*) (epc%cellep(i,j), j=1,3)
     enddo
     read(unit=30, fmt=*)
     do i=1,na
-      read(unit=30, fmt=*) (epc%cellepc(i+3,j), j=1,3)
+      read(unit=30, fmt=*) (epc%cellep(i+3,j), j=1,3)
     enddo
 
     nb = bndmax - bndmin + 1
@@ -101,11 +127,11 @@ module epcoup
       stop
     end if
 
-    allocate(epc%kptsepc(nk,3), epc%energy(nk,nb))
+    allocate(epc%kptsep(nk,3), epc%energy(nk,nb))
     read(unit=31, fmt=*)
     do ik=1,nk
       read(unit=31, fmt=*)
-      read(unit=31, fmt=*) epc%kptsepc(ik,:)
+      read(unit=31, fmt=*) epc%kptsep(ik,:)
       do ib=1,nb
         read(unit=31, fmt=*) epc%energy(ik,ib)
         olap%Eig(ib+nb*(ik-1),:) = epc%energy(ik,ib)
@@ -120,11 +146,11 @@ module epcoup
       stop
     end if
 
-    allocate(epc%qptsepc(nq,3), epc%freqep(nq,nm))
+    allocate(epc%qptsep(nq,3), epc%freqep(nq,nm))
     read(unit=32, fmt=*)
     do iq=1,epc%nqpts
       read(unit=32, fmt=*)
-      read(unit=32, fmt=*) epc%qptsepc(iq,:)
+      read(unit=32, fmt=*) epc%qptsep(iq,:)
       do im=1,epc%nmodes
         read(unit=32, fmt=*) epc%freqep(iq,im)
       end do
@@ -206,29 +232,29 @@ module epcoup
     epc%nmodes = nm
     epc%nqpts  = nq
     epc%natepc = na
-    allocate(epc%cellepc(na+3,3), &
-             epc%kptsepc(nk,3), &
-             epc%qptsepc(nq,3), &
+    allocate(epc%cellep(na+3,3), &
+             epc%kptsep(nk,3), &
+             epc%qptsep(nq,3), &
              epc%energy(nk,nb), &
              epc%epmat(nb,nb,nk,nm,nq))
 
     read(unit=90, fmt=*)
     do i=1,3
-      read(unit=90, fmt=*) (epc%cellepc(i,j), j=1,3)
+      read(unit=90, fmt=*) (epc%cellep(i,j), j=1,3)
     enddo
     read(unit=90, fmt=*)
     do i=1,na
-      read(unit=90, fmt=*) (epc%cellepc(i+3,j), j=1,3)
+      read(unit=90, fmt=*) (epc%cellep(i+3,j), j=1,3)
     enddo
 
     read(unit=90, fmt=*)
     do i=1,nk
-      read(unit=90, fmt=*) (epc%kptsepc(i,j), j=1,3)
+      read(unit=90, fmt=*) (epc%kptsep(i,j), j=1,3)
     enddo
 
     read(unit=90, fmt=*)
     do i=1,nq
-      read(unit=90, fmt=*) (epc%qptsepc(i,j), j=1,3)
+      read(unit=90, fmt=*) (epc%qptsep(i,j), j=1,3)
     enddo
 
     read(unit=90, fmt=*)
@@ -282,7 +308,7 @@ module epcoup
     allocate(epc%freqph(nqs, nmodes))
     allocate(qpt(3), at(3, 3))
 
-    at = epc%cellepc(1:3,1:3) / epc%cellepc(1,1)
+    at = epc%cellep(1:3,1:3) / epc%cellep(1,1)
     ! write(*,'(3f12.7)') ((at(i,iax),i=1,3), iax=1,3)
 
     do iq=1,nqs
@@ -409,13 +435,13 @@ module epcoup
              N(3), dr(3), temp1(3), temp2(3))
 
     do iax=1,3
-      N(iax) = NINT( SUM(epc%cellmd(iax,:)) / SUM(epc%cellepc(iax,:)) )
+      N(iax) = NINT( SUM(epc%cellmd(iax,:)) / SUM(epc%cellep(iax,:)) )
     enddo
 
     do ia=1,epc%natmd
       temp1 = 9999.9
       do ja=1,epc%natepc
-        dr = epc%cellmd(ia+3,:) * N - epc%cellepc(ja+3,:)
+        dr = epc%cellmd(ia+3,:) * N - epc%cellep(ja+3,:)
         do iax=1,3
           temp2(iax) = ABS( dr(iax) - NINT(dr(iax)) )
         enddo
@@ -528,8 +554,8 @@ module epcoup
     do ik=1,epc%nkpts
       do jk=1,epc%nkpts
         do iq=1,epc%nqpts
-          dkq1 = epc%kptsepc(ik,:) - epc%kptsepc(jk,:) - epc%qptsepc(iq,:)
-          dkq2 = epc%kptsepc(ik,:) - epc%kptsepc(jk,:) + epc%qptsepc(iq,:)
+          dkq1 = epc%kptsep(ik,:) - epc%kptsep(jk,:) - epc%qptsep(iq,:)
+          dkq2 = epc%kptsep(ik,:) - epc%kptsep(jk,:) + epc%qptsep(iq,:)
           do iax=1,3
             dkq1(iax) = ABS(dkq1(iax)-NINT(dkq1(iax)))
             dkq2(iax) = ABS(dkq2(iax)-NINT(dkq2(iax)))
@@ -543,7 +569,7 @@ module epcoup
 
     do iq=1,epc%nqpts
       do jq=1,epc%nqpts
-        dq = epc%qptsepc(iq,:) - epc%qptsph(jq,:)
+        dq = epc%qptsep(iq,:) - epc%qptsph(jq,:)
         do iax=1,3
           dq(iax) = ABS(dq(iax)-NINT(dq(iax)))
         end do
@@ -649,8 +675,7 @@ module epcoup
                     end do
                   end if
                  
-                  temp = temp / SQRT(1.0 * epc%natmd / epc%natepc) &
-                         * 2 * inp%POTIM * imgUnit / hbar
+                  temp = temp / SQRT(1.0 * epc%natmd / epc%natepc)
                   olap%Dij(inp%NBANDS*(ik-1)+ib, jb+inp%NBANDS*(jk-1), t) = temp
 
                 end if
@@ -675,6 +700,9 @@ module epcoup
       call writeNaEig(olap_sec, inp)
 
     end if
+
+    call releaseEPC(epc)
+    deallocate(olap%Dij, olap%Eig)
 
   end subroutine TDepCoupIJ
 

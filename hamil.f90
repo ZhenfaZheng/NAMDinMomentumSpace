@@ -101,7 +101,7 @@ module hamil
       ks%eigKs(:,t) = olap%Eig(:, i)
       ! Divide by 2 * POTIM here, because we didn't do this in the calculation
       ! of couplings
-      ks%NAcoup(:,:,t) = olap%Dij(:,:, i) / (2*inp%POTIM)
+      if (.not. inp%LEPC) ks%NAcoup(:,:,t) = olap%Dij(:,:, i) / (2*inp%POTIM)
     end do
 
   end subroutine
@@ -125,7 +125,7 @@ module hamil
                    (ks%NAcoup(:,:,TION+1) - ks%NAcoup(:,:,TION)) * TELE / inp%NELM
 
     ! multiply by -i * hbar
-    ks%ham_c = -imgUnit * hbar * ks%ham_c 
+    if (.not. inp%LEPC) ks%ham_c = -imgUnit * hbar * ks%ham_c 
     
     ! the energy eigenvalue part
     do i=1, ks%ndim
