@@ -3,6 +3,7 @@ module epcoup
   use constants
   use fileio
   use couplings
+  use hdf5
 
   implicit none
 
@@ -204,6 +205,160 @@ module epcoup
     end do
 
   end subroutine readEPC
+
+  subroutine readEPCpert(inp, epc, olap)
+    ! Read information of e-ph coupling from perturbo.x output file
+    ! (prefix_ephmat_p1.h5), which is in form of hdf5.
+    ! Extract informations include: el bands, ph dispersion, k & q lists, ephmat
+
+    implicit none
+
+    type(namdInfo), intent(in) :: inp
+    type(epCoupling), intent(inout) :: epc
+    type(overlap), intent(inout) :: olap
+
+    integer :: hdferror, info(4)
+    integer :: nk, nq, nb, nm
+    integer :: ib, jb, ik, jk, im, iq
+    integer(hid_t) :: file_id, gr_id, dset_id
+    integer(hsize_t) :: dim1(1), dim2(2), dim4(4)
+    character(len=72) :: tagk, fname, grname, dsetname
+    real(kind=q) :: kbT, phn, dE
+    real(kind=q), allocatable, dimension(:,:) :: kqltemp
+    real(kind=q), allocatable, dimension(:,:,:,:) :: eptemp_r, eptemp_i
+    complex(kind=q), allocatable, dimension(:,:,:,:) :: eptemp
+    complex :: eptemp_s
+
+    call h5open_f(hdferror)
+    fname = 'graphene_ephmat_p1.h5'
+    call h5fopen_f(fname, H5F_ACC_RDONLY_F, file_id, hdferror)
+
+    ! Read el bands, ph dispersion, k & q lists.
+    grname = 'el_ph_band_info'
+    call h5gopen_f(file_id, grname, gr_id, hdferror)
+
+    dsetname = 'information'
+    dim1 = shape(info, kind=hsize_t)
+    call h5dopen_f(gr_id, dsetname, dset_id, hdferror)
+    call h5dread_f(dset_id, H5T_NATIVE_INTEGER, info, dim1, hdferror)
+    call h5dclose_f(dset_id, hdferror)
+    nk = info(1); epc%nkpts  = nk
+    nq = info(2); epc%nqpts  = nq
+    nb = info(3); epc%nbands = nb
+    nm = info(4); epc%nmodes = nm
+    ! write(*,*) info
+
+    dsetname = 'k_list'
+    allocate(kqltemp(3,nk), epc%kptsep(nk,3))
+    dim2 = shape(kqltemp, kind=hsize_t)
+    call h5dopen_f(gr_id, dsetname, dset_id, hdferror)
+    call h5dread_f(dset_id, H5T_NATIVE_DOUBLE, kqltemp, dim2, hdferror)
+    call h5dclose_f(dset_id, hdferror)
+    epc%kptsep = transpose(kqltemp)
+    deallocate(kqltemp)
+
+    dsetname = 'q_list'
+    allocate(kqltemp(3,nq), epc%qptsep(nq,3))
+    dim2 = shape(kqltemp, kind=hsize_t)
+    call h5dopen_f(gr_id, dsetname, dset_id, hdferror)
+    call h5dread_f(dset_id, H5T_NATIVE_DOUBLE, kqltemp, dim2, hdferror)
+    call h5dclose_f(dset_id, hdferror)
+    epc%qptsep = transpose(kqltemp)
+    deallocate(kqltemp)
+
+    dsetname = 'el_band_eV'
+    allocate(epc%energy(nb,nk))
+    dim2 = shape(epc%energy, kind=hsize_t)
+    call h5dopen_f(gr_id, dsetname, dset_id, hdferror)
+    call h5dread_f(dset_id, H5T_NATIVE_DOUBLE, epc%energy, dim2, hdferror)
+    call h5dclose_f(dset_id, hdferror)
+
+    do ik=1,nk
+      do ib=1,nb
+        olap%Eig(ib+nb*(ik-1),:) = epc%energy(ib,ik)
+      end do
+    end do
+
+    dsetname = 'ph_disp_meV'
+    allocate(epc%freqep(nm,nq))
+    dim2 = shape(epc%freqep, kind=hsize_t)
+    call h5dopen_f(gr_id, dsetname, dset_id, hdferror)
+    call h5dread_f(dset_id, H5T_NATIVE_DOUBLE, epc%freqep, dim2, hdferror)
+    call h5dclose_f(dset_id, hdferror)
+
+    call h5gclose_f(gr_id, hdferror)
+
+    ! Read e-ph matrix for every k.
+    grname = 'g_ephmat_total_meV'
+    call h5gopen_f(file_id, grname, gr_id, hdferror)
+    allocate(eptemp(nb, nb, nm, nq))
+    allocate(eptemp_r(nb, nb, nm, nq))
+    allocate(eptemp_i(nb, nb, nm, nq))
+    allocate(epc%epmat(nb, nb, nk, nm, nq))
+
+    call kqMatch(epc)
+    kbT = inp%TEMP * BOLKEV
+
+    do ik=1,nk
+
+      write(tagk, '(I8)') ik
+
+      dsetname = 'g_ik_r_' // trim( adjustl(tagk) )
+      dim4 = shape(eptemp, kind=hsize_t)
+      call h5dopen_f(gr_id, dsetname, dset_id, hdferror)
+      call h5dread_f(dset_id, H5T_NATIVE_DOUBLE, eptemp_r, dim4, hdferror)
+      call h5dclose_f(dset_id, hdferror)
+      ! if (ik==1) write(*,*) eptemp(1,1,:,2)
+
+      dsetname = 'g_ik_i_' // trim( adjustl(tagk) )
+      dim4 = shape(eptemp, kind=hsize_t)
+      call h5dopen_f(gr_id, dsetname, dset_id, hdferror)
+      call h5dread_f(dset_id, H5T_NATIVE_DOUBLE, eptemp_i, dim4, hdferror)
+      call h5dclose_f(dset_id, hdferror)
+
+      eptemp = ( eptemp_r + imgUnit * eptemp_i ) / 1000
+      epc%epmat(:,:,ik,:,:) = eptemp
+
+      do jk=1,nk
+        iq = epc%kkqmap(ik, jk, 1)
+        ! write(*,'(6F6.3)') epc%kptsep(ik,1:2), epc%kptsep(jk,1:2), epc%qptsep(iq,1:2)
+        if (iq<0) exit
+        do im=1,nm
+          do jb=1,epc%nbands
+            do ib=1,epc%nbands
+              eptemp_s = eptemp(ib, jb, im, iq)
+              dE = epc%energy(ib,ik) - epc%energy(jb,jk) - epc%freqep(im,iq)/1000
+              ! write(*,'(8I4)') ik, ib, jk, jb, im, iq
+              ! write(*,'(4F8.3)') dE, epc%energy(ib,ik), epc%energy(jb,jk), epc%freqep(im,iq)
+              eptemp_s = eptemp_s * 0.015**2 / (dE**2 + 0.015**2) / PI
+              if (epc%freqep(im,iq)>5) then
+                phn = 1.0 / (exp(epc%freqep(im,iq)/1000/kbT)-1)
+              else
+                phn = 0.0
+              end if
+              ! write(*,'(2F8.3)') 0.015**2 / (dE**2 + 0.015**2) / PI, phn
+              eptemp_s = eptemp_s * (sqrt(phn) + sqrt(phn+1))
+              olap%Dij(nb*(ik-1)+ib, jb+nb*(jk-1), :) &
+              = olap%Dij(nb*(ik-1)+ib, jb+nb*(jk-1), :) + eptemp_s
+            end do
+          end do
+        enddo
+      enddo
+
+    enddo
+
+    call h5gclose_f(gr_id, hdferror)
+
+    call h5fclose_f(file_id, hdferror)
+
+    do ib=1,nb*nk
+      olap%Dij(ib,ib,:) = real(olap%Dij(ib,ib,:))
+      do jb=ib+1,nb*nk
+        olap%Dij(jb,ib,:) = CONJG(olap%Dij(ib,jb,:))
+      enddo
+    enddo
+
+  end subroutine readEPCpert
 
 
   subroutine readEPCold(inp, epc)
@@ -567,18 +722,20 @@ module epcoup
       end do
     end do
 
-    do iq=1,epc%nqpts
-      do jq=1,epc%nqpts
-        dq = epc%qptsep(iq,:) - epc%qptsph(jq,:)
-        do iax=1,3
-          dq(iax) = ABS(dq(iax)-NINT(dq(iax)))
+    if (allocated(epc%qptsph)) then
+      do iq=1,epc%nqpts
+        do jq=1,epc%nqpts
+          dq = epc%qptsep(iq,:) - epc%qptsph(jq,:)
+          do iax=1,3
+            dq(iax) = ABS(dq(iax)-NINT(dq(iax)))
+          end do
+          if (SUM(dq)<norm) then
+            epc%qqmap(iq) = jq
+            exit
+          end if
         end do
-        if (SUM(dq)<norm) then
-          epc%qqmap(iq) = jq
-          exit
-        end if
       end do
-    end do
+    end if
 
   end subroutine kqMatch
 
@@ -630,7 +787,7 @@ module epcoup
       write(*,'(A)') "------------------------------------------------------------"
       write(*,*) "Calculating couplings from dense e-p matrix..."
 
-      call readEPC(inp, epc, olap)
+      call readEPCpert(inp, epc, olap)
       call copyToSec(olap, olap_sec, inp)
       call CoupToFile(olap)
       call writeNaEig(olap_sec, inp)

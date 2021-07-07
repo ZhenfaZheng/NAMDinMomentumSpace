@@ -7,4 +7,5 @@ namd
 
 # ignore test folder
 test
-test2
+perttest
+copy

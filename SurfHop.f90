@@ -90,7 +90,7 @@ module shop
     else
       do i=1, ks%ndim
         dE = ks%eigKs(i,tion) - ks%eigKs(cstat, tion)
-        if (ks%eigKs(i,tion)<-2.0) then
+        if (ks%eigKs(i,tion)<-20.0) then
           ks%sh_prop(i,tion) = 0.0
         else if (dE>0) then
           ks%sh_prop(i,tion) = ks%sh_prop(i,tion) * exp(-dE / kbT)
@@ -185,11 +185,13 @@ module shop
     end do
 
     do tion=1, inp%NAMDTIME
-      write(unit=24, fmt=*) tion * inp%POTIM, SUM(ks%eigKs(:,tion) * ks%sh_pops(:,tion)), &
-                            (ks%sh_pops(i,tion), i=1, ks%ndim)
-      write(unit=25, fmt=*) tion * inp%POTIM, SUM(ks%eigKs(:,tion) * ks%pop_a(:,tion)), &
-                            (ks%psi_a(i,tion), i=1, ks%ndim)
-                            ! (ks%pop_a(i,tion), i=1, ks%ndim)
+      write(unit=24, fmt='(*(G20.10))') &
+            tion * inp%POTIM, SUM(ks%eigKs(:,tion) * ks%sh_pops(:,tion)), &
+            (ks%sh_pops(i,tion), i=1, ks%ndim)
+      write(unit=25, fmt="(2G20.10, *( ' ( ',G20.10,' , ',G20.10,' ) ' ) )") &
+            tion * inp%POTIM, SUM(ks%eigKs(:,tion) * ks%pop_a(:,tion)), &
+            (ks%psi_a(i,tion), i=1, ks%ndim)
+          ! (ks%pop_a(i,tion), i=1, ks%ndim)
     end do
 
     close(24)

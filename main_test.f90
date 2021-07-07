@@ -21,7 +21,7 @@ Program main
   !call readEPC(inp, epc)
   !call phDecomp(inp, epc)
   !call kqMatch(epc)
-  call readEPCf(inp, epc, olap)
+  call readEPCpert(inp, epc, olap)
 
 
 end Program

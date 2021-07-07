@@ -29,3 +29,6 @@ If use LEPC=.TRUE. and EPCTYPE=1, the couplings do not change by time, can set N
 and set long NAMDTIME to reduce size of coupling files.
 For other case, we can use not so long NSW to simulate long NAMDTIME molecular dynamics.
 
+Version 1.3.0
+Add API for reading e-ph matrix from PERTURBO output file.
+Need to install hdf5, and its lib to Makefile. Because the PERTURBO file is in form of hdf5.

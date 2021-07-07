@@ -101,7 +101,12 @@ module hamil
       ks%eigKs(:,t) = olap%Eig(:, i)
       ! Divide by 2 * POTIM here, because we didn't do this in the calculation
       ! of couplings
-      if (.not. inp%LEPC) ks%NAcoup(:,:,t) = olap%Dij(:,:, i) / (2*inp%POTIM)
+      if (inp%LEPC) then
+        ks%NAcoup(:,:,t) = olap%Dij(:,:, i)
+      else
+        ks%NAcoup(:,:,t) = olap%Dij(:,:, i) / (2*inp%POTIM)
+      end if
+
     end do
 
   end subroutine
