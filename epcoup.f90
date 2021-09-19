@@ -299,6 +299,7 @@ module epcoup
     call kqMatch(epc)
     kbT = inp%TEMP * BOLKEV
 
+
     do ik=1,nk
 
       write(tagk, '(I8)') ik
@@ -330,11 +331,12 @@ module epcoup
               dE = epc%energy(ib,ik) - epc%energy(jb,jk) - epc%freqep(im,iq)/1000
               ! write(*,'(8I4)') ik, ib, jk, jb, im, iq
               ! write(*,'(4F8.3)') dE, epc%energy(ib,ik), epc%energy(jb,jk), epc%freqep(im,iq)
-              eptemp_s = eptemp_s * 0.015**2 / (dE**2 + 0.015**2) / PI
+              eptemp_s = eptemp_s * 0.02**2 / (dE**2 + 0.02**2) / PI
               if (epc%freqep(im,iq)>5) then
                 phn = 1.0 / (exp(epc%freqep(im,iq)/1000/kbT)-1)
               else
                 phn = 0.0
+                eptemp_s = cero
               end if
               ! write(*,'(2F8.3)') 0.015**2 / (dE**2 + 0.015**2) / PI, phn
               eptemp_s = eptemp_s * (sqrt(phn) + sqrt(phn+1))
@@ -357,6 +359,8 @@ module epcoup
         olap%Dij(jb,ib,:) = CONJG(olap%Dij(ib,jb,:))
       enddo
     enddo
+
+    write(*,*) 'Done !'
 
   end subroutine readEPCpert
 
@@ -743,7 +747,7 @@ module epcoup
   subroutine TDepCoupIJ(olap, olap_sec, inp, epc)
     implicit none
 
-    type(namdInfo), intent(in) :: inp
+    type(namdInfo), intent(inout) :: inp
     type(epCoupling), intent(inout) :: epc
     type(overlap), intent(inout) :: olap
     type(overlap), intent(inout) :: olap_sec
@@ -765,11 +769,11 @@ module epcoup
     olap%Dij = cero
     olap%EIg = cero
 
-    olap_sec%NBANDS = inp%NBASIS * inp%NKSEL
-    olap_sec%TSTEPS = inp%NSW
-    olap_sec%dt = inp%POTIM
-    allocate(olap_sec%Dij(olap_sec%NBANDS, olap_sec%NBANDS, olap_sec%TSTEPS-1))
-    allocate(olap_sec%Eig(olap_sec%NBANDS, olap_sec%TSTEPS-1))
+    ! olap_sec%NBANDS = inp%NBASIS
+    ! olap_sec%TSTEPS = inp%NSW
+    ! olap_sec%dt = inp%POTIM
+    ! allocate(olap_sec%Dij(olap_sec%NBANDS, olap_sec%NBANDS, olap_sec%TSTEPS-1))
+    ! allocate(olap_sec%Eig(olap_sec%NBANDS, olap_sec%TSTEPS-1))
 
     inquire(file='COUPCAR', exist=lcoup)
     if (lcoup) then
@@ -801,9 +805,9 @@ module epcoup
       call readEPC(inp, epc, olap)
       call phDecomp(inp, epc)
       call kqMatch(epc)
-     
+
       allocate(dkq(3), dq(3))
-     
+
       do t=1,inp%NSW-1
         do ib=1,inp%NBANDS
           do jb=1,inp%NBANDS
@@ -824,14 +828,14 @@ module epcoup
                       temp = temp + SQRT(phn) * epc%epmat(ib, jb, jk, im, iq)
                     end do
                   end if
-                 
+
                   if (jq2>0) then
                     do im=1,epc%nmodes
                       phn = ABS(epc%phproj(t, im, jq2))
                       temp = temp + SQRT(phn+1) * epc%epmat(ib, jb, jk, im, iq)
                     end do
                   end if
-                 
+
                   temp = temp / SQRT(1.0 * epc%natmd / epc%natepc)
                   olap%Dij(inp%NBANDS*(ik-1)+ib, jb+inp%NBANDS*(jk-1), t) = temp
 
@@ -842,7 +846,7 @@ module epcoup
           end do
         end do
       end do
-     
+
       do ib=1,inp%NBANDS
         do ik=1,inp%NKPOINTS
           olap%Eig(ib+inp%NBANDS*(ik-1),:) = epc%energy(ik,ib)
@@ -851,7 +855,7 @@ module epcoup
 
       write(*,*) "Done..."
       write(*,'(A)') "------------------------------------------------------------"
-     
+
       call copyToSec(olap, olap_sec, inp)
       call CoupToFile(olap)
       call writeNaEig(olap_sec, inp)
@@ -864,26 +868,96 @@ module epcoup
   end subroutine TDepCoupIJ
 
 
-  subroutine copyToSec(olap, olap_sec, inp)
+  subroutine selBasis(inp, olap)
     implicit none
-    type(overlap), intent(inout) :: olap_sec
-    type(overlap), intent(in) :: olap
-    type(namdInfo), intent(in) :: inp
 
-    integer :: ik, jk, NB, NBas
+    type(overlap), intent(in) :: olap
+    type(namdInfo), intent(inout) :: inp
+
+    integer :: ik, ib, NK, NB
+    real :: emin, emax
 
     NB = inp%NBANDS
-    NBas = inp%NBASIS
+    NK = inp%NKPOINTS
+    emin = inp%EMIN
+    emax = inp%EMAX
 
-    do ik=inp%KMIN,inp%KMAX
-      do jk=inp%KMIN,inp%KMAX
-        olap_sec%Dij( (ik-inp%KMIN)*NBas+1:(ik-inp%KMIN+1)*NBas, &
-                      (jk-inp%KMIN)*NBas+1:(jk-inp%KMIN+1)*NBas, : ) = &
-            olap%Dij( (ik-1)*NB+inp%BMIN:(ik-1)*NB+inp%BMAX, &
-                      (jk-1)*NB+inp%BMIN:(jk-1)*NB+inp%BMAX, : )
+    inp%NBASIS = 0
+    inp%BASSEL = -1
+
+    do ik=inp%KMIN, inp%KMAX
+      do ib=inp%BMIN, inp%BMAX
+        if ( olap%Eig((ik-1)*NB+ib, 1)>emin .and. &
+             olap%Eig((ik-1)*NB+ib, 1)<emax ) then
+          inp%NBASIS = inp%NBASIS + 1
+          inp%BASSEL(ik,ib) = inp%NBASIS
+        end if
       end do
-      olap_sec%Eig( (ik-inp%KMIN)*NBas+1:(ik-inp%KMIN+1)*NBas, : ) = &
-          olap%Eig( (ik-1)*NB+inp%BMIN:(ik-1)*NB+inp%BMAX, : )
+      write(unit=39, fmt='(*(I8))') inp%BASSEL(ik,:)
+    end do
+
+    open(unit=39, file='BASSEL', status='unknown', action='write')
+    write(unit=39, fmt='(A)') '# Basises selected from nk*nb eigen states'
+    write(unit=39, fmt='(A2,A6,I6,A2,A6,I6,A2,A10,I6)') &
+          '# ', 'NK = ', NK, ';', 'NB = ', NB, ' ', 'NBASIS = ', inp%NBASIS
+
+    do ik=1,NK
+      write(unit=39, fmt='(*(I8))') inp%BASSEL(ik,:)
+    end do
+
+    close(unit=39)
+
+    !! For array element inp%BASSEL(ik,ib),
+    !! -1 represent ik,ib state isn't selected as basis;
+    !! number >0 represent ik,ib state is selected as basis,
+    !! and the number is the state's serial number among the basises.
+
+  end subroutine selBasis
+
+
+  subroutine copyToSec(olap, olap_sec, inp)
+    implicit none
+    type(namdInfo), intent(inout) :: inp
+    type(overlap), intent(inout) :: olap_sec
+    type(overlap), intent(in) :: olap
+
+    integer :: ik, jk, ib, jb, NB, iBas, jBas
+
+    call selBasis(inp, olap)
+
+    NB = inp%NBANDS
+
+    olap_sec%dt = inp%POTIM
+    olap_sec%TSTEPS = inp%NSW
+    olap_sec%NBANDS = inp%NBASIS
+    allocate(olap_sec%Dij(inp%NBASIS, inp%NBASIS, inp%NSW-1))
+    allocate(olap_sec%Eig(inp%NBASIS, inp%NSW-1))
+
+    do ik=inp%KMIN, inp%KMAX
+      do ib=inp%BMIN, inp%BMAX
+
+        if (inp%BASSEL(ik,ib)>0) then
+
+          iBas = inp%BASSEL(ik,ib)
+          olap_sec%Eig(iBas, :) = olap%Eig((ik-1)*NB+ib, :)
+
+          do jk=inp%KMIN, inp%KMAX
+            do jb=inp%BMIN, inp%BMAX
+
+              if (inp%BASSEL(jk,jb)>0) then
+
+                jBas = inp%BASSEL(jk,jb)
+                olap_sec%Dij(iBas, jBas, :) = &
+                olap%Dij( (ik-1)*NB+ib, (ik-1)*NB+ib, : )
+
+              end if
+
+            end do
+          end do
+
+        end if
+
+      end do
     end do
 
   end subroutine copyToSec

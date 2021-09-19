@@ -115,7 +115,7 @@ module shop
 
     ks%sh_pops = 0
     ks%sh_prop = 0
-    istat = (inp%INIKPT-inp%KMIN)*inp%NBASIS + inp%INIBAND - inp%BMIN + 1
+    istat = inp%BASSEL(inp%INIKPT, inp%INIBAND)
 
     ! initialize the random seed for ramdom number production
     call init_random_seed()

@@ -8,15 +8,12 @@ module fileio
     integer :: BMAX
     integer :: NBASIS      ! No. of adiabatic states as basis
     integer :: NBANDS      ! No. of band of the system
-    integer :: NKPOINTS    ! No. of k-points of the system
     integer :: INIBAND     ! inititial adiabatic state of excited electron/hole
-    integer :: INIKPT      ! inititial k point of excited electron/hole
     integer :: NSW         ! No. of MD steps
     integer :: NAMDTINI    ! Initial time step of NAMD
     integer :: NAMDTIME    ! No. of steps of NAMD
     integer, allocatable, dimension(:) :: NAMDTINI_A    ! No. of steps of NAMD
     integer, allocatable, dimension(:) :: INIBAND_A     ! No. of steps of NAMD
-    integer, allocatable, dimension(:) :: INIKPT_A      ! No. of steps of NAMD
     integer :: NTRAJ       ! No. of surface hopping trajectories
     integer :: NELM        ! No. of steps of electron wave propagation
     integer :: NSAMPLE     ! No. of steps of electron wave propagation
@@ -30,6 +27,10 @@ module fileio
     logical :: LSHP
     logical :: LCPTXT
 
+    ! running directories
+    character(len=256) :: RUNDIR
+    character(len=256) :: TBINIT
+
     ! whether the WAVECARs come from gamma version VASP or not.
     ! for other version WAVECARs, the NA couplings are complex number.
     ! for gamma version WAVECARs, the NA couplings are real number.
@@ -41,11 +42,14 @@ module fileio
     integer :: EPCTYPE
     integer :: KMIN
     integer :: KMAX
-    integer :: NKSEL    ! No. of selected k-points for surface hopping
+    integer :: NKPOINTS    ! No. of k-points of the system
+    integer :: INIKPT      ! inititial k point of excited electron/hole
+    integer, allocatable, dimension(:) :: INIKPT_A      ! No. of steps of NAMD
+    integer, allocatable, dimension(:,:) :: BASSEL
+    ! selected basises among the nk*nb eigen states
+    real(kind=q) :: EMIN
+    real(kind=q) :: EMAX
 
-    ! running directories
-    character(len=256) :: RUNDIR
-    character(len=256) :: TBINIT
     character(len=256) :: FILEPC  ! epc file from EPW package, if LEPC=.TRUE.
     character(len=256) :: FILPH   ! phonon modes file from QE-PH, if LEPC=.TRUE.
     character(len=256) :: FILMD   ! MD trajetory (XDATCAR) from VASP, if LEPC=.TRUE.
@@ -89,6 +93,9 @@ module fileio
       integer :: epctype
       integer :: kmin
       integer :: kmax
+      integer :: ik, ib, num
+      real(kind=q) :: emin
+      real(kind=q) :: emax
 
 
       namelist /NAMDPARA/ bmin, bmax, nsw,      &
@@ -98,7 +105,7 @@ module fileio
                           lhole, lshp, lcpext,  &
                           lgamma, lepc, epctype,&
                           filepc, filph, filmd, &
-                          kmin, kmax,           &
+                          kmin, kmax, emin, emax, &
                           namdtime,             &
                           nsample, tbinit
 
@@ -130,6 +137,8 @@ module fileio
       filmd = 'XDATCAR'
       kmin = 1
       kmax = nkpoints
+      emin = -99999.9
+      emin =  99999.9
 
       open(file="inp", unit=8, status='unknown', action='read', iostat=ierr)
       if ( ierr /= 0 ) then
@@ -144,6 +153,7 @@ module fileio
           lgamma = .FALSE.
       end if
 
+      allocate(inp%BASSEL(nkpoints,nbands))
       allocate(inp%INIBAND_A(nsample), inp%NAMDTINI_A(nsample))
       allocate(inp%INIKPT_A(nsample))
 
@@ -214,7 +224,23 @@ module fileio
       inp%FILMD    = trim(filmd)
       inp%KMIN     = kmin
       inp%KMAX     = kmax
-      inp%NKSEL    = kmax - kmin + 1
+      inp%NBASIS   = inp%NBASIS * ( kmax - kmin + 1 )
+      inp%EMIN     = emin
+      inp%EMAX     = emax
+
+      num = 0
+      inp%BASSEL = -1 
+      !! For array element inp%BASSEL(ik,ib),
+      !! -1 represent ik,ib state isn't selected as basis;
+      !! number >0 represent ik,ib state is selected as basis,
+      !! and the number is the state's serial number among the basises.
+      do ik = kmin, kmax
+        do ib = bmin, bmax
+          num = num + 1
+          inp%BASSEL(ik,ib) = num
+        end do
+      end do
+
     end subroutine
 
     ! Need a subroutine to print out all the input parameters
