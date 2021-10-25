@@ -136,9 +136,9 @@ module fileio
       filph = 'prefix.matdyn.modes'
       filmd = 'XDATCAR'
       kmin = 1
-      kmax = nkpoints
+      kmax = 0
       emin = -99999.9
-      emin =  99999.9
+      emax =  99999.9
 
       open(file="inp", unit=8, status='unknown', action='read', iostat=ierr)
       if ( ierr /= 0 ) then
@@ -148,10 +148,9 @@ module fileio
       read(unit=8, nml=NAMDPARA)
       close(unit=8)
 
-      ! if No. of k-points more than 1, lgamma automatically set to False.
-      if ( nkpoints > 1) then
-          lgamma = .FALSE.
-      end if
+      ! if No. of k-points more than 1, lgamma is automatically set to False.
+      if ( nkpoints > 1) lgamma = .FALSE.
+      if ( kmax == 0 ) kmax = nkpoints
 
       allocate(inp%BASSEL(nkpoints,nbands))
       allocate(inp%INIBAND_A(nsample), inp%NAMDTINI_A(nsample))

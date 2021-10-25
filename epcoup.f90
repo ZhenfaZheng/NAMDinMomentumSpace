@@ -219,7 +219,7 @@ module epcoup
 
     integer :: hdferror, info(4)
     integer :: nk, nq, nb, nm
-    integer :: ib, jb, ik, jk, im, iq
+    integer :: ib, jb, ik, jk, im, iq, it, ibas, jbas
     integer(hid_t) :: file_id, gr_id, dset_id
     integer(hsize_t) :: dim1(1), dim2(2), dim4(4)
     character(len=72) :: tagk, fname, grname, dsetname
@@ -227,7 +227,7 @@ module epcoup
     real(kind=q), allocatable, dimension(:,:) :: kqltemp
     real(kind=q), allocatable, dimension(:,:,:,:) :: eptemp_r, eptemp_i
     complex(kind=q), allocatable, dimension(:,:,:,:) :: eptemp
-    complex :: eptemp_s
+    complex :: eptemp_s, iomega
 
     call h5open_f(hdferror)
     fname = 'graphene_ephmat_p1.h5'
@@ -299,7 +299,6 @@ module epcoup
     call kqMatch(epc)
     kbT = inp%TEMP * BOLKEV
 
-
     do ik=1,nk
 
       write(tagk, '(I8)') ik
@@ -321,39 +320,46 @@ module epcoup
       epc%epmat(:,:,ik,:,:) = eptemp
 
       do jk=1,nk
-        iq = epc%kkqmap(ik, jk, 1)
-        ! write(*,'(6F6.3)') epc%kptsep(ik,1:2), epc%kptsep(jk,1:2), epc%qptsep(iq,1:2)
-        if (iq<0) exit
-        do im=1,nm
-          do jb=1,epc%nbands
-            do ib=1,epc%nbands
-              eptemp_s = eptemp(ib, jb, im, iq)
-              dE = epc%energy(ib,ik) - epc%energy(jb,jk) - epc%freqep(im,iq)/1000
-              ! write(*,'(8I4)') ik, ib, jk, jb, im, iq
-              ! write(*,'(4F8.3)') dE, epc%energy(ib,ik), epc%energy(jb,jk), epc%freqep(im,iq)
-              eptemp_s = eptemp_s * 0.02**2 / (dE**2 + 0.02**2) / PI
-              if (epc%freqep(im,iq)>5) then
-                phn = 1.0 / (exp(epc%freqep(im,iq)/1000/kbT)-1)
-              else
-                phn = 0.0
-                eptemp_s = cero
-              end if
-              ! write(*,'(2F8.3)') 0.015**2 / (dE**2 + 0.015**2) / PI, phn
-              eptemp_s = eptemp_s * (sqrt(phn) + sqrt(phn+1))
-              olap%Dij(nb*(ik-1)+ib, jb+nb*(jk-1), :) &
-              = olap%Dij(nb*(ik-1)+ib, jb+nb*(jk-1), :) + eptemp_s
-            end do
-          end do
-        enddo
-      enddo
 
-    enddo
+        iq = epc%kkqmap(ik, jk, 1)
+        if (iq<0) cycle
+
+        do im=1,nm
+
+          if (epc%freqep(im,iq)<5) cycle
+          phn = 1.0 / (exp(epc%freqep(im,iq)/1000/kbT)-1)
+          iomega = imgUnit * epc%freqep(im,iq)/1000/hbar
+
+          do jb=1,nb
+            do ib=1,nb
+
+              ibas = nb*(ik-1)+ib
+              jbas = nb*(jk-1)+jb
+              eptemp_s = eptemp(ib, jb, im, iq)
+
+              do it=1,inp%NSW-1
+                olap%Dij(ibas, jbas, it) &
+                = olap%Dij(ibas, jbas, it) + eptemp_s * &
+                ( sqrt(phn)*exp(-iomega*it) + sqrt(phn+1)*exp(iomega*it) )
+              end do ! it loop
+
+            end do ! ib loop
+          end do ! jb loop
+
+        enddo ! im loop
+
+      enddo ! jk loop
+
+    enddo ! ik loop
 
     call h5gclose_f(gr_id, hdferror)
 
     call h5fclose_f(file_id, hdferror)
 
+    olap%Dij = olap%Dij / sqrt(1.0*nq)
     do ib=1,nb*nk
+      ! olap%Eig(ib,:) = olap%Eig(ib,:) + real(olap%Dij(ib,ib,:))
+      ! olap%Dij(ib,ib,:) = cero
       olap%Dij(ib,ib,:) = real(olap%Dij(ib,ib,:))
       do jb=ib+1,nb*nk
         olap%Dij(jb,ib,:) = CONJG(olap%Dij(ib,jb,:))
@@ -948,7 +954,7 @@ module epcoup
 
                 jBas = inp%BASSEL(jk,jb)
                 olap_sec%Dij(iBas, jBas, :) = &
-                olap%Dij( (ik-1)*NB+ib, (ik-1)*NB+ib, : )
+                olap%Dij( (ik-1)*NB+ib, (jk-1)*NB+jb, : )
 
               end if
 

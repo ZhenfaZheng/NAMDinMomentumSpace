@@ -38,3 +38,7 @@ Add EMIN, EMAX tags to choose states in specified energy range.
 Selected basises are outputted to file BASSEL, which in form of nk lines and nbands rows numbers.
 The number >0 represent the corresponding state is choosen, 
 and the number is the state's serial number among the basises.
+
+Version 1.3.2
+Remove the energy conservation operation because the energy conservation 
+is contained in the time-dependent Schrodinger equation naturely.
