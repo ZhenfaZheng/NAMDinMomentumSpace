@@ -90,9 +90,7 @@ module shop
     else
       do i=1, ks%ndim
         dE = ks%eigKs(i,tion) - ks%eigKs(cstat, tion)
-        if (ks%eigKs(i,tion)<-20.0) then
-          ks%sh_prop(i,tion) = 0.0
-        else if (dE>0) then
+        if (dE>0) then
           ks%sh_prop(i,tion) = ks%sh_prop(i,tion) * exp(-dE / kbT)
         end if
       end do

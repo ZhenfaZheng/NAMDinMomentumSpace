@@ -15,8 +15,9 @@ module epcoup
     !! cell numbers for each atoms of md cell
     integer, allocatable, dimension(:) :: qqmap
     !! map q points in phonon calculation to q points in e-p calcultion.
-    integer, allocatable, dimension(:,:,:) :: kkqmap
+    integer, allocatable, dimension(:,:) :: kkqmap
     !! map ik & jk of electronic states to q or -q of e-p matrix.
+    real(kind=q), allocatable, dimension(:) :: mass
     real(kind=q), allocatable, dimension(:,:) :: energy
     real(kind=q), allocatable, dimension(:,:) :: cellep
     real(kind=q), allocatable, dimension(:,:) :: kptsep
@@ -24,6 +25,7 @@ module epcoup
     real(kind=q), allocatable, dimension(:,:) :: freqep
     real(kind=q), allocatable, dimension(:,:) :: freqph
     real(kind=q), allocatable, dimension(:,:) :: qptsph
+    complex(kind=q), allocatable, dimension(:,:,:) :: normcoord
     complex(kind=q), allocatable, dimension(:,:,:,:,:) :: epmat
     complex(kind=q), allocatable, dimension(:,:,:,:) :: phmodes
     real(kind=q), allocatable, dimension(:,:) :: cellmd
@@ -218,14 +220,14 @@ module epcoup
     type(overlap), intent(inout) :: olap
 
     integer :: hdferror, info(4)
-    integer :: nk, nq, nb, nm
+    integer :: nk, nq, nb, nm, nat
     integer :: ib, jb, ik, jk, im, iq, it, ibas, jbas
     integer(hid_t) :: file_id, gr_id, dset_id
     integer(hsize_t) :: dim1(1), dim2(2), dim4(4)
     character(len=72) :: tagk, fname, grname, dsetname
     real(kind=q) :: kbT, phn, dE
-    real(kind=q), allocatable, dimension(:,:) :: kqltemp
-    real(kind=q), allocatable, dimension(:,:,:,:) :: eptemp_r, eptemp_i
+    real(kind=q), allocatable, dimension(:,:) :: kqltemp, pos, lattvec
+    real(kind=q), allocatable, dimension(:,:,:,:) :: eptemp_r, eptemp_i, phmtemp
     complex(kind=q), allocatable, dimension(:,:,:,:) :: eptemp
     complex :: eptemp_s, iomega
 
@@ -246,7 +248,31 @@ module epcoup
     nq = info(2); epc%nqpts  = nq
     nb = info(3); epc%nbands = nb
     nm = info(4); epc%nmodes = nm
+    nat = nm/3  ; epc%natepc = nat
     ! write(*,*) info
+
+    dsetname = 'mass_a.u.'
+    allocate(epc%mass(nat))
+    dim1 = shape(epc%mass, kind=hsize_t)
+    call h5dopen_f(gr_id, dsetname, dset_id, hdferror)
+    call h5dread_f(dset_id, H5T_NATIVE_INTEGER, epc%mass, dim1, hdferror)
+    call h5dclose_f(dset_id, hdferror)
+
+    dsetname = 'lattice_vec_angstrom'
+    allocate(epc%cellep(nat+3,3), lattvec(3,3))
+    dim2 = shape(lattvec, kind=hsize_t)
+    call h5dopen_f(gr_id, dsetname, dset_id, hdferror)
+    call h5dread_f(dset_id, H5T_NATIVE_DOUBLE, lattvec, dim2, hdferror)
+    call h5dclose_f(dset_id, hdferror)
+    epc%cellep(:3,:) = transpose(lattvec)
+
+    dsetname = 'atom_pos'
+    allocate(pos(3,nat))
+    dim2 = shape(pos, kind=hsize_t)
+    call h5dopen_f(gr_id, dsetname, dset_id, hdferror)
+    call h5dread_f(dset_id, H5T_NATIVE_DOUBLE, pos, dim2, hdferror)
+    call h5dclose_f(dset_id, hdferror)
+    epc%cellep(4:,:) = transpose(pos)
 
     dsetname = 'k_list'
     allocate(kqltemp(3,nk), epc%kptsep(nk,3))
@@ -286,6 +312,21 @@ module epcoup
     call h5dread_f(dset_id, H5T_NATIVE_DOUBLE, epc%freqep, dim2, hdferror)
     call h5dclose_f(dset_id, hdferror)
 
+    dsetname = 'phmod_ev_r'
+    allocate(epc%phmodes(nq, nm, nat, 3))
+    allocate(phmtemp(nq, nm, nat, 3))
+    dim4 = shape(phmtemp, kind=hsize_t)
+    call h5dopen_f(gr_id, dsetname, dset_id, hdferror)
+    call h5dread_f(dset_id, H5T_NATIVE_DOUBLE, phmtemp, dim2, hdferror)
+    call h5dclose_f(dset_id, hdferror)
+    epc%phmodes = phmtemp
+
+    dsetname = 'phmod_ev_i'
+    call h5dopen_f(gr_id, dsetname, dset_id, hdferror)
+    call h5dread_f(dset_id, H5T_NATIVE_DOUBLE, phmtemp, dim2, hdferror)
+    call h5dclose_f(dset_id, hdferror)
+    epc%phmodes = epc%phmodes + imgUnit * phmtemp
+
     call h5gclose_f(gr_id, hdferror)
 
     ! Read e-ph matrix for every k.
@@ -321,7 +362,7 @@ module epcoup
 
       do jk=1,nk
 
-        iq = epc%kkqmap(ik, jk, 1)
+        iq = epc%kkqmap(ik, jk)
         if (iq<0) cycle
 
         do im=1,nm
@@ -630,48 +671,42 @@ module epcoup
     type(namdInfo), intent(in) :: inp
     type(epCoupling), intent(inout) :: epc
 
-    ! The normal mode coordinate and its derivative.
-    complex(kind=q) :: Qn, dQn
+    ! The normal mode coordinate
+    complex(kind=q) :: tempQ
     ! The potential and kinetic energies of the normal mode.
-    real(kind=q) :: Eu, Ek
     real(kind=q) :: theta
-    real(kind=q), allocatable, dimension(:) :: displ, vel
+    real(kind=q), allocatable, dimension(:) :: displ
     integer :: iq, im, ia, iax, t
     integer :: nqs, nmodes, nat
 
-    call readPhmodes(inp, epc)
+    ! call readPhmodes(inp, epc)
     call readDISPL(inp, epc)
     call cellPROJ(epc)
 
     nmodes = epc%nmodes
     nqs = epc%nqpts
-    allocate(epc%phproj(inp%NSW, nmodes, nqs), displ(3), vel(3))
+    allocate(epc%phproj(inp%NSW, nmodes, nqs), displ(3))
+    allocate(epc%normcoord(inp%NSW, nmodes, nqs))
 
     do t=1,inp%NSW
       do iq=1,epc%nqpts
         do im=1,epc%nmodes
-          Qn = cero; dQn = cero
+          tempQ = cero
           do ia=1,epc%natmd
-            displ = 0.0; vel = 0.0
+            displ = 0.0
             do iax=1,3
               displ = displ + epc%displ(t, ia, iax) * epc%cellmd(iax, :) 
-              vel = vel + epc%vel(t, ia, iax) * epc%cellmd(iax, :) 
             end do
-            theta = 2 * PI * DOT_PRODUCT( epc%qptsph(iq,:), epc%R(ia,:) )
-            Qn  =  Qn + EXP(imgUnit*theta) * DOT_PRODUCT( &
-                      CONJG(epc%phmodes(iq, im, epc%atnum(ia), :)), displ )
-            dQn = dQn + EXP(imgUnit*theta) * DOT_PRODUCT( &
-                      CONJG(epc%phmodes(iq, im, epc%atnum(ia), :)), vel )
+            theta = 2 * PI * DOT_PRODUCT( epc%qptsep(iq,:), epc%R(ia,:) )
+            tempQ  =  tempQ + EXP(imgUnit*theta) * epc%mass(epc%atnum(ia)) * &
+              DOT_PRODUCT( CONJG(epc%phmodes(iq, im, epc%atnum(ia), :)), displ )
           end do
-          ! mass of C = 12.011
-          Eu = 0.5 * 12.011 * epc%freqph(iq, im)**2 * CONJG(Qn) * Qn / epc%natmd &
-            * 1.66 * 6.2415 / 100000
-          Ek = 0.5 * 12.011 * CONJG(dQn) * dQn / epc%natmd &
-            * 1.66 * 6.2415 * 10
-          epc%phproj(t, im, iq) = (Eu + Ek) / ( hbar * epc%freqph(iq, im) / 1000 )
+          epc%normcoord(t, im, iq) = tempQ / sqrt(0.5*epc%natmd)
         end do
       end do
     end do
+
+    write(*,*) 'phDe done'
 
     call savePhp(inp, epc)
 
@@ -704,14 +739,14 @@ module epcoup
     type(epCoupling), intent(inout) :: epc
 
     real(kind=q) :: norm
-    real(kind=q) :: dkq1(3), dkq2(3), dq(3)
+    real(kind=q) :: dkq(3), dq(3)
     integer :: ik, jk, iq, jq, iax
 
-    norm = 0.005
+    norm = 0.001
     ! If k1-k2 < norm, recognize k1 and k2 as same k point.
-    ! So, number of kx, ky, kz or qx, qy, qz must not supass 1/norm = 200
+    ! So, number of kx, ky, kz or qx, qy, qz must not supass 1/norm = 1000
 
-    allocate(epc%kkqmap(epc%nkpts,epc%nkpts,2), epc%qqmap(epc%nqpts))
+    allocate(epc%kkqmap(epc%nkpts,epc%nkpts), epc%qqmap(epc%nqpts))
 
     epc%kkqmap = -1
     epc%qqmap = -1
@@ -719,15 +754,14 @@ module epcoup
     do ik=1,epc%nkpts
       do jk=1,epc%nkpts
         do iq=1,epc%nqpts
-          dkq1 = epc%kptsep(ik,:) - epc%kptsep(jk,:) - epc%qptsep(iq,:)
-          dkq2 = epc%kptsep(ik,:) - epc%kptsep(jk,:) + epc%qptsep(iq,:)
+          dkq = epc%kptsep(ik,:) - epc%kptsep(jk,:) - epc%qptsep(iq,:)
           do iax=1,3
-            dkq1(iax) = ABS(dkq1(iax)-NINT(dkq1(iax)))
-            dkq2(iax) = ABS(dkq2(iax)-NINT(dkq2(iax)))
+            dkq(iax) = ABS(dkq(iax)-NINT(dkq(iax)))
           end do
-          if (SUM(dkq1)<norm) epc%kkqmap(ik,jk,1) = iq
-          if (SUM(dkq2)<norm) epc%kkqmap(ik,jk,2) = iq
-          if (epc%kkqmap(ik,jk,1)>0 .and. epc%kkqmap(ik,jk,2)>0) exit
+          if (SUM(dkq)<norm) then
+              epc%kkqmap(ik,jk) = iq
+              exit
+          end if
         end do
       end do
     end do
@@ -748,6 +782,62 @@ module epcoup
     end if
 
   end subroutine kqMatch
+
+
+  subroutine calcEPC(olap, inp, epc)
+    implicit none
+
+    type(overlap), intent(inout) :: olap
+    type(namdInfo), intent(in) :: inp
+    type(epCoupling), intent(in) :: epc
+
+    integer :: nsw, nk, nb, nq, nm, Np
+    integer :: it, ik, jk, ib, jb, iq, im, ibas, jbas
+    real(kind=q) :: lqv ! zero-point displacement amplitude
+
+    nsw = inp%NSW
+    nk  = inp%NKPOINTS
+    nb  = inp%NBANDS
+    nm  = epc%nmodes
+
+    lqv = hbar * sqrt(0.5/AMTOKG * EVTOJ) * 1.0E-5_q
+
+    do ik=1,nk
+      do jk=1,nk
+
+        iq = epc%kkqmap(ik,jk)
+        if (iq<0) cycle
+
+        do ib=1,nb
+          do jb=1,nb
+
+            ibas = nb*(ik-1)+ib
+            jbas = nb*(jk-1)+jb
+
+            do im=1,nm
+              lqv = lqv / sqrt(epc%freqep(im, iq)/1000.0) ! in unit Angstrom
+              do it=1,nsw-1
+                olap%Dij(ibas, jbas, it) = olap%Dij(ibas, jbas, it) &
+                + epc%epmat(ib,jb,ik,im,iq) * epc%normcoord(it,im,iq) / lqv
+              end do
+            end do
+
+          end do
+        end do
+
+      end do
+    end do
+
+    do ib=1,nb
+      do ik=1,nk
+        olap%Eig(nb*(ik-1)+ib,:) = epc%energy(ib,ik)
+      enddo
+    enddo
+
+   Np = epc%natmd / epc%natepc
+   olap%Dij = olap%Dij / sqrt(1.0 * Np)
+
+  end subroutine calcEPC
 
 
   subroutine TDepCoupIJ(olap, olap_sec, inp, epc)
@@ -808,56 +898,10 @@ module epcoup
       write(*,*) "Calculating couplings from e-p matrix..."
 
       ! call readEPCold(inp, epc)
-      call readEPC(inp, epc, olap)
+      call readEPCpert(inp, epc, olap)
       call phDecomp(inp, epc)
-      call kqMatch(epc)
-
-      allocate(dkq(3), dq(3))
-
-      do t=1,inp%NSW-1
-        do ib=1,inp%NBANDS
-          do jb=1,inp%NBANDS
-            do ik=1,inp%NKPOINTS
-              do jk=1,inp%NKPOINTS
-
-                iq = epc%kkqmap(ik,jk,1)
-
-                if (iq>0) then
-
-                  temp = (0.0, 0.0)
-                  jq1 = epc%qqmap(epc%kkqmap(ik,jk,1)) ! ik-jk =  q
-                  jq2 = epc%qqmap(epc%kkqmap(ik,jk,2)) ! ik-jk = -q
-
-                  if (jq1>0) then
-                    do im=1,epc%nmodes
-                      phn = ABS(epc%phproj(t, im, jq1))
-                      temp = temp + SQRT(phn) * epc%epmat(ib, jb, jk, im, iq)
-                    end do
-                  end if
-
-                  if (jq2>0) then
-                    do im=1,epc%nmodes
-                      phn = ABS(epc%phproj(t, im, jq2))
-                      temp = temp + SQRT(phn+1) * epc%epmat(ib, jb, jk, im, iq)
-                    end do
-                  end if
-
-                  temp = temp / SQRT(1.0 * epc%natmd / epc%natepc)
-                  olap%Dij(inp%NBANDS*(ik-1)+ib, jb+inp%NBANDS*(jk-1), t) = temp
-
-                end if
-
-              end do
-            end do
-          end do
-        end do
-      end do
-
-      do ib=1,inp%NBANDS
-        do ik=1,inp%NKPOINTS
-          olap%Eig(ib+inp%NBANDS*(ik-1),:) = epc%energy(ik,ib)
-        enddo
-      enddo
+      ! call kqMatch(epc)
+      call calcEPC(olap, inp, epc)
 
       write(*,*) "Done..."
       write(*,'(A)') "------------------------------------------------------------"

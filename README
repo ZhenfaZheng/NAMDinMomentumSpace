@@ -42,3 +42,6 @@ and the number is the state's serial number among the basises.
 Version 1.3.2
 Remove the energy conservation operation because the energy conservation 
 is contained in the time-dependent Schrodinger equation naturely.
+
+Version 1.4.0
+Redesign the type 2 epc calculation, in which the phonon informations are read from perturbo output file.
