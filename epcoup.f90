@@ -9,10 +9,10 @@ module epcoup
 
   type epCoupling
     integer :: nbands, nkpts, nmodes, nqpts, natepc, natmd
-    integer, allocatable, dimension(:) :: atnum
-    !! atom number of each md cell atom in phonon cell
-    integer, allocatable, dimension(:,:) :: R
-    !! cell numbers for each atoms of md cell
+    integer, allocatable, dimension(:) :: atmap
+    !! mapping of each atom in MD cell to atom in unit cell for epc calculation.
+    integer, allocatable, dimension(:,:) :: Rp
+    !! number of lattice vector of each atom in MD cell, Rp(natmd,3)
     integer, allocatable, dimension(:) :: qqmap
     !! map q points in phonon calculation to q points in e-p calcultion.
     integer, allocatable, dimension(:,:) :: kkqmap
@@ -24,15 +24,11 @@ module epcoup
     real(kind=q), allocatable, dimension(:,:) :: qptsep
     real(kind=q), allocatable, dimension(:,:) :: freqep
     real(kind=q), allocatable, dimension(:,:) :: freqph
-    real(kind=q), allocatable, dimension(:,:) :: qptsph
     complex(kind=q), allocatable, dimension(:,:,:) :: normcoord
     complex(kind=q), allocatable, dimension(:,:,:,:,:) :: epmat
     complex(kind=q), allocatable, dimension(:,:,:,:) :: phmodes
     real(kind=q), allocatable, dimension(:,:) :: cellmd
     real(kind=q), allocatable, dimension(:,:,:) :: displ
-    real(kind=q), allocatable, dimension(:,:,:) :: vel
-    real(kind=q), allocatable, dimension(:,:,:) :: phproj
-    ! Phonon projection of displacement in MD.
   end type
 
   contains
@@ -42,8 +38,8 @@ module epcoup
 
     type(epCoupling), intent(inout) :: epc
 
-    if ( allocated(epc%R) ) deallocate(epc%R)
-    if ( allocated(epc%atnum) ) deallocate(epc%atnum)
+    if ( allocated(epc%Rp) ) deallocate(epc%Rp)
+    if ( allocated(epc%atmap) ) deallocate(epc%atmap)
     if ( allocated(epc%qqmap) ) deallocate(epc%qqmap)
     if ( allocated(epc%kkqmap) ) deallocate(epc%kkqmap)
     if ( allocated(epc%energy) ) deallocate(epc%energy)
@@ -52,161 +48,13 @@ module epcoup
     if ( allocated(epc%qptsep) ) deallocate(epc%qptsep)
     if ( allocated(epc%freqep) ) deallocate(epc%freqep)
     if ( allocated(epc%freqph) ) deallocate(epc%freqph)
-    if ( allocated(epc%qptsph) ) deallocate(epc%qptsph)
     if ( allocated(epc%epmat) ) deallocate(epc%epmat)
     if ( allocated(epc%phmodes) ) deallocate(epc%phmodes)
     if ( allocated(epc%cellmd) ) deallocate(epc%cellmd)
     if ( allocated(epc%displ) ) deallocate(epc%displ)
-    if ( allocated(epc%vel) ) deallocate(epc%vel)
-    if ( allocated(epc%phproj) ) deallocate(epc%phproj)
 
   end subroutine releaseEPC
 
-
-  subroutine readEPC(inp, epc, olap)
-    ! Read informations about e-p couplings from files in epc/.
-    ! Folder epc/ include egnv (band energies), freq (phonon frequencies)
-    ! and ephmat* (inteploted e-p matrix in dense k q mesh) files.
-
-    implicit none
-
-    type(namdInfo), intent(in) :: inp
-    type(epCoupling), intent(inout) :: epc
-    type(overlap), intent(inout) :: olap
-
-    integer :: ierr
-    integer :: nm, nq, na
-    integer :: bndmin, bndmax, nb
-    integer :: nk1, nk2, nk3, nktot, nk
-    integer :: i, j, ik, jk, ib, jb, iq, im
-    integer :: ipool, npool, pool, lmpi
-    integer :: ikf, nkf
-    integer, allocatable :: nkq(:)
-    real(kind=q) :: ef, kbT, phn, dE
-    complex(kind=q) :: eptemp
-    character(len=72) :: filinfo, filegnv, filfreq, filephmat, tag
-
-    filinfo = trim(inp%FILEPC) // '/info'
-    filegnv = trim(inp%FILEPC) // '/egnv'
-    filfreq = trim(inp%FILEPC) // '/freq'
-
-    open(unit=30, file=filinfo, action='read', iostat=ierr)
-    if (ierr /= 0) then
-      write(*,*) "info file does NOT exist!"
-      stop
-    end if
-
-    read(unit=30, fmt=*)
-    read(unit=30, fmt=*) ef
-    read(unit=30, fmt=*)
-    read(unit=30, fmt=*) bndmin, bndmax, nk, nm, nq, na, npool, lmpi
-    read(unit=30, fmt=*)
-    allocate(nkq(npool))
-    do ipool=1,npool
-      read(unit=30, fmt=*) nkq(ipool)
-    end do
-    allocate(epc%cellep(na+3,3))
-    read(unit=30, fmt=*)
-    do i=1,3
-      read(unit=30, fmt=*) (epc%cellep(i,j), j=1,3)
-    enddo
-    read(unit=30, fmt=*)
-    do i=1,na
-      read(unit=30, fmt=*) (epc%cellep(i+3,j), j=1,3)
-    enddo
-
-    nb = bndmax - bndmin + 1
-    epc%nkpts  = nk
-    epc%nbands = nb
-    epc%nqpts  = nq
-    epc%nmodes = nm
-    epc%natepc = na
-
-    close(30)
-     
-    open(unit=31, file=filegnv, action='read', iostat=ierr)
-    if (ierr /= 0) then
-      write(*,*) "egnv file does NOT exist!"
-      stop
-    end if
-
-    allocate(epc%kptsep(nk,3), epc%energy(nk,nb))
-    read(unit=31, fmt=*)
-    do ik=1,nk
-      read(unit=31, fmt=*)
-      read(unit=31, fmt=*) epc%kptsep(ik,:)
-      do ib=1,nb
-        read(unit=31, fmt=*) epc%energy(ik,ib)
-        olap%Eig(ib+nb*(ik-1),:) = epc%energy(ik,ib)
-      end do
-    end do
-
-    close(31)
-     
-    open(unit=32, file=filfreq, action='read', iostat=ierr)
-    if (ierr /= 0) then
-      write(*,*) "freq file does NOT exist!"
-      stop
-    end if
-
-    allocate(epc%qptsep(nq,3), epc%freqep(nq,nm))
-    read(unit=32, fmt=*)
-    do iq=1,epc%nqpts
-      read(unit=32, fmt=*)
-      read(unit=32, fmt=*) epc%qptsep(iq,:)
-      do im=1,epc%nmodes
-        read(unit=32, fmt=*) epc%freqep(iq,im)
-      end do
-    end do
-
-    close(32)
-
-    olap%Dij = cero
-    allocate(epc%epmat(nb,nb,nk,nm,nq))
-    do ipool=1,npool
-
-      if (lmpi==0) then
-        filephmat = trim(inp%FILEPC) // '/ephmat'
-      else
-        write(tag, *) ipool
-        filephmat = trim(inp%FILEPC) // '/ephmat' // trim(adjustl(tag))
-      end if
-
-      open(unit=33, file=filephmat, action='read', iostat=ierr)
-      if (ierr /= 0) then
-        write(*,*) "ephmat file does NOT exist!"
-        stop
-      end if
-
-      read(unit=33, fmt=*) nkf
-
-      kbT = inp%TEMP * BOLKEV
-
-      do ikf=1,nkq(ipool)
-
-        read(unit=33, fmt=*) ik, jk, iq
-        do im=1,epc%nmodes
-          do jb=1,epc%nbands
-            do ib=1,epc%nbands
-              read(unit=33, fmt='(2ES20.10)') eptemp
-              dE = epc%energy(ik,ib) - epc%energy(jk,jb) - epc%freqep(iq,im)/8065.541
-              eptemp = eptemp * 0.015**2 / (dE**2 + 0.015**2) / PI
-              epc%epmat(ib,jb,jk,im,iq) = eptemp
-              phn = 1.0 / (exp(abs(epc%freqep(iq,im)/8065.541)/kbT)-1)
-              eptemp = eptemp * (sqrt(phn) + sqrt(phn+1))
-              olap%Dij(nb*(ik-1)+ib, jb+nb*(jk-1), :) &
-              = olap%Dij(nb*(ik-1)+ib, jb+nb*(jk-1), :) + eptemp 
-            end do
-          end do
-        end do
-        
-      end do
-
-      close(33)
-
-    end do
-
-  end subroutine readEPC
 
   subroutine readEPCpert(inp, epc, olap)
     ! Read information of e-ph coupling from perturbo.x output file
@@ -255,7 +103,7 @@ module epcoup
     allocate(epc%mass(nat))
     dim1 = shape(epc%mass, kind=hsize_t)
     call h5dopen_f(gr_id, dsetname, dset_id, hdferror)
-    call h5dread_f(dset_id, H5T_NATIVE_INTEGER, epc%mass, dim1, hdferror)
+    call h5dread_f(dset_id, H5T_NATIVE_DOUBLE, epc%mass, dim1, hdferror)
     call h5dclose_f(dset_id, hdferror)
 
     dsetname = 'lattice_vec_angstrom'
@@ -311,6 +159,7 @@ module epcoup
     call h5dopen_f(gr_id, dsetname, dset_id, hdferror)
     call h5dread_f(dset_id, H5T_NATIVE_DOUBLE, epc%freqep, dim2, hdferror)
     call h5dclose_f(dset_id, hdferror)
+    epc%freqep = epc%freqep / 1000.0_q ! transform unit to eV
 
     dsetname = 'phmod_ev_r'
     allocate(epc%phmodes(nq, nm, nat, 3))
@@ -357,7 +206,7 @@ module epcoup
       call h5dread_f(dset_id, H5T_NATIVE_DOUBLE, eptemp_i, dim4, hdferror)
       call h5dclose_f(dset_id, hdferror)
 
-      eptemp = ( eptemp_r + imgUnit * eptemp_i ) / 1000
+      eptemp = ( eptemp_r + imgUnit * eptemp_i ) / 1000.0_q
       epc%epmat(:,:,ik,:,:) = eptemp
 
       do jk=1,nk
@@ -367,9 +216,9 @@ module epcoup
 
         do im=1,nm
 
-          if (epc%freqep(im,iq)<5) cycle
-          phn = 1.0 / (exp(epc%freqep(im,iq)/1000/kbT)-1)
-          iomega = imgUnit * epc%freqep(im,iq)/1000/hbar
+          if (epc%freqep(im,iq)<5.0E-3_q) cycle
+          phn = 1.0 / (exp(epc%freqep(im,iq)/kbT)-1)
+          iomega = imgUnit * epc%freqep(im,iq)/hbar
 
           do jb=1,nb
             do ib=1,nb
@@ -381,7 +230,7 @@ module epcoup
               do it=1,inp%NSW-1
                 olap%Dij(ibas, jbas, it) &
                 = olap%Dij(ibas, jbas, it) + eptemp_s * &
-                ( sqrt(phn)*exp(-iomega*it) + sqrt(phn+1)*exp(iomega*it) )
+                ( SQRT(phn)*exp(-iomega*it) + SQRT(phn+1)*exp(iomega*it) )
               end do ! it loop
 
             end do ! ib loop
@@ -397,7 +246,7 @@ module epcoup
 
     call h5fclose_f(file_id, hdferror)
 
-    olap%Dij = olap%Dij / sqrt(1.0*nq)
+    olap%Dij = olap%Dij / SQRT(1.0*nq)
     do ib=1,nb*nk
       ! olap%Eig(ib,:) = olap%Eig(ib,:) + real(olap%Dij(ib,ib,:))
       ! olap%Dij(ib,ib,:) = cero
@@ -407,145 +256,7 @@ module epcoup
       enddo
     enddo
 
-    write(*,*) 'Done !'
-
   end subroutine readEPCpert
-
-
-  subroutine readEPCold(inp, epc)
-    ! Read informations about e-p couplings from .epc file.
-    ! Including cell for epc, k, q points, eigen energies and e-p matrix.
-
-    implicit none
-
-    type(namdInfo), intent(in) :: inp
-    type(epCoupling), intent(inout) :: epc
-
-    integer :: ierr, i, j
-    integer :: nb, nk, nm, nq, na
-    integer :: ib, jb, ik, im, iq
-
-    open(unit=90, file=inp%FILEPC, status='unknown', action='read', iostat=ierr)
-    if (ierr /= 0) then
-      write(*,*) "epc file does NOT exist!"
-      stop
-    end if
-
-    read(unit=90, fmt=*)
-    read(unit=90, fmt=*) nb, nk, nm, nq, na
-    epc%nbands = nb
-    epc%nkpts  = nk
-    epc%nmodes = nm
-    epc%nqpts  = nq
-    epc%natepc = na
-    allocate(epc%cellep(na+3,3), &
-             epc%kptsep(nk,3), &
-             epc%qptsep(nq,3), &
-             epc%energy(nk,nb), &
-             epc%epmat(nb,nb,nk,nm,nq))
-
-    read(unit=90, fmt=*)
-    do i=1,3
-      read(unit=90, fmt=*) (epc%cellep(i,j), j=1,3)
-    enddo
-    read(unit=90, fmt=*)
-    do i=1,na
-      read(unit=90, fmt=*) (epc%cellep(i+3,j), j=1,3)
-    enddo
-
-    read(unit=90, fmt=*)
-    do i=1,nk
-      read(unit=90, fmt=*) (epc%kptsep(i,j), j=1,3)
-    enddo
-
-    read(unit=90, fmt=*)
-    do i=1,nq
-      read(unit=90, fmt=*) (epc%qptsep(i,j), j=1,3)
-    enddo
-
-    read(unit=90, fmt=*)
-    do i=1,nk
-      read(unit=90, fmt=*) (epc%energy(i,j), j=1,nb)
-    enddo
-
-    read(unit=90, fmt=*)
-    do ib=1,nb
-      do jb=1,nb
-        do ik=1,nk
-          do im=1,nm
-            do iq=1,nq
-              read(unit=90, fmt='(2f15.10)') epc%epmat(ib,jb,ik,im,iq)
-            end do
-          end do
-        end do
-      end do
-    end do
-
-    close(90)
-
-  end subroutine readEPCold
-
-
-  subroutine readPhmodes(inp, epc)
-    implicit none
-
-    type(namdInfo), intent(in) :: inp
-    type(epCoupling), intent(inout) :: epc
-
-    integer :: ierr, i
-    integer :: iq, im, ia, iax
-    integer :: nqs, nmodes, nat
-    character(len=24) :: charac, bra, ket
-    complex(kind=q) :: temp
-    real(kind=q), allocatable, dimension(:) :: qpt
-    real(kind=q), allocatable, dimension(:,:) :: at
-
-    open(unit=909, file=inp%FILPH, status='unknown', action='read', iostat=ierr)
-    if (ierr /= 0) then
-      write(*,*) "phonon modes file does NOT exist!"
-      stop
-    end if
-
-    nat = epc%natepc
-    nmodes = epc%nmodes
-    nqs = epc%nqpts
-    allocate(epc%phmodes(nqs, nmodes, nat, 3))
-    allocate(epc%qptsph(nqs, 3))
-    allocate(epc%freqph(nqs, nmodes))
-    allocate(qpt(3), at(3, 3))
-
-    at = epc%cellep(1:3,1:3) / epc%cellep(1,1)
-    ! write(*,'(3f12.7)') ((at(i,iax),i=1,3), iax=1,3)
-
-    do iq=1,nqs
-      read(unit=909, fmt=*)
-      read(unit=909, fmt=*)
-      read(unit=909, fmt=9019) charac, (qpt(iax), iax=1,3)
-      do iax=1,3
-        epc%qptsph(iq,iax) = at(iax,1)*qpt(1) + at(iax,2)*qpt(2) &
-                             + at(iax,3)*qpt(3)
-      end do
-      ! write(*, 9019) charac, epc%qptsph(iq,:)
-      read(unit=909, fmt=*)
-      do im=1,nmodes
-        read(unit=909, fmt=9011) charac, epc%freqph(iq, im)
-        if (epc%freqph(iq,im)==0.0) epc%freqph(iq,im) = 0.00000001
-        ! write(*,9011) charac, epc%freqph(iq, im)
-        do ia=1,nat
-          read(unit=909, fmt=9021) bra, (epc%phmodes(iq, im, ia, iax), &
-                                         iax=1,3), ket
-          ! write(*, 9021) bra, (epc%phmodes(iq, im, ia, iax), &
-          !                      iax=1,3), ket
-        end do
-      end do
-      read(unit=909, fmt=*)
-    end do
-
-  9011 format ( 5x, a14, f15.6 )
-  9019 format ( 1x, a4, 3f12.4 )
-  9021 format ( 1x, a1, 3(f10.6,1x,f10.6,3x), a1 )
-
-  end subroutine readPhmodes
 
 
   subroutine readDISPL(inp, epc)
@@ -554,8 +265,7 @@ module epcoup
     type(namdInfo), intent(in) :: inp
     type(epCoupling), intent(inout) :: epc
 
-    real(kind=q) :: scal, dr
-    real(kind=q), allocatable, dimension(:,:) :: supercell
+    real(kind=q) :: scal, dr, lattvec(3,3)
     integer :: ierr, i, iax, ia, t
     integer :: nat, mdtime
 
@@ -567,44 +277,37 @@ module epcoup
       stop
     end if
 
-    allocate(supercell(3,3))
-
     read(unit=33, fmt=*)
     read(unit=33, fmt=*) scal
     do i=1,3
-      read(unit=33, fmt=*) (supercell(i, iax), iax=1,3)
-      supercell(i,:) = supercell(i,:) * scal
+      read(unit=33, fmt=*) (lattvec(i, iax), iax=1,3)
+      lattvec(i,:) = lattvec(i,:) * scal
     end do
     read(unit=33, fmt=*)
     read(unit=33, fmt=*) nat
     epc%natmd = nat
 
-    allocate(epc%displ(mdtime, nat, 3), &
-             epc%vel(mdtime, nat, 3))
+    allocate(epc%displ(mdtime, nat, 3))
+
     do t=1,mdtime
       read(unit=33, fmt=*)
       do ia=1,nat
         read(unit=33, fmt=*) (epc%displ(t, ia, iax), iax=1, 3)
-        if (t==1) then
-          epc%vel(t,ia,:) = 0
-        else
-          ! Fix atom position if atom moves to other cell.
-          do iax=1,3
-            dr = epc%displ(t, ia, iax) - epc%displ(t-1, ia, iax)
-            if (dr>0.9) then
-              epc%displ(t, ia, iax) = epc%displ(t, ia, iax) - 1
-            else if (dr<-0.9) then
-              epc%displ(t, ia, iax) = epc%displ(t, ia, iax) + 1
-            endif
-          enddo
-          epc%vel(t,ia,:) &
-          = ( epc%displ(t, ia, :) - epc%displ(t-1, ia, :) ) / inp%POTIM
-        endif
+        do iax=1,3
+          if (t==1) cycle
+          ! Modify atom position if atom moves to other cell.
+          dr = epc%displ(t, ia, iax) - epc%displ(t-1, ia, iax)
+          if (dr>0.9) then
+            epc%displ(t, ia, iax) = epc%displ(t, ia, iax) - 1
+          else if (dr<-0.9) then
+            epc%displ(t, ia, iax) = epc%displ(t, ia, iax) + 1
+          endif
+        enddo
       end do
     end do
 
     allocate(epc%cellmd(nat+3, 3))
-    epc%cellmd(:3,:) = supercell
+    epc%cellmd(:3,:) = lattvec
     ! epc%cellmd(4:,:) = epc%displ(1,:,:)
     do ia=1,nat
       do iax=1,3
@@ -629,18 +332,16 @@ module epcoup
     ! Project from phonon cell to md cell.
     implicit none
 
-    integer :: iax, ia, ja, i
-    integer, allocatable, dimension(:) :: N
+    integer :: iax, ia, ja, i, N(3)
     !! scale numbers of md cell compared with phonon cell
-    real(kind=q), allocatable, dimension(:) :: dr
-    real(kind=q), allocatable, dimension(:) :: temp1, temp2
+    real(kind=q) :: dr(3), temp1(3), temp2(3)
 
     type(epCoupling), intent(inout) :: epc
 
-    allocate(epc%R(epc%natmd,3), epc%atnum(epc%natmd), &
-             N(3), dr(3), temp1(3), temp2(3))
+    allocate(epc%Rp(epc%natmd,3), epc%atmap(epc%natmd))
 
     do iax=1,3
+      ! ONLY suit for sample shape cells !
       N(iax) = NINT( SUM(epc%cellmd(iax,:)) / SUM(epc%cellep(iax,:)) )
     enddo
 
@@ -653,13 +354,11 @@ module epcoup
         enddo
         if (SUM(temp2)<SUM(temp1)) then
           temp1 = temp2
-          epc%atnum(ia) = ja
-          epc%R(ia,:) = (/(MOD(NINT(dr(i)),N(i)), i=1,3)/)
+          epc%atmap(ia) = ja
+          epc%Rp(ia,:) = (/(MOD(NINT(dr(i)),N(i)), i=1,3)/)
         endif
       enddo
     enddo
-
-    deallocate(N, dr, temp1, temp2)
 
   end subroutine cellPROJ
 
@@ -671,66 +370,47 @@ module epcoup
     type(namdInfo), intent(in) :: inp
     type(epCoupling), intent(inout) :: epc
 
-    ! The normal mode coordinate
+    ! Temporary normal mode coordinate
     complex(kind=q) :: tempQ
-    ! The potential and kinetic energies of the normal mode.
-    real(kind=q) :: theta
-    real(kind=q), allocatable, dimension(:) :: displ
-    integer :: iq, im, ia, iax, t
+    real(kind=q) :: theta, displ(3), Np
+    integer :: iq, im, ia, ja, iax, t
     integer :: nqs, nmodes, nat
 
-    ! call readPhmodes(inp, epc)
     call readDISPL(inp, epc)
     call cellPROJ(epc)
 
-    nmodes = epc%nmodes
     nqs = epc%nqpts
-    allocate(epc%phproj(inp%NSW, nmodes, nqs), displ(3))
+    nmodes = epc%nmodes
+
     allocate(epc%normcoord(inp%NSW, nmodes, nqs))
 
     do t=1,inp%NSW
       do iq=1,epc%nqpts
         do im=1,epc%nmodes
+
           tempQ = cero
           do ia=1,epc%natmd
             displ = 0.0
+            ja = epc%atmap(ia)
             do iax=1,3
               displ = displ + epc%displ(t, ia, iax) * epc%cellmd(iax, :) 
             end do
-            theta = 2 * PI * DOT_PRODUCT( epc%qptsep(iq,:), epc%R(ia,:) )
-            tempQ  =  tempQ + EXP(imgUnit*theta) * epc%mass(epc%atnum(ia)) * &
-              DOT_PRODUCT( CONJG(epc%phmodes(iq, im, epc%atnum(ia), :)), displ )
+            theta = 2 * PI * DOT_PRODUCT( epc%qptsep(iq,:), epc%Rp(ia,:) )
+            tempQ  = tempQ + EXP(-imgUnit*theta) * SQRT(epc%mass(ja)) * &
+                     DOT_PRODUCT( CONJG(epc%phmodes(iq, im, ja, :)), displ )
           end do
-          epc%normcoord(t, im, iq) = tempQ / sqrt(0.5*epc%natmd)
+          epc%normcoord(t, im, iq) = tempQ
+
         end do
       end do
     end do
 
-    write(*,*) 'phDe done'
-
-    call savePhp(inp, epc)
+    Np = 1.0_q * epc%natmd / epc%natepc
+    ! Np is the number of unit cells in MD cell.
+    epc%normcoord = epc%normcoord / SQRT(Np)
+    close(unit=41)
 
   end subroutine phDecomp
-
-
-  subroutine savePhp(inp, epc)
-    implicit none
-
-    type(namdInfo), intent(in) :: inp
-    type(epCoupling), intent(in) :: epc
-
-    character(len=72) :: filename
-    integer :: t, iq, im
-
-    filename = 'phproj.dat'
-    open(unit=38, file=filename, status='unknown', action='write')
-
-    do t=1, inp%NSW
-      write(unit=38, fmt='(*(f12.6))') &
-          ((epc%phproj(t, im, iq), iq=1,epc%nqpts), im=1,epc%nmodes)
-    end do
-
-  end subroutine savePhp
 
 
   subroutine kqMatch(epc)
@@ -766,21 +446,6 @@ module epcoup
       end do
     end do
 
-    if (allocated(epc%qptsph)) then
-      do iq=1,epc%nqpts
-        do jq=1,epc%nqpts
-          dq = epc%qptsep(iq,:) - epc%qptsph(jq,:)
-          do iax=1,3
-            dq(iax) = ABS(dq(iax)-NINT(dq(iax)))
-          end do
-          if (SUM(dq)<norm) then
-            epc%qqmap(iq) = jq
-            exit
-          end if
-        end do
-      end do
-    end if
-
   end subroutine kqMatch
 
 
@@ -793,14 +458,15 @@ module epcoup
 
     integer :: nsw, nk, nb, nq, nm, Np
     integer :: it, ik, jk, ib, jb, iq, im, ibas, jbas
-    real(kind=q) :: lqv ! zero-point displacement amplitude
+    real(kind=q) :: lqvtemp, lqv ! zero-point displacement amplitude
+    real(kind=q) :: kbT, phn
 
     nsw = inp%NSW
     nk  = inp%NKPOINTS
     nb  = inp%NBANDS
     nm  = epc%nmodes
 
-    lqv = hbar * sqrt(0.5/AMTOKG * EVTOJ) * 1.0E-5_q
+    lqvtemp = hbar * SQRT( EVTOJ / (2.0_q*AMTOKG) ) * 1.0E-5_q
 
     do ik=1,nk
       do jk=1,nk
@@ -815,7 +481,7 @@ module epcoup
             jbas = nb*(jk-1)+jb
 
             do im=1,nm
-              lqv = lqv / sqrt(epc%freqep(im, iq)/1000.0) ! in unit Angstrom
+              lqv = lqvtemp / SQRT(epc%freqep(im, iq)) ! in unit of Angstrom
               do it=1,nsw-1
                 olap%Dij(ibas, jbas, it) = olap%Dij(ibas, jbas, it) &
                 + epc%epmat(ib,jb,ik,im,iq) * epc%normcoord(it,im,iq) / lqv
@@ -830,13 +496,17 @@ module epcoup
 
     do ib=1,nb
       do ik=1,nk
-        olap%Eig(nb*(ik-1)+ib,:) = epc%energy(ib,ik)
+        ibas = nb*(ik-1)+ib
+        olap%Eig(ibas,:) = epc%energy(ib,ik)
+        do jbas=ibas+1,nb*nk
+          olap%Dij(jbas,ibas,:) = CONJG(olap%Dij(ibas,jbas,:))
+        enddo
       enddo
     enddo
 
-   Np = epc%natmd / epc%natepc
-   olap%Dij = olap%Dij / sqrt(1.0 * Np)
-
+    Np = epc%natmd / epc%natepc
+    olap%Dij = olap%Dij / SQRT(1.0 * Np)
+    
   end subroutine calcEPC
 
 
@@ -892,18 +562,20 @@ module epcoup
       call CoupToFile(olap)
       call writeNaEig(olap_sec, inp)
 
+      write(*,*) "Done!"
+      write(*,'(A)') "------------------------------------------------------------"
+
     else
 
       write(*,'(A)') "------------------------------------------------------------"
       write(*,*) "Calculating couplings from e-p matrix..."
 
-      ! call readEPCold(inp, epc)
       call readEPCpert(inp, epc, olap)
       call phDecomp(inp, epc)
       ! call kqMatch(epc)
       call calcEPC(olap, inp, epc)
 
-      write(*,*) "Done..."
+      write(*,*) "Done!"
       write(*,'(A)') "------------------------------------------------------------"
 
       call copyToSec(olap, olap_sec, inp)
@@ -943,7 +615,7 @@ module epcoup
           inp%BASSEL(ik,ib) = inp%NBASIS
         end if
       end do
-      write(unit=39, fmt='(*(I8))') inp%BASSEL(ik,:)
+      ! write(unit=39, fmt='(*(I8))') inp%BASSEL(ik,:)
     end do
 
     open(unit=39, file='BASSEL', status='unknown', action='write')
