@@ -79,8 +79,8 @@ module epcoup
     complex(kind=q), allocatable, dimension(:,:,:,:) :: eptemp
     complex :: eptemp_s, iomega
 
+    fname = inp%FILEPM
     call h5open_f(hdferror)
-    fname = 'graphene_ephmat_p1.h5'
     call h5fopen_f(fname, H5F_ACC_RDONLY_F, file_id, hdferror)
 
     ! Read el bands, ph dispersion, k & q lists.
@@ -498,6 +498,12 @@ module epcoup
       do ik=1,nk
         ibas = nb*(ik-1)+ib
         olap%Eig(ibas,:) = epc%energy(ib,ik)
+        ! olap%Dij(ibas,ibas,:) = ABS(olap%Dij(ib,ib,:))
+        if (olap%Eig(ibas,1)<-2.8 .and. olap%Eig(ibas,1)>-3.2) &
+        ! olap%Eig(ibas,:) = epc%energy(ib,ik) + (ik-25) * 0.02
+        olap%Eig(ibas,:) = -4.4
+        ! olap%Eig(ibas,:) = olap%Eig(ibas,:) + ABS(olap%Dij(ibas,ibas,200)) * 4
+        ! olap%Dij(ibas,ibas,:) = cero
         do jbas=ibas+1,nb*nk
           olap%Dij(jbas,ibas,:) = CONJG(olap%Dij(ibas,jbas,:))
         enddo
@@ -544,7 +550,8 @@ module epcoup
     inquire(file='COUPCAR', exist=lcoup)
     if (lcoup) then
       ! file containing couplings exists, then read it
-      if (inp%LCPTXT) then
+      if (inp%LCPTXT .and. inp%LBASSEL) then
+        call readBasis(inp)
         call readNaEig(olap_sec, inp)
       else
         call CoupFromFile(olap)
@@ -590,47 +597,72 @@ module epcoup
   end subroutine TDepCoupIJ
 
 
+  subroutine readBasis(inp)
+    implicit none
+
+    type(namdInfo), intent(inout) :: inp
+    integer :: ierr, ibas, ik, ib
+
+    open(unit=38, file='BASSEL', status='unknown', action='read', iostat=ierr)
+
+    if (ierr /= 0) then
+      write(*,*) "XDATCAR file does NOT exist!"
+      stop
+    end if
+
+    inp%BASSEL = 0
+    read(unit=38, fmt=*) inp%NBASIS
+    do ibas=1,inp%NBASIS
+      read(unit=38, fmt=*) ik, ib
+      inp%BASSEL(ik, ib) = ibas
+    end do
+
+    close(unit=38)
+
+  end subroutine readBasis
+
+
   subroutine selBasis(inp, olap)
     implicit none
 
     type(overlap), intent(in) :: olap
     type(namdInfo), intent(inout) :: inp
 
-    integer :: ik, ib, NK, NB
+    integer :: ik, ib, nb
     real :: emin, emax
 
-    NB = inp%NBANDS
-    NK = inp%NKPOINTS
+    nb = inp%NBANDS
     emin = inp%EMIN
     emax = inp%EMAX
 
     inp%NBASIS = 0
-    inp%BASSEL = -1
+    inp%BASSEL = 0
 
     do ik=inp%KMIN, inp%KMAX
       do ib=inp%BMIN, inp%BMAX
-        if ( olap%Eig((ik-1)*NB+ib, 1)>emin .and. &
-             olap%Eig((ik-1)*NB+ib, 1)<emax ) then
+        if ( olap%Eig((ik-1)*nb+ib, 1)>emin .and. &
+             olap%Eig((ik-1)*nb+ib, 1)<emax ) then
           inp%NBASIS = inp%NBASIS + 1
           inp%BASSEL(ik,ib) = inp%NBASIS
         end if
       end do
-      ! write(unit=39, fmt='(*(I8))') inp%BASSEL(ik,:)
     end do
 
     open(unit=39, file='BASSEL', status='unknown', action='write')
-    write(unit=39, fmt='(A)') '# Basises selected from nk*nb eigen states'
-    write(unit=39, fmt='(A2,A6,I6,A2,A6,I6,A2,A10,I6)') &
-          '# ', 'NK = ', NK, ';', 'NB = ', NB, ' ', 'NBASIS = ', inp%NBASIS
 
-    do ik=1,NK
-      write(unit=39, fmt='(*(I8))') inp%BASSEL(ik,:)
+    write(unit=39, fmt='(I18)') inp%NBASIS
+
+    do ik=inp%KMIN, inp%KMAX
+      do ib=inp%BMIN, inp%BMAX
+        if (inp%BASSEL(ik,ib)>0) &
+          write(unit=39, fmt='(2I12)') ik, ib
+      end do
     end do
 
     close(unit=39)
 
     !! For array element inp%BASSEL(ik,ib),
-    !! -1 represent ik,ib state isn't selected as basis;
+    !! 0 represent ik,ib state isn't selected as basis;
     !! number >0 represent ik,ib state is selected as basis,
     !! and the number is the state's serial number among the basises.
 
@@ -643,11 +675,15 @@ module epcoup
     type(overlap), intent(inout) :: olap_sec
     type(overlap), intent(in) :: olap
 
-    integer :: ik, jk, ib, jb, NB, iBas, jBas
+    integer :: ik, jk, ib, jb, nb, iBas, jBas
 
-    call selBasis(inp, olap)
+    if (inp%LBASSEL) then
+      call readBasis(inp)
+    else
+      call selBasis(inp, olap)
+    end if
 
-    NB = inp%NBANDS
+    nb = inp%NBANDS
 
     olap_sec%dt = inp%POTIM
     olap_sec%TSTEPS = inp%NSW
@@ -661,7 +697,7 @@ module epcoup
         if (inp%BASSEL(ik,ib)>0) then
 
           iBas = inp%BASSEL(ik,ib)
-          olap_sec%Eig(iBas, :) = olap%Eig((ik-1)*NB+ib, :)
+          olap_sec%Eig(iBas, :) = olap%Eig((ik-1)*nb+ib, :)
 
           do jk=inp%KMIN, inp%KMAX
             do jb=inp%BMIN, inp%BMAX
@@ -670,7 +706,7 @@ module epcoup
 
                 jBas = inp%BASSEL(jk,jb)
                 olap_sec%Dij(iBas, jBas, :) = &
-                olap%Dij( (ik-1)*NB+ib, (jk-1)*NB+jb, : )
+                olap%Dij( (ik-1)*nb+ib, (jk-1)*nb+jb, : )
 
               end if
 

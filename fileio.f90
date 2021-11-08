@@ -39,6 +39,7 @@ module fileio
 
     ! whether to use e-p matrix as NA couplings
     logical :: LEPC
+    logical :: LBASSEL
     integer :: EPCTYPE
     integer :: KMIN
     integer :: KMAX
@@ -50,8 +51,7 @@ module fileio
     real(kind=q) :: EMIN
     real(kind=q) :: EMAX
 
-    character(len=256) :: FILEPC  ! epc file from EPW package, if LEPC=.TRUE.
-    character(len=256) :: FILPH   ! phonon modes file from QE-PH, if LEPC=.TRUE.
+    character(len=256) :: FILEPM  ! epc file from EPW package, if LEPC=.TRUE.
     character(len=256) :: FILMD   ! MD trajetory (XDATCAR) from VASP, if LEPC=.TRUE.
 
   end type
@@ -85,11 +85,12 @@ module fileio
       logical :: lcpext
       logical :: lgamma
       logical :: lepc
+      logical :: lbassel
       ! running directories
       character(len=256) :: rundir
       character(len=256) :: tbinit
       ! files for e-p coupling calculation, if LEPC=.TRUE.
-      character(len=256) :: filepc, filph, filmd
+      character(len=256) :: filepm, filmd
       integer :: epctype
       integer :: kmin
       integer :: kmax
@@ -104,7 +105,7 @@ module fileio
                           temp, rundir,         &
                           lhole, lshp, lcpext,  &
                           lgamma, lepc, epctype,&
-                          filepc, filph, filmd, &
+                          filepm, filmd, lbassel, &
                           kmin, kmax, emin, emax, &
                           namdtime,             &
                           nsample, tbinit
@@ -131,9 +132,9 @@ module fileio
       lcpext = .FALSE.
       lgamma = .TRUE.
       lepc = .FALSE.
+      lbassel = .FALSE.
       epctype = 1
-      filepc = 'prefix.epc'
-      filph = 'prefix.matdyn.modes'
+      filepm = 'ephmat.h5'
       filmd = 'XDATCAR'
       kmin = 1
       kmax = 0
@@ -216,10 +217,10 @@ module fileio
       inp%LCPTXT   = lcpext
       inp%LGAMMA   = lgamma
       inp%LEPC     = lepc
+      inp%LBASSEL  = lbassel
       inp%EPCTYPE  = epctype
       inp%TEMP     = temp
-      inp%FILEPC   = trim(filepc)
-      inp%FILPH    = trim(filph)
+      inp%FILEPM   = trim(filepm)
       inp%FILMD    = trim(filmd)
       inp%KMIN     = kmin
       inp%KMAX     = kmax
