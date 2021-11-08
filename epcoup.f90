@@ -499,9 +499,9 @@ module epcoup
         ibas = nb*(ik-1)+ib
         olap%Eig(ibas,:) = epc%energy(ib,ik)
         ! olap%Dij(ibas,ibas,:) = ABS(olap%Dij(ib,ib,:))
-        if (olap%Eig(ibas,1)<-2.8 .and. olap%Eig(ibas,1)>-3.2) &
+        ! if (olap%Eig(ibas,1)<-2.8 .and. olap%Eig(ibas,1)>-3.2) &
         ! olap%Eig(ibas,:) = epc%energy(ib,ik) + (ik-25) * 0.02
-        olap%Eig(ibas,:) = -4.4
+        ! olap%Eig(ibas,:) = -4.4
         ! olap%Eig(ibas,:) = olap%Eig(ibas,:) + ABS(olap%Dij(ibas,ibas,200)) * 4
         ! olap%Dij(ibas,ibas,:) = cero
         do jbas=ibas+1,nb*nk
@@ -533,25 +533,15 @@ module epcoup
     logical :: lcoup
 
     ! Initialization
-    olap%NBANDS = inp%NBANDS * inp%NKPOINTS
-    olap%TSTEPS = inp%NSW
-    olap%dt = inp%POTIM
-    allocate(olap%Dij(olap%NBANDS, olap%NBANDS, olap%TSTEPS-1))
-    allocate(olap%Eig(olap%NBANDS, olap%TSTEPS-1))
-    olap%Dij = cero
-    olap%EIg = cero
-
-    ! olap_sec%NBANDS = inp%NBASIS
-    ! olap_sec%TSTEPS = inp%NSW
-    ! olap_sec%dt = inp%POTIM
-    ! allocate(olap_sec%Dij(olap_sec%NBANDS, olap_sec%NBANDS, olap_sec%TSTEPS-1))
-    ! allocate(olap_sec%Eig(olap_sec%NBANDS, olap_sec%TSTEPS-1))
+    if ( (.not. inp%LCPTXT) .or. (.not. inp%LBASSEL) ) &
+      call initOlap(olap, inp, inp%NBANDS * inp%NKPOINTS)
 
     inquire(file='COUPCAR', exist=lcoup)
     if (lcoup) then
       ! file containing couplings exists, then read it
       if (inp%LCPTXT .and. inp%LBASSEL) then
         call readBasis(inp)
+        call initOlap(olap_sec, inp, inp%NBASIS)
         call readNaEig(olap_sec, inp)
       else
         call CoupFromFile(olap)
@@ -592,7 +582,7 @@ module epcoup
     end if
 
     call releaseEPC(epc)
-    deallocate(olap%Dij, olap%Eig)
+    if ( allocated(olap%Dij) )deallocate(olap%Dij, olap%Eig)
 
   end subroutine TDepCoupIJ
 
@@ -669,6 +659,25 @@ module epcoup
   end subroutine selBasis
 
 
+  subroutine initOlap(olap, inp, nb)
+    implicit none
+    type(overlap), intent(inout) :: olap
+    type(namdInfo), intent(in) :: inp
+    integer, intent(in) :: nb
+
+    olap%NBANDS = nb
+    olap%TSTEPS = inp%NSW
+    olap%dt = inp%POTIM
+
+    allocate(olap%Dij(nb, nb, inp%NSW-1))
+    allocate(olap%Eig(nb, inp%NSW-1))
+
+    olap%Dij = cero
+    olap%Eig = 0.0_q
+
+  end subroutine initOlap
+
+
   subroutine copyToSec(olap, olap_sec, inp)
     implicit none
     type(namdInfo), intent(inout) :: inp
@@ -685,11 +694,7 @@ module epcoup
 
     nb = inp%NBANDS
 
-    olap_sec%dt = inp%POTIM
-    olap_sec%TSTEPS = inp%NSW
-    olap_sec%NBANDS = inp%NBASIS
-    allocate(olap_sec%Dij(inp%NBASIS, inp%NBASIS, inp%NSW-1))
-    allocate(olap_sec%Eig(inp%NBASIS, inp%NSW-1))
+    call initOlap(olap_sec, inp, inp%NBASIS)
 
     do ik=inp%KMIN, inp%KMAX
       do ib=inp%BMIN, inp%BMAX
