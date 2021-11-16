@@ -48,29 +48,31 @@ module hamil
     type(overlap), intent(in)  :: olap
     type(namdInfo), intent(in) :: inp
 
-    integer :: i, j, t, N
+    integer :: i, j, t, nsteps, N, Nt
+    integer :: initstep
 
     ! memory allocation
 
     N = inp%NBASIS
     ks%ndim = inp%NBASIS
+    Nt = inp%NAMDTIME / inp%POTIM
 
     if (.NOT. ks%LALLO) then
       allocate(ks%psi_c(N))
       allocate(ks%psi_p(N))
       allocate(ks%psi_n(N))
       allocate(ks%hpsi(N))
-      allocate(ks%psi_a(N, inp%NAMDTIME))
-      allocate(ks%pop_a(N, inp%NAMDTIME))
-      allocate(ks%norm(inp%NAMDTIME))
+      allocate(ks%psi_a(N, Nt))
+      allocate(ks%pop_a(N, Nt))
+      allocate(ks%norm(Nt))
 
       allocate(ks%ham_c(N,N))
 
-      allocate(ks%eigKs(N, inp%NAMDTIME))
-      allocate(ks%NAcoup(N,N, inp%NAMDTIME))
+      allocate(ks%eigKs(N, Nt))
+      allocate(ks%NAcoup(N,N, Nt))
 
-      allocate(ks%sh_pops(N, inp%NAMDTIME))
-      allocate(ks%sh_prop(N, inp%NAMDTIME))
+      allocate(ks%sh_pops(N, Nt))
+      allocate(ks%sh_prop(N, Nt))
       allocate(ks%Bkm(N))
       ! allocate(ks%ham_p(N,N))
       ! allocate(ks%ham_n(N,N))
@@ -86,20 +88,23 @@ module hamil
     ! ks%ham_p = cero
     ! ks%ham_n = cero
     ks%psi_c( inp%BASSEL(inp%INIKPT, inp%INIBAND) ) = uno
+    initstep = inp%NAMDTINI / inp%POTIM - 2
+    ! initstep = MOD(initstep-1, nsw-1) + 1
+    nsteps = inp%NSW - 1
 
-    do t=1, inp%NAMDTIME
+    do t=1, Nt
 
-      ! If time step > NSW-1, use Eig & couplings from initial time repeatedly.
-      i = MOD(inp%NAMDTINI+t-1,inp%NSW-1)
-      if (i==0) i=inp%NSW-1
+      ! If time step > NSW-1, use Eig & couplings
+      ! from initial time repeatedly.
+      i = MOD(initstep+t, nsteps) + 1
 
       ! We don't need all the information, only a section of it
       ks%eigKs(:,t) = olap%Eig(:, i)
-      ! Divide by 2 * POTIM here, because we didn't do this in the calculation
-      ! of couplings
       if (inp%LEPC) then
         ks%NAcoup(:,:,t) = olap%Dij(:,:, i)
       else
+        ! Divide by 2 * POTIM here,
+        ! because we didn't do this in the calculation of couplings
         ks%NAcoup(:,:,t) = olap%Dij(:,:, i) / (2*inp%POTIM)
       end if
 

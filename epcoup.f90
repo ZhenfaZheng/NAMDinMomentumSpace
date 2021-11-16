@@ -77,7 +77,7 @@ module epcoup
     real(kind=q), allocatable, dimension(:,:) :: kqltemp, pos, lattvec
     real(kind=q), allocatable, dimension(:,:,:,:) :: eptemp_r, eptemp_i, phmtemp
     complex(kind=q), allocatable, dimension(:,:,:,:) :: eptemp
-    complex :: eptemp_s, iomega
+    complex :: eptemp_s, iomegat
 
     fname = inp%FILEPM
     call h5open_f(hdferror)
@@ -218,7 +218,7 @@ module epcoup
 
           if (epc%freqep(im,iq)<5.0E-3_q) cycle
           phn = 1.0 / (exp(epc%freqep(im,iq)/kbT)-1)
-          iomega = imgUnit * epc%freqep(im,iq)/hbar
+          iomegat = imgUnit * epc%freqep(im,iq)/hbar * inp%POTIM
 
           do jb=1,nb
             do ib=1,nb
@@ -230,7 +230,7 @@ module epcoup
               do it=1,inp%NSW-1
                 olap%Dij(ibas, jbas, it) &
                 = olap%Dij(ibas, jbas, it) + eptemp_s * &
-                ( SQRT(phn)*exp(-iomega*it) + SQRT(phn+1)*exp(iomega*it) )
+                ( SQRT(phn)*exp(-iomegat*it) + SQRT(phn+1)*exp(iomegat*it) )
               end do ! it loop
 
             end do ! ib loop
@@ -266,10 +266,10 @@ module epcoup
     type(epCoupling), intent(inout) :: epc
 
     real(kind=q) :: scal, dr, lattvec(3,3)
-    integer :: ierr, i, iax, ia, t
-    integer :: nat, mdtime
+    integer :: ierr, i, iax, ia, it
+    integer :: nat, nsw
 
-    mdtime = inp%NSW
+    nsw = inp%NSW
 
     open(unit=33, file=inp%FILMD, status='unknown', action='read', iostat=ierr)
     if (ierr /= 0) then
@@ -287,20 +287,20 @@ module epcoup
     read(unit=33, fmt=*) nat
     epc%natmd = nat
 
-    allocate(epc%displ(mdtime, nat, 3))
+    allocate(epc%displ(nsw, nat, 3))
 
-    do t=1,mdtime
+    do it=1,nsw
       read(unit=33, fmt=*)
       do ia=1,nat
-        read(unit=33, fmt=*) (epc%displ(t, ia, iax), iax=1, 3)
+        read(unit=33, fmt=*) (epc%displ(it, ia, iax), iax=1, 3)
         do iax=1,3
-          if (t==1) cycle
+          if (it==1) cycle
           ! Modify atom position if atom moves to other cell.
-          dr = epc%displ(t, ia, iax) - epc%displ(t-1, ia, iax)
+          dr = epc%displ(it, ia, iax) - epc%displ(it-1, ia, iax)
           if (dr>0.9) then
-            epc%displ(t, ia, iax) = epc%displ(t, ia, iax) - 1
+            epc%displ(it, ia, iax) = epc%displ(it, ia, iax) - 1
           else if (dr<-0.9) then
-            epc%displ(t, ia, iax) = epc%displ(t, ia, iax) + 1
+            epc%displ(it, ia, iax) = epc%displ(it, ia, iax) + 1
           endif
         enddo
       end do
@@ -311,14 +311,14 @@ module epcoup
     ! epc%cellmd(4:,:) = epc%displ(1,:,:)
     do ia=1,nat
       do iax=1,3
-        epc%cellmd(ia+3, iax) = SUM(epc%displ(:, ia, iax)) / mdtime
+        epc%cellmd(ia+3, iax) = SUM(epc%displ(:, ia, iax)) / nsw
       end do
     end do
 
-    do t=1,mdtime
+    do it=1,nsw
       do ia=1,nat
-        epc%displ(t,ia,:) &
-        = epc%displ(t,ia,:) - epc%cellmd(ia+3, :)
+        epc%displ(it,ia,:) &
+        = epc%displ(it,ia,:) - epc%cellmd(ia+3, :)
       end do
     end do
 
@@ -373,18 +373,19 @@ module epcoup
     ! Temporary normal mode coordinate
     complex(kind=q) :: tempQ
     real(kind=q) :: theta, displ(3), Np
-    integer :: iq, im, ia, ja, iax, t
-    integer :: nqs, nmodes, nat
+    integer :: iq, im, ia, ja, iax, it
+    integer :: nqs, nmodes, nat, nsw
 
     call readDISPL(inp, epc)
     call cellPROJ(epc)
 
     nqs = epc%nqpts
     nmodes = epc%nmodes
+    nsw = inp%NSW
 
-    allocate(epc%normcoord(inp%NSW, nmodes, nqs))
+    allocate(epc%normcoord(nsw, nmodes, nqs))
 
-    do t=1,inp%NSW
+    do it=1,nsw
       do iq=1,epc%nqpts
         do im=1,epc%nmodes
 
@@ -393,13 +394,13 @@ module epcoup
             displ = 0.0
             ja = epc%atmap(ia)
             do iax=1,3
-              displ = displ + epc%displ(t, ia, iax) * epc%cellmd(iax, :) 
+              displ = displ + epc%displ(it, ia, iax) * epc%cellmd(iax, :) 
             end do
             theta = 2 * PI * DOT_PRODUCT( epc%qptsep(iq,:), epc%Rp(ia,:) )
             tempQ  = tempQ + EXP(-imgUnit*theta) * SQRT(epc%mass(ja)) * &
                      DOT_PRODUCT( CONJG(epc%phmodes(iq, im, ja, :)), displ )
           end do
-          epc%normcoord(t, im, iq) = tempQ
+          epc%normcoord(it, im, iq) = tempQ
 
         end do
       end do
@@ -528,7 +529,7 @@ module epcoup
     real(kind=q), allocatable, dimension(:) :: dkq, dq
     integer :: iq, jq1, jq2, im
     integer :: nqs, nmodes, nat
-    integer :: t, ik, jk, ib, jb
+    integer :: ik, jk, ib, jb
     complex(kind=q) :: temp
     logical :: lcoup
 
@@ -596,7 +597,7 @@ module epcoup
     open(unit=38, file='BASSEL', status='unknown', action='read', iostat=ierr)
 
     if (ierr /= 0) then
-      write(*,*) "XDATCAR file does NOT exist!"
+      write(*,*) "BASSEL file does NOT exist!"
       stop
     end if
 

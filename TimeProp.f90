@@ -12,16 +12,17 @@ module TimeProp
     type(TDKS), intent(inout)  :: ks
     type(namdInfo), intent(in) :: inp
 
-    integer :: tion, tele
+    integer :: tion, tele, Nt
     integer :: i, j
     real(kind=q) :: edt
     real(kind=q) :: start, fin
 
+    Nt = inp%NAMDTIME / inp%POTIM
     edt = inp%POTIM / inp%NELM
     ! write(*,*) inp%POTIM, inp%NELM, edt
 
     ! the OUTER loop
-    do tion = 1, inp%NAMDTIME - 1
+    do tion = 1, Nt - 1
       ks%pop_a(:,tion) = CONJG(ks%psi_c) * ks%psi_c
       ks%norm(tion) = SUM(ks%pop_a(:,tion))
       ks%psi_a(:,tion) = ks%psi_c
@@ -54,7 +55,7 @@ module TimeProp
       ! write(*,*) "T_ion ", tion, fin - start
 
     end do
-    tion = inp%NAMDTIME
+    tion = Nt
     ks%pop_a(:,tion) = CONJG(ks%psi_c) * ks%psi_c
     ks%norm(tion) = SUM(ks%pop_a(:,tion))
     ks%psi_a(:,tion) = ks%psi_c

@@ -70,13 +70,23 @@ module shop
     ! Because the dimension of NAcoup is smaller than NSW-1, replace tion 
     ! index as follow xtion.
     ! If time step > NSW-1, use the couplings from initial time repeatedly.
-    xtion = MOD(tion,inp%NSW-1)
-    if (xtion==0) xtion=inp%NSW-1
+    xtion = MOD(tion-1,inp%NSW-1) + 1
+
     ! Bkm = REAL(CONJG(Akm) * Ckm)
-    ks%Bkm = -2. * REAL(CONJG(ks%psi_a(cstat, tion)) * ks%psi_a(:, tion) * &
-                    ks%NAcoup(cstat, :, xtion))
+    ! ks%Bkm = 2. * REAL(CONJG(ks%psi_a(cstat, tion)) * ks%psi_a(:, tion) * &
+    !               ks%NAcoup(cstat, :, xtion))
+    ks%Bkm = -2. / hbar * AIMAG(CONJG(ks%psi_a(cstat, tion)) * ks%psi_a(:, tion) * &
+                   ks%NAcoup(cstat, :, xtion))
 
     ks%sh_prop(:,tion) = ks%Bkm / Akk * inp%POTIM
+
+    ! do i=1, ks%ndim
+    !   dE = ks%eigKs(cstat, tion) - ks%eigKs(i,tion) - 0.01
+    !   ks%Bkm(i) =  -2. * AIMAG(CONJG(ks%psi_a(cstat, tion)) * ks%psi_a(i, tion) * &
+    !                ks%NAcoup(cstat, i, xtion) * &
+    !                (exp( imgUnit * (dE/hbar*inp%POTIM) ) - 1.0 ) / (imgUnit*dE))
+    !   ks%sh_prop(i,tion) = ks%Bkm(i) / Akk
+    ! end do
 
     kbT = inp%TEMP * BOLKEV
 
@@ -108,12 +118,13 @@ module shop
 
     type(TDKS), intent(inout) :: ks
     type(namdInfo), intent(in) :: inp
-    integer :: i, j, tion
+    integer :: i, j, tion, Nt
     integer :: istat, cstat, which
 
     ks%sh_pops = 0
     ks%sh_prop = 0
     istat = inp%BASSEL(inp%INIKPT, inp%INIBAND)
+    Nt = inp%NAMDTIME / inp%POTIM
 
     ! initialize the random seed for ramdom number production
     call init_random_seed()
@@ -121,7 +132,7 @@ module shop
     do i=1, inp%NTRAJ
       ! in the first step, current step always equal initial step
       cstat = istat
-      do tion=1, inp%NAMDTIME
+      do tion=1, Nt
         call calcprop(tion, cstat, ks, inp)
         call whichToHop(tion, ks, which)
         if (which > 0) cstat = which
@@ -132,7 +143,7 @@ module shop
     ks%sh_pops = ks%sh_pops / inp%NTRAJ
     ! ks%sh_prop = ks%sh_prop / inp%NTRAJ
 
-    ! do tion=1, inp%NAMDTIME
+    ! do tion=1, Nt
     !   write(*,*) (ks%sh_pops(i,tion), i=1, ks%ndim)
     ! end do
   end subroutine
@@ -143,7 +154,7 @@ module shop
     type(TDKS), intent(in) :: ks
     type(namdInfo), intent(in) :: inp
 
-    integer :: i, j, tion, ierr, io
+    integer :: i, j, tion, Nt, ierr, io
     character(len=48) :: buf
 
     write(buf, *) inp%NAMDTINI
@@ -182,14 +193,16 @@ module shop
       write(io,'(A,A12,A3,I5)') '#', 'KMAX',     ' = ', inp%KMAX
     end do
 
-    do tion=1, inp%NAMDTIME
+    Nt = inp%NAMDTIME / inp%POTIM
+    do tion=1, Nt
       write(unit=24, fmt='(*(G20.10))') &
             tion * inp%POTIM, SUM(ks%eigKs(:,tion) * ks%sh_pops(:,tion)), &
             (ks%sh_pops(i,tion), i=1, ks%ndim)
-      write(unit=25, fmt="(2G20.10, *( ' ( ',G20.10,' , ',G20.10,' ) ' ) )") &
+      ! write(unit=25, fmt="(2G20.10, *( ' ( ',G20.10,' , ',G20.10,' ) ' ) )") &
+      write(unit=25, fmt='(*(G20.10))') &
             tion * inp%POTIM, SUM(ks%eigKs(:,tion) * ks%pop_a(:,tion)), &
-            (ks%psi_a(i,tion), i=1, ks%ndim)
-          ! (ks%pop_a(i,tion), i=1, ks%ndim)
+          ! (ks%psi_a(i,tion), i=1, ks%ndim)
+            (ks%pop_a(i,tion), i=1, ks%ndim)
     end do
 
     close(24)
