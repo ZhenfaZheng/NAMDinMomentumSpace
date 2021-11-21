@@ -25,7 +25,6 @@ module epcoup
     real(kind=q), allocatable, dimension(:,:) :: freqep
     real(kind=q), allocatable, dimension(:,:) :: freqph
     complex(kind=q), allocatable, dimension(:,:,:) :: normcoord
-    complex(kind=q), allocatable, dimension(:,:,:,:,:) :: epmat
     complex(kind=q), allocatable, dimension(:,:,:,:) :: phmodes
     real(kind=q), allocatable, dimension(:,:) :: cellmd
     real(kind=q), allocatable, dimension(:,:,:) :: displ
@@ -48,7 +47,6 @@ module epcoup
     if ( allocated(epc%qptsep) ) deallocate(epc%qptsep)
     if ( allocated(epc%freqep) ) deallocate(epc%freqep)
     if ( allocated(epc%freqph) ) deallocate(epc%freqph)
-    if ( allocated(epc%epmat) ) deallocate(epc%epmat)
     if ( allocated(epc%phmodes) ) deallocate(epc%phmodes)
     if ( allocated(epc%cellmd) ) deallocate(epc%cellmd)
     if ( allocated(epc%displ) ) deallocate(epc%displ)
@@ -73,13 +71,14 @@ module epcoup
     integer(hid_t) :: file_id, gr_id, dset_id
     integer(hsize_t) :: dim1(1), dim2(2), dim4(4)
     character(len=72) :: tagk, fname, grname, dsetname
-    real(kind=q) :: kbT, phn, dE
     real(kind=q), allocatable, dimension(:,:) :: kqltemp, pos, lattvec
     real(kind=q), allocatable, dimension(:,:,:,:) :: eptemp_r, eptemp_i, phmtemp
     complex(kind=q), allocatable, dimension(:,:,:,:) :: eptemp
-    complex :: eptemp_s, iomegat
+
+    write(*,*) "Reading ephmat.h5 file."
 
     fname = inp%FILEPM
+
     call h5open_f(hdferror)
     call h5fopen_f(fname, H5F_ACC_RDONLY_F, file_id, hdferror)
 
@@ -97,6 +96,7 @@ module epcoup
     nb = info(3); epc%nbands = nb
     nm = info(4); epc%nmodes = nm
     nat = nm/3  ; epc%natepc = nat
+    olap%Np = nq
     ! write(*,*) info
 
     dsetname = 'mass_a.u.'
@@ -184,10 +184,8 @@ module epcoup
     allocate(eptemp(nb, nb, nm, nq))
     allocate(eptemp_r(nb, nb, nm, nq))
     allocate(eptemp_i(nb, nb, nm, nq))
-    allocate(epc%epmat(nb, nb, nk, nm, nq))
 
     call kqMatch(epc)
-    kbT = inp%TEMP * BOLKEV
 
     do ik=1,nk
 
@@ -207,31 +205,27 @@ module epcoup
       call h5dclose_f(dset_id, hdferror)
 
       eptemp = ( eptemp_r + imgUnit * eptemp_i ) / 1000.0_q
-      epc%epmat(:,:,ik,:,:) = eptemp
 
       do jk=1,nk
 
         iq = epc%kkqmap(ik, jk)
         if (iq<0) cycle
 
+        ! print '(4(3(F10.5,3x)))', &
+        ! epc%kptsep(ik,:), epc%kptsep(jk,:), epc%qptsep(iq,:), &
+        ! epc%kptsep(ik,:)-epc%kptsep(jk,:)-epc%qptsep(iq,:)
+
         do im=1,nm
 
           if (epc%freqep(im,iq)<5.0E-3_q) cycle
-          phn = 1.0 / (exp(epc%freqep(im,iq)/kbT)-1)
-          iomegat = imgUnit * epc%freqep(im,iq)/hbar * inp%POTIM
 
           do jb=1,nb
             do ib=1,nb
 
               ibas = nb*(ik-1)+ib
               jbas = nb*(jk-1)+jb
-              eptemp_s = eptemp(ib, jb, im, iq)
-
-              do it=1,inp%NSW-1
-                olap%Dij(ibas, jbas, it) &
-                = olap%Dij(ibas, jbas, it) + eptemp_s * &
-                ( SQRT(phn)*exp(-iomegat*it) + SQRT(phn+1)*exp(iomegat*it) )
-              end do ! it loop
+              olap%gij(ibas, jbas, im) = eptemp(ib, jb, im, iq)
+              olap%Phfreq(ibas, jbas, im) = epc%freqep(im,iq)
 
             end do ! ib loop
           end do ! jb loop
@@ -246,16 +240,6 @@ module epcoup
 
     call h5fclose_f(file_id, hdferror)
 
-    olap%Dij = olap%Dij / SQRT(1.0*nq)
-    do ib=1,nb*nk
-      ! olap%Eig(ib,:) = olap%Eig(ib,:) + real(olap%Dij(ib,ib,:))
-      ! olap%Dij(ib,ib,:) = cero
-      olap%Dij(ib,ib,:) = real(olap%Dij(ib,ib,:))
-      do jb=ib+1,nb*nk
-        olap%Dij(jb,ib,:) = CONJG(olap%Dij(ib,jb,:))
-      enddo
-    enddo
-
   end subroutine readEPCpert
 
 
@@ -265,11 +249,12 @@ module epcoup
     type(namdInfo), intent(in) :: inp
     type(epCoupling), intent(inout) :: epc
 
-    real(kind=q) :: scal, dr, lattvec(3,3)
+    real(kind=q) :: scal, dr, lattvec(3,3), temp(3)
     integer :: ierr, i, iax, ia, it
     integer :: nat, nsw
 
     nsw = inp%NSW
+    write(*,*) 'Reading MD traj.'
 
     open(unit=33, file=inp%FILMD, status='unknown', action='read', iostat=ierr)
     if (ierr /= 0) then
@@ -317,8 +302,14 @@ module epcoup
 
     do it=1,nsw
       do ia=1,nat
-        epc%displ(it,ia,:) &
-        = epc%displ(it,ia,:) - epc%cellmd(ia+3, :)
+        temp = 0.0_q
+        do iax=1,3
+          ! minus average coordinates.
+          ! change from crastal coordinates to cartesian coordinates.
+          temp = temp + ( epc%displ(it,ia,iax) - epc%cellmd(ia+3, iax) ) * &
+                 lattvec(iax, :)
+        end do
+        epc%displ(it,ia,:) = temp
       end do
     end do
 
@@ -363,53 +354,77 @@ module epcoup
   end subroutine cellPROJ
 
 
-  subroutine phDecomp(inp, epc)
+  subroutine phDecomp(inp, olap, epc)
     ! Project the atomic motion from an MD simulation to phonon modes.
     implicit none
 
     type(namdInfo), intent(in) :: inp
+    type(overlap), intent(inout) :: olap
     type(epCoupling), intent(inout) :: epc
 
     ! Temporary normal mode coordinate
-    complex(kind=q) :: tempQ
+    complex(kind=q) :: temp
+    complex(kind=q), allocatable, dimension(:,:) :: eiqR
+    complex(kind=q), allocatable, dimension(:,:,:) :: tempQ
     real(kind=q) :: theta, displ(3), Np
     integer :: iq, im, ia, ja, iax, it
     integer :: nqs, nmodes, nat, nsw
+    integer :: ik, jk, nks, ib, jb, ibas, jbas, nb
 
     call readDISPL(inp, epc)
     call cellPROJ(epc)
 
+    write(*,*) "Decomposing phonon modes from MD traj."
+
+    nks = epc%nkpts
+    nb = inp%NBANDS
     nqs = epc%nqpts
     nmodes = epc%nmodes
     nsw = inp%NSW
+    nat = epc%natmd
 
-    allocate(epc%normcoord(nsw, nmodes, nqs))
+    allocate(eiqR(nqs,nat), tempQ(nqs, nmodes, nsw-1))
 
-    do it=1,nsw
-      do iq=1,epc%nqpts
-        do im=1,epc%nmodes
+    do iq=1,nqs
+      do ia=1,nat
+        theta = 2 * PI * DOT_PRODUCT( epc%qptsep(iq,:), epc%Rp(ia,:) )
+        eiqR(iq, ia) = EXP(-imgUnit*theta)
+      end do
+    end do
 
-          tempQ = cero
-          do ia=1,epc%natmd
-            displ = 0.0
+    do iq=1,nqs
+      do im=1,nmodes
+        do it=1,nsw-1
+          temp = cero
+          do ia=1,nat
             ja = epc%atmap(ia)
-            do iax=1,3
-              displ = displ + epc%displ(it, ia, iax) * epc%cellmd(iax, :) 
-            end do
-            theta = 2 * PI * DOT_PRODUCT( epc%qptsep(iq,:), epc%Rp(ia,:) )
-            tempQ  = tempQ + EXP(-imgUnit*theta) * SQRT(epc%mass(ja)) * &
-                     DOT_PRODUCT( CONJG(epc%phmodes(iq, im, ja, :)), displ )
+            temp = temp + eiqR(iq,ia) * SQRT(epc%mass(ja)) * &
+                   DOT_PRODUCT( CONJG(epc%phmodes(iq, im, ja, :)), &
+                   epc%displ(it, ia, :) )
           end do
-          epc%normcoord(it, im, iq) = tempQ
-
+          tempQ(iq,im,it) = temp
         end do
       end do
     end do
 
-    Np = 1.0_q * epc%natmd / epc%natepc
+    do ik=1,nks
+      do jk=1,nks
+        iq = epc%kkqmap(ik, jk)
+        do ib=1,nb
+          ibas = nb*(ik-1)+ib
+          do jb=1,nb
+            jbas = nb*(jk-1)+jb
+            olap%PhQ(ibas, jbas, :, :) = tempQ(iq,:,:)
+          end do
+        end do
+      end do
+    end do
+    
+    deallocate(tempQ)
+
     ! Np is the number of unit cells in MD cell.
-    epc%normcoord = epc%normcoord / SQRT(Np)
-    close(unit=41)
+    Np = epc%natmd / epc%natepc
+    olap%PhQ = olap%PhQ / SQRT(Np)
 
   end subroutine phDecomp
 
@@ -450,69 +465,99 @@ module epcoup
   end subroutine kqMatch
 
 
-  subroutine calcEPC(olap, inp, epc)
+  subroutine calcEPC(olap, inp)
     implicit none
 
     type(overlap), intent(inout) :: olap
-    type(namdInfo), intent(in) :: inp
-    type(epCoupling), intent(in) :: epc
+    type(namdInfo), intent(inout) :: inp
 
-    integer :: nsw, nk, nb, nq, nm, Np
-    integer :: it, ik, jk, ib, jb, iq, im, ibas, jbas
-    real(kind=q) :: lqvtemp, lqv ! zero-point displacement amplitude
+    integer :: nb, nm, nsw
+    integer :: ib, jb, im, it
+    ! zero-point displacement amplitude
+    real(kind=q) :: lqvtemp, lqv
     real(kind=q) :: kbT, phn
+    complex(kind=q) :: iw, iwtemp
+
 
     nsw = inp%NSW
-    nk  = inp%NKPOINTS
-    nb  = inp%NBANDS
-    nm  = epc%nmodes
+    nb  = olap%NBANDS
+    nm  = olap%NMODES
 
-    lqvtemp = hbar * SQRT( EVTOJ / (2.0_q*AMTOKG) ) * 1.0E-5_q
+    write(*,*) "Calculating e-ph couplings."
 
-    do ik=1,nk
-      do jk=1,nk
+    allocate(olap%Dij(nb, nb, nsw-1))
 
-        iq = epc%kkqmap(ik,jk)
-        if (iq<0) cycle
+    if (olap%COUPTYPE==1) then
 
-        do ib=1,nb
-          do jb=1,nb
+     kbT = inp%TEMP * BOLKEV
+     iwtemp = imgUnit * inp%POTIM / hbar
+     allocate(olap%EPcoup(nb, nb, nm, 2, nsw-1))
+     olap%EPcoup = cero
 
-            ibas = nb*(ik-1)+ib
-            jbas = nb*(jk-1)+jb
+     do ib=1,nb
+      do jb=ib,nb
 
-            do im=1,nm
-              lqv = lqvtemp / SQRT(epc%freqep(im, iq)) ! in unit of Angstrom
-              do it=1,nsw-1
-                olap%Dij(ibas, jbas, it) = olap%Dij(ibas, jbas, it) &
-                + epc%epmat(ib,jb,ik,im,iq) * epc%normcoord(it,im,iq) / lqv
-              end do
-            end do
+        do im=1,nm
 
+          if (olap%Phfreq(ib, jb, im)<5.0E-3_q) cycle
+          phn = 1.0 / ( exp(olap%Phfreq(ib, jb, im)/kbT) - 1.0 )
+          iw = iwtemp * olap%Phfreq(ib, jb, im)
+
+          do it=1,nsw-1
+            olap%EPcoup(ib, jb, im, 1, it) = &
+              olap%gij(ib, jb, im) * SQRT(phn) * exp(-iw*it)
+            olap%EPcoup(ib, jb, im, 2, it) = &
+              olap%gij(ib, jb, im) * SQRT(phn+1) * exp(iw*it)
           end do
         end do
 
+        if (jb==ib) then
+          olap%EPcoup(ib,ib,:,:,:) = ABS(olap%EPcoup(ib,ib,:,:,:))
+        else
+          olap%EPcoup(jb,ib,:,:,:) = CONJG(olap%EPcoup(ib,jb,:,:,:))
+        end if
+
       end do
-    end do
+     end do
+     olap%EPcoup = olap%EPcoup / SQRT(olap%Np)
+     olap%Dij = SUM( SUM(olap%EPcoup, dim=3), dim=3 )
 
-    do ib=1,nb
-      do ik=1,nk
-        ibas = nb*(ik-1)+ib
-        olap%Eig(ibas,:) = epc%energy(ib,ik)
-        ! olap%Dij(ibas,ibas,:) = ABS(olap%Dij(ib,ib,:))
-        ! if (olap%Eig(ibas,1)<-2.8 .and. olap%Eig(ibas,1)>-3.2) &
-        ! olap%Eig(ibas,:) = epc%energy(ib,ik) + (ik-25) * 0.02
-        ! olap%Eig(ibas,:) = -4.4
-        ! olap%Eig(ibas,:) = olap%Eig(ibas,:) + ABS(olap%Dij(ibas,ibas,200)) * 4
-        ! olap%Dij(ibas,ibas,:) = cero
-        do jbas=ibas+1,nb*nk
-          olap%Dij(jbas,ibas,:) = CONJG(olap%Dij(ibas,jbas,:))
-        enddo
-      enddo
-    enddo
+    else if (olap%COUPTYPE==2) then
 
-    Np = epc%natmd / epc%natepc
-    olap%Dij = olap%Dij / SQRT(1.0 * Np)
+     ! kbT = inp%TEMP * BOLKEV
+     lqvtemp = hbar * SQRT( EVTOJ / (2.0_q*AMTOKG) ) * 1.0E-5_q
+     allocate(olap%EPcoup(nb, nb, nm, 1, nsw-1))
+     olap%EPcoup = cero
+
+     do ib=1,nb
+      do jb=ib,nb
+
+        do im=1,nm
+          ! unit of Angstrom
+          lqv = lqvtemp / SQRT(olap%Phfreq(ib, jb, im))
+          ! if (olap%Phfreq(ib, jb, im)<1.0E-2_q) cycle
+          ! phn = 1.0 / ( exp(olap%Phfreq(ib, jb, im)/kbT) - 1.0 )
+          ! print '(F15.9)', (2.0*phn+1)*nsw
+          ! print '(F15.9)', SUM(ABS(olap%PhQ(ib, jb, im, :))**2) / lqv**2
+          ! print *
+          do it=1,nsw-1
+            olap%EPcoup(ib, jb, im, 1, it) = &
+              olap%gij(ib, jb, im) * olap%PhQ(ib, jb, im, it) / lqv
+          end do
+        end do
+
+        if (jb==ib) then
+          olap%EPcoup(ib,ib,:,:,:) = ABS(olap%EPcoup(ib,ib,:,:,:))
+        else
+          olap%EPcoup(jb,ib,:,:,:) = CONJG(olap%EPcoup(ib,jb,:,:,:))
+        end if
+
+      end do
+     end do
+     olap%EPcoup = olap%EPcoup / SQRT(olap%Np)
+     olap%Dij = SUM( SUM(olap%EPcoup, dim=3), dim=3 )
+
+    end if
     
   end subroutine calcEPC
 
@@ -525,7 +570,7 @@ module epcoup
     type(overlap), intent(inout) :: olap
     type(overlap), intent(inout) :: olap_sec
 
-    real(kind=q) :: proj, norm, phn
+    real(kind=q) :: proj, norm
     real(kind=q), allocatable, dimension(:) :: dkq, dq
     integer :: iq, jq1, jq2, im
     integer :: nqs, nmodes, nat
@@ -534,7 +579,7 @@ module epcoup
     logical :: lcoup
 
     ! Initialization
-    if ( (.not. inp%LCPTXT) .or. (.not. inp%LBASSEL) ) &
+    if ( .not. ( inp%LCPTXT .and. inp%LBASSEL) ) &
       call initOlap(olap, inp, inp%NBANDS * inp%NKPOINTS)
 
     inquire(file='COUPCAR', exist=lcoup)
@@ -553,11 +598,12 @@ module epcoup
     else if (inp%EPCTYPE==1) then
 
       write(*,'(A)') "------------------------------------------------------------"
-      write(*,*) "Calculating couplings from dense e-p matrix..."
+      write(*,*) "TypeI e-ph coupling calculation."
 
       call readEPCpert(inp, epc, olap)
       call copyToSec(olap, olap_sec, inp)
-      call CoupToFile(olap)
+      ! call CoupToFile(olap)
+      call calcEPC(olap_sec, inp)
       call writeNaEig(olap_sec, inp)
 
       write(*,*) "Done!"
@@ -566,19 +612,17 @@ module epcoup
     else
 
       write(*,'(A)') "------------------------------------------------------------"
-      write(*,*) "Calculating couplings from e-p matrix..."
+      write(*,*) "TypeII e-ph coupling calculation."
 
       call readEPCpert(inp, epc, olap)
-      call phDecomp(inp, epc)
-      ! call kqMatch(epc)
-      call calcEPC(olap, inp, epc)
+      call phDecomp(inp, olap, epc)
+      ! call CoupToFile(olap)
+      call copyToSec(olap, olap_sec, inp)
+      call calcEPC(olap_sec, inp)
+      call writeNaEig(olap_sec, inp)
 
       write(*,*) "Done!"
       write(*,'(A)') "------------------------------------------------------------"
-
-      call copyToSec(olap, olap_sec, inp)
-      call CoupToFile(olap)
-      call writeNaEig(olap_sec, inp)
 
     end if
 
@@ -601,7 +645,7 @@ module epcoup
       stop
     end if
 
-    inp%BASSEL = 0
+    inp%BASSEL = -1
     read(unit=38, fmt=*) inp%NBASIS
     do ibas=1,inp%NBASIS
       read(unit=38, fmt=*) ik, ib
@@ -627,7 +671,7 @@ module epcoup
     emax = inp%EMAX
 
     inp%NBASIS = 0
-    inp%BASSEL = 0
+    inp%BASSEL = -1
 
     do ik=inp%KMIN, inp%KMAX
       do ib=inp%BMIN, inp%BMAX
@@ -665,15 +709,28 @@ module epcoup
     type(overlap), intent(inout) :: olap
     type(namdInfo), intent(in) :: inp
     integer, intent(in) :: nb
+    integer :: nmodes, nsw
+
+    nmodes = 6
+    nsw = inp%NSW
 
     olap%NBANDS = nb
     olap%TSTEPS = inp%NSW
     olap%dt = inp%POTIM
+    olap%NMODES = nmodes
+    olap%COUPTYPE = inp%EPCTYPE
 
-    allocate(olap%Dij(nb, nb, inp%NSW-1))
-    allocate(olap%Eig(nb, inp%NSW-1))
+    allocate(olap%Eig(nb, nsw-1))
+    allocate(olap%gij(nb, nb, nmodes))
+    allocate(olap%Phfreq(nb, nb, nmodes))
 
-    olap%Dij = cero
+    if (olap%COUPTYPE==2) then
+      allocate(olap%PhQ(nb, nb, nmodes, nsw-1))
+      olap%PhQ = cero
+    end if
+
+    olap%gij = cero
+    olap%Phfreq = 0.0_q
     olap%Eig = 0.0_q
 
   end subroutine initOlap
@@ -696,30 +753,36 @@ module epcoup
     nb = inp%NBANDS
 
     call initOlap(olap_sec, inp, inp%NBASIS)
+    olap_sec%Np = olap%Np
 
     do ik=inp%KMIN, inp%KMAX
       do ib=inp%BMIN, inp%BMAX
 
-        if (inp%BASSEL(ik,ib)>0) then
+        if (inp%BASSEL(ik,ib)<0) cycle
+        iBas = inp%BASSEL(ik,ib)
+        olap_sec%Eig(iBas, :) = olap%Eig((ik-1)*nb+ib, :)
 
-          iBas = inp%BASSEL(ik,ib)
-          olap_sec%Eig(iBas, :) = olap%Eig((ik-1)*nb+ib, :)
+        do jk=inp%KMIN, inp%KMAX
+          do jb=inp%BMIN, inp%BMAX
 
-          do jk=inp%KMIN, inp%KMAX
-            do jb=inp%BMIN, inp%BMAX
+            if (inp%BASSEL(jk,jb)<0) cycle
+            jBas = inp%BASSEL(jk,jb)
 
-              if (inp%BASSEL(jk,jb)>0) then
+            ! olap_sec%Dij(iBas, jBas, :) = &
+            ! olap%Dij( (ik-1)*nb+ib, (jk-1)*nb+jb, : )
 
-                jBas = inp%BASSEL(jk,jb)
-                olap_sec%Dij(iBas, jBas, :) = &
-                olap%Dij( (ik-1)*nb+ib, (jk-1)*nb+jb, : )
+            olap_sec%gij(iBas, jBas, :) = &
+            olap%gij( (ik-1)*nb+ib, (jk-1)*nb+jb, : )
 
-              end if
+            olap_sec%Phfreq(iBas, jBas, :) = &
+            olap%Phfreq( (ik-1)*nb+ib, (jk-1)*nb+jb, : )
 
-            end do
+            if (inp%EPCTYPE==2) &
+            olap_sec%PhQ(iBas, jBas, :, :) = &
+            olap%PhQ( (ik-1)*nb+ib, (jk-1)*nb+jb, :, : )
+
           end do
-
-        end if
+        end do
 
       end do
     end do

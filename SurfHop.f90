@@ -53,40 +53,68 @@ module shop
 
   end subroutine
 
-  subroutine calcprop(tion, cstat, ks, inp)
+  subroutine calcprop(tion, cstat, ks, inp, olap)
     implicit none
 
     type(TDKS), intent(inout) :: ks
     type(namdInfo), intent(in) :: inp
+    type(overlap), intent(in)  :: olap
     integer, intent(in) :: tion
     integer, intent(in) :: cstat
 
-    integer :: i, j, xtion
-    real(kind=q) :: Akk
-    real(kind=q) :: dE, kbT
+    integer :: i, j, im, nm, couptype
+    real(kind=q) :: Akk, avT
+    real(kind=q) :: dE, dE1, dE2, kbT
+    complex(kind=q) :: iomegat, temp
 
     Akk = CONJG(ks%psi_a(cstat, tion)) * ks%psi_a(cstat, tion)
 
-    ! Because the dimension of NAcoup is smaller than NSW-1, replace tion 
-    ! index as follow xtion.
-    ! If time step > NSW-1, use the couplings from initial time repeatedly.
-    xtion = MOD(tion-1,inp%NSW-1) + 1
+    avT = 10000.0_q
+    nm = olap%NMODES
+    couptype = olap%COUPTYPE
+    iomegat = imgUnit * inp%POTIM / hbar * avT
 
-    ! Bkm = REAL(CONJG(Akm) * Ckm)
-    ! ks%Bkm = 2. * REAL(CONJG(ks%psi_a(cstat, tion)) * ks%psi_a(:, tion) * &
-    !               ks%NAcoup(cstat, :, xtion))
-    ks%Bkm = -2. / hbar * AIMAG(CONJG(ks%psi_a(cstat, tion)) * ks%psi_a(:, tion) * &
-                   ks%NAcoup(cstat, :, xtion))
+    if (couptype==0) then
+      ks%Bkm = 2. * REAL(CONJG(ks%psi_a(cstat, tion)) * ks%psi_a(:, tion) * &
+                    ks%NAcoup(cstat, :, tion))
 
-    ks%sh_prop(:,tion) = ks%Bkm / Akk * inp%POTIM
+      ks%sh_prop(:,tion) = ks%Bkm / Akk * inp%POTIM
 
-    ! do i=1, ks%ndim
-    !   dE = ks%eigKs(cstat, tion) - ks%eigKs(i,tion) - 0.01
-    !   ks%Bkm(i) =  -2. * AIMAG(CONJG(ks%psi_a(cstat, tion)) * ks%psi_a(i, tion) * &
-    !                ks%NAcoup(cstat, i, xtion) * &
-    !                (exp( imgUnit * (dE/hbar*inp%POTIM) ) - 1.0 ) / (imgUnit*dE))
-    !   ks%sh_prop(i,tion) = ks%Bkm(i) / Akk
-    ! end do
+    else if (couptype==1) then
+
+      do i=1, ks%ndim
+        temp = cero
+        dE = ks%eigKs(cstat, tion) - ks%eigKs(i,tion) + 1.0E-8_q
+        do im=1,nm
+          dE1 = dE - olap%Phfreq(cstat, i, im)
+          temp = temp + ks%EPcoup(cstat, i, im, 1, tion) * &
+               ( exp(iomegat * dE1) - 1.0 ) / ( imgUnit * dE1 )
+          dE2 = dE + olap%Phfreq(cstat, i, im)
+          temp = temp + ks%EPcoup(cstat, i, im, 2, tion) * &
+               ( exp(iomegat * dE2) - 1.0 ) / ( imgUnit * dE2 )
+        end do
+        ks%Bkm(i) = AIMAG(CONJG(ks%psi_a(cstat, tion)) * ks%psi_a(i,tion) * temp)
+      end do
+      ks%sh_prop(:,tion) = -2. * ks%Bkm / Akk / avT
+      ! print '(*(F20.12))', ks%sh_prop(:,tion)
+      ! print '(*(F20.12))', ( exp(iomegat * dE2) - 1.0 ) / ( imgUnit * dE2 )
+    
+    else if (couptype==2) then
+
+      do i=1, ks%ndim
+        temp = cero
+        dE = ks%eigKs(cstat, tion) - ks%eigKs(i,tion) + 1.0E-8_q
+        ! dE = ks%eigKs(cstat, tion) - ks%eigKs(i,tion) - 0.01
+        do im=1,nm
+          dE1 = dE - olap%Phfreq(cstat, i, im)
+          temp = temp + ks%EPcoup(cstat, i, im, 1, tion) * &
+             ( exp(iomegat * dE1) - 1.0 ) / ( imgUnit * dE1 )
+        end do
+        ks%Bkm(i) = AIMAG(CONJG(ks%psi_a(cstat, tion)) * ks%psi_a(i,tion) * temp)
+      end do
+      ks%sh_prop(:,tion) = -2. * ks%Bkm / Akk
+
+    end if
 
     kbT = inp%TEMP * BOLKEV
 
@@ -113,11 +141,12 @@ module shop
   end subroutine
 
   ! calculate surface hopping probabilities
-  subroutine runSH(ks, inp)
+  subroutine runSH(ks, inp, olap)
     implicit none
 
     type(TDKS), intent(inout) :: ks
     type(namdInfo), intent(in) :: inp
+    type(overlap), intent(in)  :: olap
     integer :: i, j, tion, Nt
     integer :: istat, cstat, which
 
@@ -133,7 +162,7 @@ module shop
       ! in the first step, current step always equal initial step
       cstat = istat
       do tion=1, Nt
-        call calcprop(tion, cstat, ks, inp)
+        call calcprop(tion, cstat, ks, inp, olap)
         call whichToHop(tion, ks, which)
         if (which > 0) cstat = which
         ks%sh_pops(cstat, tion) = ks%sh_pops(cstat, tion) + 1

@@ -12,6 +12,14 @@ module couplings
     real(kind=q) :: dt
     complex(kind=q), allocatable, dimension(:,:,:) :: Dij
     real(kind=q), allocatable, dimension(:,:) :: Eig
+
+    complex(kind=q), allocatable, dimension(:,:,:) :: gij
+    complex(kind=q), allocatable, dimension(:,:,:,:) :: PhQ
+    complex(kind=q), allocatable, dimension(:,:,:,:,:) :: EPcoup
+    real(kind=q), allocatable, dimension(:,:,:) :: Phfreq
+    integer :: NMODES
+    integer :: COUPTYPE
+    real :: Np
   end type
 
   contains

@@ -54,7 +54,7 @@ Program main
     call Propagation(ks, inp)
     ! Run surface hopping
     if (inp%LSHP) then
-      call runSH(ks, inp)
+      call runSH(ks, inp, olap_sec)
       call printSH(ks, inp)
     end if
     call cpu_time(fin)

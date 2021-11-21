@@ -3,6 +3,7 @@ module hamil
   use fileio
   use couplings
   use constants
+  use epcoup
   implicit none
 
   type TDKS 
@@ -26,6 +27,7 @@ module hamil
     real(kind=q), allocatable, dimension(:,:) :: eigKs
     ! Non-adiabatic couplings
     complex(kind=q), allocatable, dimension(:,:,:) :: NAcoup
+    complex(kind=q), allocatable, dimension(:,:,:,:,:) :: EPcoup
 
     ! surface hopping related
 
@@ -48,12 +50,13 @@ module hamil
     type(overlap), intent(in)  :: olap
     type(namdInfo), intent(in) :: inp
 
-    integer :: i, j, t, nsteps, N, Nt
+    integer :: i, j, im, t, nsteps, N, NM, Nt
     integer :: initstep
 
     ! memory allocation
 
     N = inp%NBASIS
+    NM = olap%NMODES
     ks%ndim = inp%NBASIS
     Nt = inp%NAMDTIME / inp%POTIM
 
@@ -70,6 +73,11 @@ module hamil
 
       allocate(ks%eigKs(N, Nt))
       allocate(ks%NAcoup(N,N, Nt))
+      if (olap%COUPTYPE==1) then
+        allocate(ks%EPcoup(N,N, NM, 2, Nt))
+      else if (olap%COUPTYPE==2) then
+        allocate(ks%EPcoup(N,N, NM, 1, Nt))
+      end if
 
       allocate(ks%sh_pops(N, Nt))
       allocate(ks%sh_prop(N, Nt))
@@ -92,23 +100,27 @@ module hamil
     ! initstep = MOD(initstep-1, nsw-1) + 1
     nsteps = inp%NSW - 1
 
-    do t=1, Nt
-
-      ! If time step > NSW-1, use Eig & couplings
-      ! from initial time repeatedly.
-      i = MOD(initstep+t, nsteps) + 1
-
-      ! We don't need all the information, only a section of it
-      ks%eigKs(:,t) = olap%Eig(:, i)
-      if (inp%LEPC) then
+    if (inp%LEPC) then
+      do t=1, Nt
+        ! If time step > NSW-1, use Eig & couplings
+        ! from initial time repeatedly.
+        i = MOD(initstep+t, nsteps) + 1
+        ks%eigKs(:,t) = olap%Eig(:, i)
         ks%NAcoup(:,:,t) = olap%Dij(:,:, i)
-      else
+        ks%EPcoup(:,:,:,:,t) = olap%EPcoup(:,:,:,:,i)
+      end do
+    else
+      do t=1, Nt
+        ! If time step > NSW-1, use Eig & couplings
+        ! from initial time repeatedly.
+        i = MOD(initstep+t, nsteps) + 1
+        ! We don't need all the information, only a section of it
+        ks%eigKs(:,t) = olap%Eig(:, i)
         ! Divide by 2 * POTIM here,
         ! because we didn't do this in the calculation of couplings
         ks%NAcoup(:,:,t) = olap%Dij(:,:, i) / (2*inp%POTIM)
-      end if
-
-    end do
+      end do
+    end if
 
   end subroutine
 
