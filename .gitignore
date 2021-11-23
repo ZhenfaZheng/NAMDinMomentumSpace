@@ -2,6 +2,9 @@
 *.o
 *.mod
 
+# ignore .pyc files
+scripts/*.pyc
+
 # ignore compiled file namd.
 namd
 

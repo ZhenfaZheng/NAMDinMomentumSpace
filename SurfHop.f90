@@ -63,16 +63,15 @@ module shop
     integer, intent(in) :: cstat
 
     integer :: i, j, im, nm, couptype
-    real(kind=q) :: Akk, avT
+    real(kind=q) :: Akk
     real(kind=q) :: dE, dE1, dE2, kbT
     complex(kind=q) :: iomegat, temp
 
     Akk = CONJG(ks%psi_a(cstat, tion)) * ks%psi_a(cstat, tion)
 
-    avT = 10000.0_q
     nm = olap%NMODES
     couptype = olap%COUPTYPE
-    iomegat = imgUnit * inp%POTIM / hbar * avT
+    iomegat = imgUnit * inp%POTIM / hbar
 
     if (couptype==0) then
       ks%Bkm = 2. * REAL(CONJG(ks%psi_a(cstat, tion)) * ks%psi_a(:, tion) * &
@@ -81,30 +80,16 @@ module shop
       ks%sh_prop(:,tion) = ks%Bkm / Akk * inp%POTIM
 
     else if (couptype==1) then
+      ks%Bkm = -2. * AIMAG(CONJG(ks%psi_a(cstat, tion)) * ks%psi_a(:, tion) * &
+                    ks%NAcoup(cstat, :, tion))
 
-      do i=1, ks%ndim
-        temp = cero
-        dE = ks%eigKs(cstat, tion) - ks%eigKs(i,tion) + 1.0E-8_q
-        do im=1,nm
-          dE1 = dE - olap%Phfreq(cstat, i, im)
-          temp = temp + ks%EPcoup(cstat, i, im, 1, tion) * &
-               ( exp(iomegat * dE1) - 1.0 ) / ( imgUnit * dE1 )
-          dE2 = dE + olap%Phfreq(cstat, i, im)
-          temp = temp + ks%EPcoup(cstat, i, im, 2, tion) * &
-               ( exp(iomegat * dE2) - 1.0 ) / ( imgUnit * dE2 )
-        end do
-        ks%Bkm(i) = AIMAG(CONJG(ks%psi_a(cstat, tion)) * ks%psi_a(i,tion) * temp)
-      end do
-      ks%sh_prop(:,tion) = -2. * ks%Bkm / Akk / avT
-      ! print '(*(F20.12))', ks%sh_prop(:,tion)
-      ! print '(*(F20.12))', ( exp(iomegat * dE2) - 1.0 ) / ( imgUnit * dE2 )
-    
+      ks%sh_prop(:,tion) = ks%Bkm / Akk * inp%POTIM
+
     else if (couptype==2) then
 
       do i=1, ks%ndim
         temp = cero
         dE = ks%eigKs(cstat, tion) - ks%eigKs(i,tion) + 1.0E-8_q
-        ! dE = ks%eigKs(cstat, tion) - ks%eigKs(i,tion) - 0.01
         do im=1,nm
           dE1 = dE - olap%Phfreq(cstat, i, im)
           temp = temp + ks%EPcoup(cstat, i, im, 1, tion) * &
@@ -140,6 +125,44 @@ module shop
 
   end subroutine
 
+
+  ! calculate correction of SH probability for EPC type NAMD.
+  subroutine calc_SHprob_corr(ks, inp, olap)
+    implicit none
+
+    type(TDKS), intent(inout) :: ks
+    type(namdInfo), intent(in) :: inp
+    type(overlap), intent(in)  :: olap
+
+    integer :: ibas, jbas, nbas, im, nmodes, i
+    real(kind=q) :: dE, dE1, dE2, kbT, averageT
+    complex(kind=q) :: iomegat
+
+    kbT = inp%TEMP * BOLKEV
+    averageT = hbar / kbT
+    iomegat = imgUnit / kbT
+    ! iwt = i * (E/hbar) * (hbar/kbT)
+
+    nbas = inp%NBASIS
+    nmodes = olap%NMODES
+    do ibas=1,nbas
+      do jbas=1,nbas
+        dE = olap%Eig(ibas,1) - olap%Eig(jbas,1) + 1.0E-8_q
+        do im=1,nmodes
+          dE1 = dE - olap%Phfreq(ibas, jbas, im)
+          ks%EPcoup(ibas, jbas, im, 1, :) = ks%EPcoup(ibas, jbas, im, 1, :) * &
+              ( exp(iomegat * dE1) - 1.0 ) / ( imgUnit * dE1 ) / averageT
+          dE2 = dE + olap%Phfreq(ibas, jbas, im)
+          ks%EPcoup(ibas, jbas, im, 2, :) = ks%EPcoup(ibas, jbas, im, 2, :) * &
+              ( exp(iomegat * dE2) - 1.0 ) / ( imgUnit * dE2 ) / averageT
+        end do
+      end do
+    end do
+    ks%NAcoup = SUM( SUM(ks%EPcoup, dim=3), dim=3 )
+
+  end subroutine
+
+
   ! calculate surface hopping probabilities
   subroutine runSH(ks, inp, olap)
     implicit none
@@ -157,6 +180,11 @@ module shop
 
     ! initialize the random seed for ramdom number production
     call init_random_seed()
+
+    if (olap%COUPTYPE==1) then
+      ! SH probability correction.
+      call calc_SHprob_corr(ks, inp, olap)
+    end if
 
     do i=1, inp%NTRAJ
       ! in the first step, current step always equal initial step
