@@ -582,7 +582,10 @@ module epcoup
     if ( .not. ( inp%LCPTXT .and. inp%LBASSEL) ) &
       call initOlap(olap, inp, inp%NBANDS * inp%NKPOINTS)
 
-    inquire(file='COUPCAR', exist=lcoup)
+    write(*,*)
+    write(*,'(A)') "------------------------------------------------------------"
+
+    inquire(file='EPCAR', exist=lcoup)
     if (lcoup) then
       ! file containing couplings exists, then read it
       if (inp%LCPTXT .and. inp%LBASSEL) then
@@ -590,44 +593,41 @@ module epcoup
         call initOlap(olap_sec, inp, inp%NBASIS)
         call readNaEig(olap_sec, inp)
       else
-        call CoupFromFile(olap)
+        call CoupFromFileEP(olap)
         call copyToSec(olap, olap_sec, inp)
+        call calcEPC(olap_sec, inp)
         call writeNaEig(olap_sec, inp)
       end if
 
     else if (inp%EPCTYPE==1) then
 
-      write(*,'(A)') "------------------------------------------------------------"
       write(*,*) "TypeI e-ph coupling calculation."
 
       call readEPCpert(inp, epc, olap)
       call copyToSec(olap, olap_sec, inp)
-      ! call CoupToFile(olap)
+      call CoupToFileEP(olap)
       call calcEPC(olap_sec, inp)
       call writeNaEig(olap_sec, inp)
 
-      write(*,*) "Done!"
-      write(*,'(A)') "------------------------------------------------------------"
-
     else
 
-      write(*,'(A)') "------------------------------------------------------------"
       write(*,*) "TypeII e-ph coupling calculation."
 
       call readEPCpert(inp, epc, olap)
       call phDecomp(inp, olap, epc)
-      ! call CoupToFile(olap)
+      call CoupToFileEP(olap)
       call copyToSec(olap, olap_sec, inp)
       call calcEPC(olap_sec, inp)
       call writeNaEig(olap_sec, inp)
-
-      write(*,*) "Done!"
-      write(*,'(A)') "------------------------------------------------------------"
 
     end if
 
     call releaseEPC(epc)
     if ( allocated(olap%Dij) )deallocate(olap%Dij, olap%Eig)
+
+    write(*,*) "Done!"
+    write(*,'(A)') "------------------------------------------------------------"
+    write(*,*)
 
   end subroutine TDepCoupIJ
 
@@ -788,6 +788,137 @@ module epcoup
     end do
 
   end subroutine copyToSec
+
+
+  subroutine CoupToFileEP(olap)
+    implicit none
+    type(overlap), intent(in) :: olap
+
+    ! Couplings are save to a binary file
+    integer :: recordL, ierr, irec
+    integer :: i, j, nb, im, nmodes, it
+    ! to find out the record length
+    complex(kind=q), allocatable, dimension(:)  :: values
+
+    allocate(values(olap%NBANDS * olap%NBANDS))
+    inquire (iolength=recordL) values
+    deallocate(values)
+
+    if (recordL<200) recordL=200 ! at least 25 real numbers (8 bytes)
+
+    open(unit=30, file='EPCAR', access='direct', form='unformatted', &
+         status='unknown', recl=recordL, iostat=ierr)
+    if(ierr /= 0) then
+        write(*,*) "File I/O error with EPCAR"
+        stop
+    end if
+
+    irec = 1
+    write(unit=30, rec=irec) &
+        real(recordL,       kind=q), real(olap%NBANDS, kind=q), &
+        real(olap%TSTEPS,   kind=q), real(olap%dt, kind=q), &
+        real(olap%COUPTYPE, kind=q), real(olap%Np, kind=q), &
+        real(olap%NMODES,   kind=q)
+
+    nb = olap%NBANDS
+    nmodes = olap%NMODES
+    do im=1, nmodes
+      irec = irec + 1
+      ! Here we only save Eig(:,1)
+      ! We suppose Eig(i,t) for any t does not change.
+      write(unit=30, rec=irec) (olap%Eig(i,1), i=1,nb), &
+          ((olap%Phfreq(i,j,im), i=1,nb), j=1,nb)
+    end do
+    do im=1, nmodes
+      irec = irec + 1
+      write(unit=30, rec=irec) ((olap%gij(i,j,im), i=1,nb), j=1,nb)
+    end do
+    do im=1, nmodes
+      irec = irec + 1
+      write(unit=30, rec=irec) ((olap%gij(i,j,im), i=1,nb), j=1,nb)
+    end do
+    if (olap%COUPTYPE==2) then
+      do it=1,olap%TSTEPS-1
+        do im=1, nmodes
+          irec = irec + 1
+          write(unit=30, rec=irec) ((olap%PhQ(i,j,im,it), i=1,nb), j=1,nb)
+        end do
+      end do
+    end if
+
+    close(unit=30)
+
+  end subroutine CoupToFileEP
+
+
+  subroutine CoupFromFileEP(olap)
+    implicit none
+    type(overlap), intent(inout) :: olap
+
+    ! Couplings are save to a binary file
+    integer :: irecordL, ierr, irec
+    integer :: i, j, nb, im, nmodes, it
+    real(kind=q) :: recordL, rnbands, rnsw, rdt, rctype, rnp, rnmodes
+
+    open(unit=30, file='EPCAR', access='direct', form='unformatted', &
+         status = 'unknown', recl=256, iostat=ierr)
+    if(ierr /= 0) then
+      write(*,*) "File I/O error with EPCAR"
+      stop
+    end if
+
+    read(unit=30,rec=1) recordL, rnbands, rnsw, rdt, rctype, rnp, rnmodes
+    ! write(*,*) recordL, rnbands, rnsw, rdt
+
+    if (olap%NBANDS /= NINT(rnbands) .or. olap%TSTEPS /= NINT(rnsw) .or. &
+       olap%COUPTYPE /= NINT(rctype) .or. olap%NMODES /= NINT(rnmodes)) then
+      ! write(*,*) olap%NBANDS, NINT(rnbands), olap%TSTEPS, NINT(rnsw)
+      write(*,*) "The EPCAR seems to be wrong..."
+      stop
+    end if
+
+    close(30)
+
+    irecordL = NINT(recordL)
+    open(unit=30, file='EPCAR', access='direct', form='unformatted', &
+         status = 'unknown', recl=irecordL, iostat=ierr)
+
+    write(*,*) "Reading couplings from EPCAR..."
+
+    irec = 1
+    nb = olap%NBANDS
+    nmodes = olap%NMODES
+    olap%Np = rnp
+
+    do im=1, nmodes
+      irec = irec + 1
+      ! We suppose Eig(i,t) for any t does not change.
+      read(unit=30, rec=irec) (olap%Eig(i,1), i=1,nb), &
+          ((olap%Phfreq(i,j,im), i=1,nb), j=1,nb)
+      do i=1,nb
+        olap%Eig(i,:) = olap%Eig(i,1)
+      end do
+    end do
+    do im=1, nmodes
+      irec = irec + 1
+      read(unit=30, rec=irec) ((olap%gij(i,j,im), i=1,nb), j=1,nb)
+    end do
+    do im=1, nmodes
+      irec = irec + 1
+      read(unit=30, rec=irec) ((olap%gij(i,j,im), i=1,nb), j=1,nb)
+    end do
+    if (olap%COUPTYPE==2) then
+      do it=1,olap%TSTEPS-1
+        do im=1, nmodes
+          irec = irec + 1
+          read(unit=30, rec=irec) ((olap%PhQ(i,j,im,it), i=1,nb), j=1,nb)
+        end do
+      end do
+    end if
+
+    close(unit=30)
+
+  end subroutine CoupFromFileEP
 
 
 end module epcoup

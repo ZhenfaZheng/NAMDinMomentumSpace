@@ -19,7 +19,7 @@ module couplings
     real(kind=q), allocatable, dimension(:,:,:) :: Phfreq
     integer :: NMODES
     integer :: COUPTYPE
-    real :: Np
+    real(kind=q) :: Np
   end type
 
   contains
