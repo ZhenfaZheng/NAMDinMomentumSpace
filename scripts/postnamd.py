@@ -1,9 +1,71 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
 
 import h5py
 import numpy as np
 import matplotlib as mpl; mpl.use('agg')
 import matplotlib.pyplot as plt
+
+
+def read_couple(filcoup='NATXT', filcoup_i='', ctype=0):
+    '''
+    This function loads data from NATXT file.
+
+    Parameters:
+    filcoup  : string, coupling file.
+    filcoup_i: string, file name of imaginary part, for ctype==2.
+    ctype    : integer, different forms of NATXT files. 0: origin type, NAC
+               data are real number; 1: NAC are complex, and restore in two
+               real numbers; 2: NAC are complex, real and imaginary part are
+               restore in two files; 3: NAC are complex, and restore in forms
+               of '( xxx , yyy )'.
+
+    Returns: ndarray, coupling data in forms of coup[nsw-1, nb, nb]
+    '''
+
+    if ctype==0:
+        coup = np.loadtxt(filcoup)
+        nb = int( np.sqrt(coup.shape[1]) )
+        nt = int(coup.shape[0])
+        coup.resize(nt,nb,nb)
+
+    elif ctype==1:
+        data = np.loadtxt(filcoup)
+        nb = int( np.sqrt(data.shape[1]/2) )
+        nt = int(data.shape[0])
+
+        coup = data[:,0::2] + data[:,1::2]*(1.0j)
+        coup.resize(nt,nb,nb)
+
+    return coup
+
+
+def plot_couple(coup, figname='COUPLE.png'):
+    '''
+    This function plots average couplings.
+
+    Parameters:
+    coup: ndarray, average coupling data in forms of coup[nb, nb]
+    figname: string, output figure file name.
+    '''
+
+    fig = plt.figure()
+    figsize_x = 4.8
+    figsize_y = 3.6 # in inches
+    fig.set_size_inches(figsize_x, figsize_y)
+
+    cmap = 'bwr'
+    n = coup.shape[0]
+    coup *= 1000.0 # change unit to meV
+    Bmin = 0.5; Bmax = n + 0.5
+    cmin = 0.0; cmax = np.max(coup)
+    norm = mpl.colors.Normalize(cmin,cmax)
+    plt.imshow(coup, cmap=cmap, origin='lower', norm=norm,
+        extent=(Bmin,Bmax,Bmin,Bmax), interpolation='none')
+
+    cbar = plt.colorbar()
+    cbar.ax.set_title('   meV')
+    plt.tight_layout()
+    plt.savefig(figname, dpi=400)
 
 
 def ek_selected(filephmat, filbassel='BASSEL'):
@@ -29,10 +91,9 @@ def ek_selected(filephmat, filbassel='BASSEL'):
     return en, kpts
 
 
-
-def plot_tdshprop(filshps, ptype=1, tdksen=None, figname='tdshp.png'):
+def tdshprop(filshps, lplot=1, ksen=None, figname='tdshp.png'):
     '''
-    This function load datas from SHPROP.xxx files,
+    This function loads data from SHPROP.xxx files,
     and plot average evolution of energy & surface hopping proportion of
     electronic states.
 
@@ -42,8 +103,8 @@ def plot_tdshprop(filshps, ptype=1, tdksen=None, figname='tdshp.png'):
     lplot  : integer, fig type to plot. 0: do not output figure; 1: plot
              average proportions; 2: plot average energy evolution with
              proportions.
-    tdksen : ndarray, time-dependent KS energies in forms of 
-             tdksen[ntsteps, nbands]
+    ksen   : ndarray, KS energies in forms of ksen[nbands]. Here we suppose
+             ksen do not change by time.
     figname: string, file name of output figure.
 
     Returns: ndarray, average data of SHPROP.xxx files.
@@ -52,7 +113,7 @@ def plot_tdshprop(filshps, ptype=1, tdksen=None, figname='tdshp.png'):
     shps = np.array( [ np.loadtxt(filshp) for filshp in filshps ] )
     shp = np.average(shps, axis=0)
 
-    if ptype==0: return shp
+    if lplot==0: return shp
         
     figsize_x = 4.8
     figsize_y = 3.2 # in inches
@@ -62,24 +123,28 @@ def plot_tdshprop(filshps, ptype=1, tdksen=None, figname='tdshp.png'):
     fig.set_size_inches(figsize_x, figsize_y)
     mpl.rcParams['axes.unicode_minus'] = False
 
-    if ptype==1:
+    if lplot==1:
         ylabel = 'SHPROP'
         ax.plot(shp[:,0], shp[:,2:])
         ax.set_ylim(0.0,1.0)
         ax.set_ylabel(ylabel)
     else:
         cmap = 'hot_r'
-        dotsize = 20
+        dotsize = 50
         ylabel = 'Energy (eV)'
-        ntsteps = tdksen.shape[0]
-        nbands = tdksen.shape[1]
-        vmin = 0; vmax = np.max(shp[:,2:])
-        norm = mpl.colors.Normalize(0,vmax)
+        ntsteps = shp.shape[0]
+        nbands = shp.shape[1] -2
+        cmin = 0.0; cmax = np.max(shp[:,2:])
+        norm = mpl.colors.Normalize(cmin,cmax)
 
-        T = np.tile(np.arange(ntsteps), nbands).reshape(nbands,ntsteps).T
-        ax.scatter(T, tdksen, s=dotsize, c=shp[:,2:], lw=0, 
-                   norm=norm, cmap=cmap)
+        if (ksen.shape[0]!=nbands):
+            print('\nNumber of ksen states doesn\'t match with SHPROP data!\n')
+        E = np.tile(ksen, ntsteps).reshape(ntsteps, nbands)
+        T = np.tile(shp[:,0], nbands).reshape(nbands,ntsteps).T
+        sc = ax.scatter(T, E, s=dotsize, c=shp[:,2:], lw=0,
+                        norm=norm, cmap=cmap)
         ax.plot(shp[:,1], 'r', lw=1, label='Average Energy')
+        plt.colorbar(sc)
 
         ax.set_ylabel(ylabel)
 

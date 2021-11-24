@@ -99,29 +99,6 @@ module epcoup
     olap%Np = nq
     ! write(*,*) info
 
-    dsetname = 'mass_a.u.'
-    allocate(epc%mass(nat))
-    dim1 = shape(epc%mass, kind=hsize_t)
-    call h5dopen_f(gr_id, dsetname, dset_id, hdferror)
-    call h5dread_f(dset_id, H5T_NATIVE_DOUBLE, epc%mass, dim1, hdferror)
-    call h5dclose_f(dset_id, hdferror)
-
-    dsetname = 'lattice_vec_angstrom'
-    allocate(epc%cellep(nat+3,3), lattvec(3,3))
-    dim2 = shape(lattvec, kind=hsize_t)
-    call h5dopen_f(gr_id, dsetname, dset_id, hdferror)
-    call h5dread_f(dset_id, H5T_NATIVE_DOUBLE, lattvec, dim2, hdferror)
-    call h5dclose_f(dset_id, hdferror)
-    epc%cellep(:3,:) = transpose(lattvec)
-
-    dsetname = 'atom_pos'
-    allocate(pos(3,nat))
-    dim2 = shape(pos, kind=hsize_t)
-    call h5dopen_f(gr_id, dsetname, dset_id, hdferror)
-    call h5dread_f(dset_id, H5T_NATIVE_DOUBLE, pos, dim2, hdferror)
-    call h5dclose_f(dset_id, hdferror)
-    epc%cellep(4:,:) = transpose(pos)
-
     dsetname = 'k_list'
     allocate(kqltemp(3,nk), epc%kptsep(nk,3))
     dim2 = shape(kqltemp, kind=hsize_t)
@@ -161,22 +138,49 @@ module epcoup
     call h5dclose_f(dset_id, hdferror)
     epc%freqep = epc%freqep / 1000.0_q ! transform unit to eV
 
-    dsetname = 'phmod_ev_r'
-    allocate(epc%phmodes(nq, nm, nat, 3))
-    allocate(phmtemp(nq, nm, nat, 3))
-    dim4 = shape(phmtemp, kind=hsize_t)
-    call h5dopen_f(gr_id, dsetname, dset_id, hdferror)
-    call h5dread_f(dset_id, H5T_NATIVE_DOUBLE, phmtemp, dim2, hdferror)
-    call h5dclose_f(dset_id, hdferror)
-    epc%phmodes = phmtemp
 
-    dsetname = 'phmod_ev_i'
-    call h5dopen_f(gr_id, dsetname, dset_id, hdferror)
-    call h5dread_f(dset_id, H5T_NATIVE_DOUBLE, phmtemp, dim2, hdferror)
-    call h5dclose_f(dset_id, hdferror)
-    epc%phmodes = epc%phmodes + imgUnit * phmtemp
+    if (inp%EPCTYPE==2) then
+      dsetname = 'mass_a.u.'
+      allocate(epc%mass(nat))
+      dim1 = shape(epc%mass, kind=hsize_t)
+      call h5dopen_f(gr_id, dsetname, dset_id, hdferror)
+      call h5dread_f(dset_id, H5T_NATIVE_DOUBLE, epc%mass, dim1, hdferror)
+      call h5dclose_f(dset_id, hdferror)
+
+      dsetname = 'lattice_vec_angstrom'
+      allocate(epc%cellep(nat+3,3), lattvec(3,3))
+      dim2 = shape(lattvec, kind=hsize_t)
+      call h5dopen_f(gr_id, dsetname, dset_id, hdferror)
+      call h5dread_f(dset_id, H5T_NATIVE_DOUBLE, lattvec, dim2, hdferror)
+      call h5dclose_f(dset_id, hdferror)
+      epc%cellep(:3,:) = transpose(lattvec)
+
+      dsetname = 'atom_pos'
+      allocate(pos(3,nat))
+      dim2 = shape(pos, kind=hsize_t)
+      call h5dopen_f(gr_id, dsetname, dset_id, hdferror)
+      call h5dread_f(dset_id, H5T_NATIVE_DOUBLE, pos, dim2, hdferror)
+      call h5dclose_f(dset_id, hdferror)
+      epc%cellep(4:,:) = transpose(pos)
+
+      dsetname = 'phmod_ev_r'
+      allocate(epc%phmodes(nq, nm, nat, 3))
+      allocate(phmtemp(nq, nm, nat, 3))
+      dim4 = shape(phmtemp, kind=hsize_t)
+      call h5dopen_f(gr_id, dsetname, dset_id, hdferror)
+      call h5dread_f(dset_id, H5T_NATIVE_DOUBLE, phmtemp, dim2, hdferror)
+      call h5dclose_f(dset_id, hdferror)
+      epc%phmodes = phmtemp
+
+      dsetname = 'phmod_ev_i'
+      call h5dopen_f(gr_id, dsetname, dset_id, hdferror)
+      call h5dread_f(dset_id, H5T_NATIVE_DOUBLE, phmtemp, dim2, hdferror)
+      call h5dclose_f(dset_id, hdferror)
+      epc%phmodes = epc%phmodes + imgUnit * phmtemp
+    end if
 
     call h5gclose_f(gr_id, hdferror)
+
 
     ! Read e-ph matrix for every k.
     grname = 'g_ephmat_total_meV'
