@@ -480,8 +480,13 @@ module epcoup
     ! zero-point displacement amplitude
     real(kind=q) :: lqvtemp, lqv
     real(kind=q) :: kbT, phn
-    complex(kind=q) :: iw, iwtemp
+    real(kind=q) :: dE, dE1, dE2, averageT
+    complex(kind=q) :: iw, iwtemp, idwt, eptemp
 
+    kbT = inp%TEMP * BOLKEV
+    averageT = hbar / kbT
+    idwt = imgUnit / kbT
+    ! iwt = i * (E/hbar) * (hbar/kbT)
 
     nsw = inp%NSW
     nb  = olap%NBANDS
@@ -490,41 +495,52 @@ module epcoup
     write(*,*) "Calculating e-ph couplings."
 
     allocate(olap%Dij(nb, nb, nsw-1))
+    olap%Dij = cero
 
     if (olap%COUPTYPE==1) then
 
-     kbT = inp%TEMP * BOLKEV
      iwtemp = imgUnit * inp%POTIM / hbar
      allocate(olap%EPcoup(nb, nb, nm, 2, nsw-1))
      olap%EPcoup = cero
 
      do ib=1,nb
       do jb=ib,nb
-
+        dE = olap%Eig(ib,1) - olap%Eig(jb,1) + 1.0E-8_q
         do im=1,nm
 
           if (olap%Phfreq(ib, jb, im)<5.0E-3_q) cycle
           phn = 1.0 / ( exp(olap%Phfreq(ib, jb, im)/kbT) - 1.0 )
           iw = iwtemp * olap%Phfreq(ib, jb, im)
+          dE1 = dE - olap%Phfreq(ib, jb, im)
+          dE2 = dE + olap%Phfreq(ib, jb, im)
 
           do it=1,nsw-1
-            olap%EPcoup(ib, jb, im, 1, it) = &
-              olap%gij(ib, jb, im) * SQRT(phn) * exp(-iw*it)
-            olap%EPcoup(ib, jb, im, 2, it) = &
-              olap%gij(ib, jb, im) * SQRT(phn+1) * exp(iw*it)
-          end do
-        end do
+
+            eptemp = olap%gij(ib, jb, im) * SQRT(phn) * exp(-iw*it)
+            olap%Dij(ib, jb, it) = olap%Dij(ib, jb, it) + eptemp
+            olap%EPcoup(ib, jb, im, 1, it) =  eptemp * &
+              ( exp(idwt * dE1) - 1.0 ) / ( imgUnit * dE1 ) / averageT
+
+            eptemp = olap%gij(ib, jb, im) * SQRT(phn+1) * exp(iw*it)
+            olap%Dij(ib, jb, it) = olap%Dij(ib, jb, it) + eptemp
+            olap%EPcoup(ib, jb, im, 2, it) = eptemp * &
+              ( exp(idwt * dE2) - 1.0 ) / ( imgUnit * dE2 ) / averageT
+
+          end do ! it loop
+        end do ! im loop
 
         if (jb==ib) then
+          olap%Dij(ib,ib,:) = ABS(olap%Dij(ib,ib,:))
           olap%EPcoup(ib,ib,:,:,:) = ABS(olap%EPcoup(ib,ib,:,:,:))
         else
+          olap%Dij(jb,ib,:) = CONJG(olap%Dij(ib,jb,:))
           olap%EPcoup(jb,ib,:,:,:) = CONJG(olap%EPcoup(ib,jb,:,:,:))
         end if
 
       end do
      end do
      olap%EPcoup = olap%EPcoup / SQRT(olap%Np)
-     olap%Dij = SUM( SUM(olap%EPcoup, dim=3), dim=3 )
+     olap%Dij = olap%Dij / SQRT(olap%Np)
 
     else if (olap%COUPTYPE==2) then
 

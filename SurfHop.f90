@@ -125,44 +125,6 @@ module shop
 
   end subroutine
 
-
-  ! calculate correction of SH probability for EPC type NAMD.
-  subroutine calc_SHprob_corr(ks, inp, olap)
-    implicit none
-
-    type(TDKS), intent(inout) :: ks
-    type(namdInfo), intent(in) :: inp
-    type(overlap), intent(in)  :: olap
-
-    integer :: ibas, jbas, nbas, im, nmodes, i
-    real(kind=q) :: dE, dE1, dE2, kbT, averageT
-    complex(kind=q) :: iomegat
-
-    kbT = inp%TEMP * BOLKEV
-    averageT = hbar / kbT
-    iomegat = imgUnit / kbT
-    ! iwt = i * (E/hbar) * (hbar/kbT)
-
-    nbas = inp%NBASIS
-    nmodes = olap%NMODES
-    do ibas=1,nbas
-      do jbas=1,nbas
-        dE = olap%Eig(ibas,1) - olap%Eig(jbas,1) + 1.0E-8_q
-        do im=1,nmodes
-          dE1 = dE - olap%Phfreq(ibas, jbas, im)
-          ks%EPcoup(ibas, jbas, im, 1, :) = ks%EPcoup(ibas, jbas, im, 1, :) * &
-              ( exp(iomegat * dE1) - 1.0 ) / ( imgUnit * dE1 ) / averageT
-          dE2 = dE + olap%Phfreq(ibas, jbas, im)
-          ks%EPcoup(ibas, jbas, im, 2, :) = ks%EPcoup(ibas, jbas, im, 2, :) * &
-              ( exp(iomegat * dE2) - 1.0 ) / ( imgUnit * dE2 ) / averageT
-        end do
-      end do
-    end do
-    ks%NAcoup = SUM( SUM(ks%EPcoup, dim=3), dim=3 )
-
-  end subroutine
-
-
   ! calculate surface hopping probabilities
   subroutine runSH(ks, inp, olap)
     implicit none
@@ -182,8 +144,8 @@ module shop
     call init_random_seed()
 
     if (olap%COUPTYPE==1) then
-      ! SH probability correction.
-      call calc_SHprob_corr(ks, inp, olap)
+      ! Use corrected e-ph coupling for SH simulations.
+      ks%NAcoup = SUM( SUM(ks%EPcoup, dim=3), dim=3 )
     end if
 
     do i=1, inp%NTRAJ
