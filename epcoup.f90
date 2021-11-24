@@ -628,6 +628,7 @@ module epcoup
       call CoupToFileEP(olap)
       call calcEPC(olap_sec, inp)
       call writeNaEig(olap_sec, inp)
+      call writeEP(olap_sec)
 
     else
 
@@ -880,14 +881,14 @@ module epcoup
     integer :: i, j, nb, im, nmodes, it
     real(kind=q) :: recordL, rnbands, rnsw, rdt, rctype, rnp, rnmodes
 
-    open(unit=30, file='EPCAR', access='direct', form='unformatted', &
+    open(unit=31, file='EPCAR', access='direct', form='unformatted', &
          status = 'unknown', recl=256, iostat=ierr)
     if(ierr /= 0) then
       write(*,*) "File I/O error with EPCAR"
       stop
     end if
 
-    read(unit=30,rec=1) recordL, rnbands, rnsw, rdt, rctype, rnp, rnmodes
+    read(unit=31,rec=1) recordL, rnbands, rnsw, rdt, rctype, rnp, rnmodes
     ! write(*,*) recordL, rnbands, rnsw, rdt
 
     if (olap%NBANDS /= NINT(rnbands) .or. olap%TSTEPS /= NINT(rnsw) .or. &
@@ -897,10 +898,10 @@ module epcoup
       stop
     end if
 
-    close(30)
+    close(31)
 
     irecordL = NINT(recordL)
-    open(unit=30, file='EPCAR', access='direct', form='unformatted', &
+    open(unit=31, file='EPCAR', access='direct', form='unformatted', &
          status = 'unknown', recl=irecordL, iostat=ierr)
 
     write(*,*) "Reading couplings from EPCAR..."
@@ -913,7 +914,7 @@ module epcoup
     do im=1, nmodes
       irec = irec + 1
       ! We suppose Eig(i,t) for any t does not change.
-      read(unit=30, rec=irec) (olap%Eig(i,1), i=1,nb), &
+      read(unit=31, rec=irec) (olap%Eig(i,1), i=1,nb), &
           ((olap%Phfreq(i,j,im), i=1,nb), j=1,nb)
       do i=1,nb
         olap%Eig(i,:) = olap%Eig(i,1)
@@ -921,24 +922,42 @@ module epcoup
     end do
     do im=1, nmodes
       irec = irec + 1
-      read(unit=30, rec=irec) ((olap%gij(i,j,im), i=1,nb), j=1,nb)
+      read(unit=31, rec=irec) ((olap%gij(i,j,im), i=1,nb), j=1,nb)
     end do
     do im=1, nmodes
       irec = irec + 1
-      read(unit=30, rec=irec) ((olap%gij(i,j,im), i=1,nb), j=1,nb)
+      read(unit=31, rec=irec) ((olap%gij(i,j,im), i=1,nb), j=1,nb)
     end do
     if (olap%COUPTYPE==2) then
       do it=1,olap%TSTEPS-1
         do im=1, nmodes
           irec = irec + 1
-          read(unit=30, rec=irec) ((olap%PhQ(i,j,im,it), i=1,nb), j=1,nb)
+          read(unit=31, rec=irec) ((olap%PhQ(i,j,im,it), i=1,nb), j=1,nb)
         end do
       end do
     end if
 
-    close(unit=30)
+    close(unit=31)
 
   end subroutine CoupFromFileEP
+
+
+  subroutine writeEP(olap)
+    implicit none
+
+    type(overlap), intent(inout) :: olap
+    integer :: i, ib, jb, nb, it, nsw, ierr
+
+    nb = olap%NBANDS
+    nsw = olap%TSTEPS
+
+    open(unit=32, file='EPTXT', status='unknown', action='write')
+    do it=1,nsw-1
+      write(unit=32, fmt='(*(f15.9))') &
+        (( SUM(olap%EPcoup(ib,jb,:,:,it)), jb=1,nb ), ib=1,nb)
+    end do
+
+  end subroutine writeEP
 
 
 end module epcoup

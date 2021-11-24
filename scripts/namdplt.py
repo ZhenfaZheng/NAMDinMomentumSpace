@@ -10,6 +10,12 @@ def main():
     coup_av = np.average(np.abs(coup), axis=0)
     pn.plot_couple(coup_av)
 
+    fileptxt = 'EPTXT'
+    figname = 'COUPLE_corr.png'
+    coup = pn.read_couple(fileptxt, ctype=1)
+    coup_av = np.average(np.abs(coup), axis=0)
+    pn.plot_couple(coup_av, figname)
+
     tag = 'SHPROP'
     fileig = 'EIGTXT'
     figname = 'TDEN.png'
