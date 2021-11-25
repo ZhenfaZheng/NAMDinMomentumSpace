@@ -617,6 +617,7 @@ module epcoup
         call copyToSec(olap, olap_sec, inp)
         call calcEPC(olap_sec, inp)
         call writeNaEig(olap_sec, inp)
+        call writeEP(olap_sec)
       end if
 
     else if (inp%EPCTYPE==1) then
@@ -624,8 +625,8 @@ module epcoup
       write(*,*) "TypeI e-ph coupling calculation."
 
       call readEPCpert(inp, epc, olap)
-      call copyToSec(olap, olap_sec, inp)
       call CoupToFileEP(olap)
+      call copyToSec(olap, olap_sec, inp)
       call calcEPC(olap_sec, inp)
       call writeNaEig(olap_sec, inp)
       call writeEP(olap_sec)
@@ -725,6 +726,57 @@ module epcoup
   end subroutine selBasis
 
 
+  subroutine sortBasis(inp, olap)
+    implicit none
+
+    type(overlap), intent(in) :: olap
+    type(namdInfo), intent(inout) :: inp
+
+    integer :: ibas, i, j, ik, nk, ib, nb, nbas
+    real(kind=q), dimension(:,:), allocatable :: basis
+    real(kind=q) :: temp(3)
+
+    nb = inp%NBANDS
+    nk = inp%NKPOINTS
+    nbas = inp%NBASIS
+    allocate(basis(nbas, 3))
+
+    ibas = 0
+    do ik=1,nk
+      do ib=1,nb
+        if (inp%BASSEL(ik,ib)>0) then
+          ibas = ibas + 1
+          basis(ibas,1) = ik
+          basis(ibas,2) = ib
+          basis(ibas,3) = olap%Eig((ik-1)*nb+ib, 1)
+        end if
+      end do
+    end do
+
+    do i=1,nbas-1
+      do j=1,nbas-i
+        if ( basis(j+1,3) < basis(j,3) ) then
+          temp = basis(j,:)
+          basis(j,:) = basis(j+1,:)
+          basis(j+1,:) = temp
+        end if
+      end do
+    end do
+
+    open(unit=39, file='BASSEL', status='unknown', action='write')
+    write(unit=39, fmt='(I18)') inp%NBASIS
+
+    do ibas=1,nbas
+      ik = NINT(basis(ibas,1))
+      ib = NINT(basis(ibas,2))
+      inp%BASSEL(ik, ib) = ibas
+      write(unit=39, fmt='(2I12)') ik, ib
+    end do
+    close(unit=39)
+
+  end subroutine sortBasis
+
+
   subroutine initOlap(olap, inp, nb)
     implicit none
     type(overlap), intent(inout) :: olap
@@ -770,6 +822,8 @@ module epcoup
     else
       call selBasis(inp, olap)
     end if
+
+    if (inp%LSORT) call sortBasis(inp, olap)
 
     nb = inp%NBANDS
 

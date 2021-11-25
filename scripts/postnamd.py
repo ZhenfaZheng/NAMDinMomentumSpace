@@ -63,7 +63,8 @@ def plot_couple(coup, figname='COUPLE.png'):
         extent=(Bmin,Bmax,Bmin,Bmax), interpolation='none')
 
     cbar = plt.colorbar()
-    cbar.ax.set_title('   meV')
+    # cbar.ax.set_title('   meV')
+    cbar.set_label('Coupling (meV)')
     plt.tight_layout()
     plt.savefig(figname, dpi=400)
 

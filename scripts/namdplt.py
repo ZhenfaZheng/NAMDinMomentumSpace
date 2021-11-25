@@ -23,6 +23,13 @@ def main():
     en = np.loadtxt(fileig)[0,:]
     pn.tdshprop(filshps, lplot=2, ksen=en, figname=figname)
 
+    tag = 'PSICT'
+    fileig = 'EIGTXT'
+    figname = 'TDPSI.png'
+    filshps = glob(tag+'.*')
+    en = np.loadtxt(fileig)[0,:]
+    pn.tdshprop(filshps, lplot=2, ksen=en, figname=figname)
+
 
 if __name__=='__main__':
     main()

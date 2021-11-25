@@ -40,6 +40,7 @@ module fileio
     ! whether to use e-p matrix as NA couplings
     logical :: LEPC
     logical :: LBASSEL
+    logical :: LSORT
     integer :: EPCTYPE
     integer :: KMIN
     integer :: KMAX
@@ -86,6 +87,7 @@ module fileio
       logical :: lgamma
       logical :: lepc
       logical :: lbassel
+      logical :: lsort
       ! running directories
       character(len=256) :: rundir
       character(len=256) :: tbinit
@@ -108,7 +110,8 @@ module fileio
                           filepm, filmd, lbassel, &
                           kmin, kmax, emin, emax, &
                           namdtime,             &
-                          nsample, tbinit
+                          nsample, tbinit,      &
+                          lsort
 
       integer :: ierr, i
       logical :: lext
@@ -133,6 +136,7 @@ module fileio
       lgamma = .TRUE.
       lepc = .FALSE.
       lbassel = .FALSE.
+      lsort = .TRUE.
       epctype = 1
       filepm = 'ephmat.h5'
       filmd = 'XDATCAR'
@@ -218,6 +222,7 @@ module fileio
       inp%LGAMMA   = lgamma
       inp%LEPC     = lepc
       inp%LBASSEL  = lbassel
+      inp%LSORT    = lsort
       inp%EPCTYPE  = epctype
       inp%TEMP     = temp
       inp%FILEPM   = trim(filepm)
