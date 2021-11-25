@@ -45,3 +45,6 @@ is contained in the time-dependent Schrodinger equation naturely.
 
 Version 1.4.0
 Redesign the type 2 epc calculation, in which the phonon informations are read from perturbo output file.
+
+Version 1.4.11
+Amend coupling in surfacing hoping for energy conservation.

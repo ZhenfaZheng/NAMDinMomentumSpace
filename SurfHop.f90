@@ -53,53 +53,27 @@ module shop
 
   end subroutine
 
-  subroutine calcprop(tion, cstat, ks, inp, olap)
+  subroutine calcprop(tion, cstat, ks, inp)
     implicit none
 
     type(TDKS), intent(inout) :: ks
     type(namdInfo), intent(in) :: inp
-    type(overlap), intent(in)  :: olap
     integer, intent(in) :: tion
     integer, intent(in) :: cstat
 
-    integer :: i, j, im, nm, couptype
-    real(kind=q) :: Akk
-    real(kind=q) :: dE, dE1, dE2, kbT
-    complex(kind=q) :: iomegat, temp
+    integer :: i, j
+    real(kind=q) :: Akk, dE, kbT
 
     Akk = CONJG(ks%psi_a(cstat, tion)) * ks%psi_a(cstat, tion)
 
-    nm = olap%NMODES
-    couptype = olap%COUPTYPE
-    iomegat = imgUnit * inp%POTIM / hbar
-
-    if (couptype==0) then
+    if (inp%LEPC) then
+      ks%Bkm = -2. / hbar * AIMAG( CONJG(ks%psi_a(cstat, tion)) * &
+               ks%psi_a(:, tion) * ks%NAcoup(cstat, :, tion) )
+    else
       ks%Bkm = 2. * REAL(CONJG(ks%psi_a(cstat, tion)) * ks%psi_a(:, tion) * &
                     ks%NAcoup(cstat, :, tion))
-
-      ks%sh_prop(:,tion) = ks%Bkm / Akk * inp%POTIM
-
-    else if (couptype==1) then
-      ks%Bkm = -2. * AIMAG(CONJG(ks%psi_a(cstat, tion)) * ks%psi_a(:, tion) * &
-                    ks%NAcoup(cstat, :, tion))
-
-      ks%sh_prop(:,tion) = ks%Bkm / Akk * inp%POTIM
-
-    else if (couptype==2) then
-
-      do i=1, ks%ndim
-        temp = cero
-        dE = ks%eigKs(cstat, tion) - ks%eigKs(i,tion) + 1.0E-8_q
-        do im=1,nm
-          dE1 = dE - olap%Phfreq(cstat, i, im)
-          temp = temp + ks%EPcoup(cstat, i, im, 1, tion) * &
-             ( exp(iomegat * dE1) - 1.0 ) / ( imgUnit * dE1 )
-        end do
-        ks%Bkm(i) = AIMAG(CONJG(ks%psi_a(cstat, tion)) * ks%psi_a(i,tion) * temp)
-      end do
-      ks%sh_prop(:,tion) = -2. * ks%Bkm / Akk
-
     end if
+    ks%sh_prop(:,tion) = ks%Bkm / Akk * inp%POTIM
 
     kbT = inp%TEMP * BOLKEV
 
@@ -126,12 +100,11 @@ module shop
   end subroutine
 
   ! calculate surface hopping probabilities
-  subroutine runSH(ks, inp, olap)
+  subroutine runSH(ks, inp)
     implicit none
 
     type(TDKS), intent(inout) :: ks
     type(namdInfo), intent(in) :: inp
-    type(overlap), intent(in)  :: olap
     integer :: i, j, tion, Nt
     integer :: istat, cstat, which
 
@@ -143,7 +116,7 @@ module shop
     ! initialize the random seed for ramdom number production
     call init_random_seed()
 
-    if (olap%COUPTYPE==1) then
+    if (inp%LEPC) then
       ! Use corrected e-ph coupling for SH simulations.
       ks%NAcoup = SUM( SUM(ks%EPcoup, dim=3), dim=3 )
     end if
@@ -152,7 +125,7 @@ module shop
       ! in the first step, current step always equal initial step
       cstat = istat
       do tion=1, Nt
-        call calcprop(tion, cstat, ks, inp, olap)
+        call calcprop(tion, cstat, ks, inp)
         call whichToHop(tion, ks, which)
         if (which > 0) cstat = which
         ks%sh_pops(cstat, tion) = ks%sh_pops(cstat, tion) + 1

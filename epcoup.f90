@@ -480,17 +480,15 @@ module epcoup
     ! zero-point displacement amplitude
     real(kind=q) :: lqvtemp, lqv
     real(kind=q) :: kbT, phn
-    real(kind=q) :: dE, dE1, dE2, averageT
+    real(kind=q) :: dE, dE1, dE2
     complex(kind=q) :: iw, iwtemp, idwt, eptemp
-
-    kbT = inp%TEMP * BOLKEV
-    averageT = hbar / kbT
-    idwt = imgUnit / kbT
-    ! iwt = i * (E/hbar) * (hbar/kbT)
 
     nsw = inp%NSW
     nb  = olap%NBANDS
     nm  = olap%NMODES
+    kbT = inp%TEMP * BOLKEV
+    idwt = imgUnit / kbT
+    ! iwt = i * (dE/hbar) * (hbar/kbT)
 
     write(*,*) "Calculating e-ph couplings."
 
@@ -505,37 +503,34 @@ module epcoup
 
      do ib=1,nb
       do jb=ib,nb
-        dE = olap%Eig(ib,1) - olap%Eig(jb,1) + 1.0E-8_q
+        dE = olap%Eig(ib,1) - olap%Eig(jb,1)
         do im=1,nm
 
           if (olap%Phfreq(ib, jb, im)<5.0E-3_q) cycle
           phn = 1.0 / ( exp(olap%Phfreq(ib, jb, im)/kbT) - 1.0 )
+          eptemp = olap%gij(ib, jb, im) * SQRT(2.0 * phn + 1.0) * 0.5
+          if (jb==ib)  eptemp = ABS(eptemp)
           iw = iwtemp * olap%Phfreq(ib, jb, im)
-          dE1 = dE - olap%Phfreq(ib, jb, im)
-          dE2 = dE + olap%Phfreq(ib, jb, im)
 
           do it=1,nsw-1
-
-            eptemp = olap%gij(ib, jb, im) * SQRT(phn) * exp(-iw*it)
-            olap%Dij(ib, jb, it) = olap%Dij(ib, jb, it) + eptemp
-            olap%EPcoup(ib, jb, im, 1, it) =  eptemp * &
-              ( exp(idwt * dE1) - 1.0 ) / ( imgUnit * dE1 ) / averageT
-
-            eptemp = olap%gij(ib, jb, im) * SQRT(phn+1) * exp(iw*it)
-            olap%Dij(ib, jb, it) = olap%Dij(ib, jb, it) + eptemp
-            olap%EPcoup(ib, jb, im, 2, it) = eptemp * &
-              ( exp(idwt * dE2) - 1.0 ) / ( imgUnit * dE2 ) / averageT
-
+            olap%EPcoup(ib, jb, im, 1, it) =  eptemp * exp(-iw*it)
+            olap%EPcoup(ib, jb, im, 2, it) =  eptemp * exp(iw*it)
           end do ! it loop
+
+          olap%Dij(ib,jb,:) = olap%Dij(ib,jb,:) + &
+              SUM(olap%EPcoup(ib,jb,im,:,:), dim=1)
+
+          dE1 = dE - olap%Phfreq(ib, jb, im) - 1.0E-8_q
+          olap%EPcoup(ib,jb,im,1,:) = olap%EPcoup(ib,jb,im,1,:) * &
+            ( exp(idwt * dE1) - 1.0 ) / ( idwt * dE1 )
+          dE2 = dE + olap%Phfreq(ib, jb, im) + 1.0E-8_q
+          olap%EPcoup(ib,jb,im,2,:) = olap%EPcoup(ib,jb,im,2,:) * &
+            ( exp(idwt * dE2) - 1.0 ) / ( idwt * dE2 )
+
         end do ! im loop
 
-        if (jb==ib) then
-          olap%Dij(ib,ib,:) = ABS(olap%Dij(ib,ib,:))
-          olap%EPcoup(ib,ib,:,:,:) = ABS(olap%EPcoup(ib,ib,:,:,:))
-        else
-          olap%Dij(jb,ib,:) = CONJG(olap%Dij(ib,jb,:))
-          olap%EPcoup(jb,ib,:,:,:) = CONJG(olap%EPcoup(ib,jb,:,:,:))
-        end if
+        olap%Dij(jb,ib,:) = CONJG(olap%Dij(ib,jb,:))
+        olap%EPcoup(jb,ib,:,:,:) = CONJG(olap%EPcoup(ib,jb,:,:,:))
 
       end do
      end do
@@ -544,38 +539,39 @@ module epcoup
 
     else if (olap%COUPTYPE==2) then
 
-     ! kbT = inp%TEMP * BOLKEV
      lqvtemp = hbar * SQRT( EVTOJ / (2.0_q*AMTOKG) ) * 1.0E-5_q
      allocate(olap%EPcoup(nb, nb, nm, 1, nsw-1))
      olap%EPcoup = cero
 
      do ib=1,nb
-      do jb=ib,nb
+      do jb=1,nb
 
+        dE = olap%Eig(ib,1) - olap%Eig(jb,1)
         do im=1,nm
           ! unit of Angstrom
           lqv = lqvtemp / SQRT(olap%Phfreq(ib, jb, im))
-          ! if (olap%Phfreq(ib, jb, im)<1.0E-2_q) cycle
-          ! phn = 1.0 / ( exp(olap%Phfreq(ib, jb, im)/kbT) - 1.0 )
-          ! print '(F15.9)', (2.0*phn+1)*nsw
-          ! print '(F15.9)', SUM(ABS(olap%PhQ(ib, jb, im, :))**2) / lqv**2
-          ! print *
-          do it=1,nsw-1
-            olap%EPcoup(ib, jb, im, 1, it) = &
-              olap%gij(ib, jb, im) * olap%PhQ(ib, jb, im, it) / lqv
-          end do
+          olap%EPcoup(ib,jb,im,1,:) &
+            = olap%gij(ib, jb, im) * olap%PhQ(ib, jb, im, :) / lqv
+
+          if (jb==ib) &
+            olap%EPcoup(ib,ib,im,1,:) = ABS(olap%EPcoup(ib,ib,im,1,:))
+
+          olap%Dij(ib,jb,:) = olap%Dij(ib,jb,:) + olap%EPcoup(ib,jb,im,1,:)
+
+          dE1 = dE - olap%Phfreq(ib, jb, im) - 1.0E-8_q
+          dE2 = dE + olap%Phfreq(ib, jb, im) + 1.0E-8_q
+          olap%EPcoup(ib,jb,im,1,:) = olap%EPcoup(ib,jb,im,1,:) * &
+            ( (exp(idwt * dE1) - 1.0) / (idwt * dE1) + &
+              (exp(idwt * dE2) - 1.0) / (idwt * dE2) ) / 2.0
         end do
 
-        if (jb==ib) then
-          olap%EPcoup(ib,ib,:,:,:) = ABS(olap%EPcoup(ib,ib,:,:,:))
-        else
-          olap%EPcoup(jb,ib,:,:,:) = CONJG(olap%EPcoup(ib,jb,:,:,:))
-        end if
+        olap%Dij(jb,ib,:) = CONJG(olap%Dij(ib,jb,:))
+        olap%EPcoup(jb,ib,:,:,:) = CONJG(olap%EPcoup(ib,jb,:,:,:))
 
       end do
      end do
      olap%EPcoup = olap%EPcoup / SQRT(olap%Np)
-     olap%Dij = SUM( SUM(olap%EPcoup, dim=3), dim=3 )
+     olap%Dij = olap%Dij / SQRT(olap%Np)
 
     end if
     
@@ -641,6 +637,7 @@ module epcoup
       call copyToSec(olap, olap_sec, inp)
       call calcEPC(olap_sec, inp)
       call writeNaEig(olap_sec, inp)
+      call writeEP(olap_sec)
 
     end if
 
