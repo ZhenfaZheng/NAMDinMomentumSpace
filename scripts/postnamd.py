@@ -92,30 +92,39 @@ def ek_selected(filephmat, filbassel='BASSEL'):
     return en, kpts
 
 
-def tdshprop(filshps, lplot=1, ksen=None, figname='tdshp.png'):
+def readshp(filshps):
+    '''
+    This function loads data from SHPROP.xxx files.
+
+    Parameters:
+    filshps: a list of strings, file names if SHPROP.xxx files. such as
+             ['SHPROP.1', 'SHPROP.5']
+
+    Returns: ndarray, average data of SHPROP.xxx files, in forms of
+             shp[ntsteps, nb+2].
+    '''
+    shps = np.array( [ np.loadtxt(filshp) for filshp in filshps ] )
+    shp = np.average(shps, axis=0)
+    return shp
+
+
+def plot_tdprop(shp, Eref=0.0, lplot=1, ksen=None, figname='tdshp.png'):
     '''
     This function loads data from SHPROP.xxx files,
     and plot average evolution of energy & surface hopping proportion of
     electronic states.
 
     Parameters:
-    filshps: a list of strings, file names if SHPROP.xxx files. such as
-             ['SHPROP.1', 'SHPROP.5'].
-    lplot  : integer, fig type to plot. 0: do not output figure; 1: plot
-             average proportions; 2: plot average energy evolution with
-             proportions.
+    shp    : ndarray, average data of SHPROP.xxx files, in forms of
+             shp[ntsteps, nb+2].
+    Eref   : float, energy reference. Make sure shp & ksen have same Eref!!!
+    lplot  : integer, fig type to plot. 1: plot average proportions; 2: plot
+             average energy evolution with proportions.
     ksen   : ndarray, KS energies in forms of ksen[nbands]. Here we suppose
              ksen do not change by time.
     figname: string, file name of output figure.
-
-    Returns: ndarray, average data of SHPROP.xxx files.
     '''
 
-    shps = np.array( [ np.loadtxt(filshp) for filshp in filshps ] )
-    shp = np.average(shps, axis=0)
-
-    if lplot==0: return shp
-        
     figsize_x = 4.8
     figsize_y = 3.2 # in inches
     namdtime = shp[-1,0]
@@ -140,11 +149,11 @@ def tdshprop(filshps, lplot=1, ksen=None, figname='tdshp.png'):
 
         if (ksen.shape[0]!=nbands):
             print('\nNumber of ksen states doesn\'t match with SHPROP data!\n')
-        E = np.tile(ksen, ntsteps).reshape(ntsteps, nbands)
+        E = np.tile(ksen-Eref, ntsteps).reshape(ntsteps, nbands)
         T = np.tile(shp[:,0], nbands).reshape(nbands,ntsteps).T
         sc = ax.scatter(T, E, s=dotsize, c=shp[:,2:], lw=0,
                         norm=norm, cmap=cmap)
-        ax.plot(shp[:,1], 'r', lw=1, label='Average Energy')
+        ax.plot(shp[:,1]-Eref, 'r', lw=1, label='Average Energy')
         plt.colorbar(sc)
 
         ax.set_ylabel(ylabel)
@@ -154,8 +163,6 @@ def tdshprop(filshps, lplot=1, ksen=None, figname='tdshp.png'):
 
     plt.tight_layout()
     plt.savefig(figname, dpi=400)
-
-    return shp
 
 
 def read_ephmath5(filname, igroup=-1, idset=-1, dset=""):
@@ -203,8 +210,80 @@ def read_ephmath5(filname, igroup=-1, idset=-1, dset=""):
         return None
 
 
+def plot_namd_3D(kpts, en, shp, kpts_tot=None, en_tot=None, Eref=0.0,
+                 figname='NAMD_3D.png'):
+    '''
+    Plot 3D elctronic evolution.
+
+    Parameters:
+    kpts    : ndarray, 2D cartisian coordinates of K-points in forms of
+              kpts[nks,2].
+    en      : ndarray, ks energies for plot in forms of en[nb]. Here nb must
+              equal to nks.
+    kpts_tot: ndarray, total K-points cartisian coordinates for background
+              plot, which in forms of kpts_tot[nks_tot,2]
+    en_tot  : ndarray, total energies for background plot, which in forms of
+              en_tot[nks_tot, nb_tot]
+    Eref    : float, energy reference. Make sure en & en_tot have same Eref!!!
+    shp     : ndarray, part for plotting average data from SHPROP.xxx files,
+              which in forms of shp[ntsteps, nb+2]
+    figname : string, output figure file name.
+    '''
+
+    nb = en.shape[0]
+    ntsteps = shp.shape[0]
+    namdtime = shp[-1,0]
+    X = np.tile(kpts[:,0], ntsteps).reshape(ntsteps,nb)
+    Y = np.tile(kpts[:,1], ntsteps).reshape(ntsteps,nb)
+    Z = np.tile(en-Eref, ntsteps).reshape(ntsteps,nb)
+
+    if (kpts_tot==None or en_tot==None):
+        X_tot = kpts[:,0]
+        Y_tot = kpts[:,1]
+        Z_tot = en - Eref
+    else:
+        X_tot = kpts_tot[:,0]
+        Y_tot = kpts_tot[:,1]
+        Z_tot = en_tot[:,1] - Eref
+
+
+    from matplotlib import cm
+    from mpl_toolkits.mplot3d import Axes3D
+
+    figsize_x = 4.8
+    figsize_y = 3.6 # in inches
+    fig = plt.figure()
+    fig.set_size_inches(figsize_x, figsize_y)
+    ax = fig.add_subplot(111, projection='3d')
+    # ax = Axes3D(fig)
+
+    norm = mpl.colors.Normalize(0,namdtime)
+    color_t = np.tile(np.arange(ntsteps), nb).reshape(nb,ntsteps).T
+    s_avg = np.average(shp[:,2:][shp[:,2:]>0])
+    # size = np.log( shp[:,2:] / s_avg + 1 ) * 25
+    size = shp[:,2:] / s_avg * 5
+
+    sc = ax.scatter(X,Y,Z, lw=0.0, s=size, c=color_t,
+                    norm=norm, cmap=cm.rainbow)
+    cbar = plt.colorbar(sc, shrink=0.5, fraction=0.05)
+    cbar.set_label('Time (fs)')
+
+    # Plot background
+    # ax.plot_surface(X_tot,Y_tot,Z_tot,
+    #     cmap=cm.coolwarm, antialiased=False)
+    # ax.plot_trisurf(X_tot,Y_tot,Z_tot, lw=0.1,
+    #     antialiased=True, alpha=0.05)
+    ax.plot_wireframe(X_tot,Y_tot,Z_tot, lw=0.1)
+    # ax.scatter(X_tot,Y_tot,Z_tot, lw=0.3)
+
+    ax.set_zlim(Z.min(),Z.max())
+
+    plt.tight_layout()
+    plt.savefig(figname, dpi=400)
+
+
 if __name__=='__main__':
-    intro = "\nThis is namd postprocessing module, you can add this file to " \
-        "your PYTHONPATH,\nand import \"postnamd\" in your python scripts.\n" \
+    intro = "\nThis is a namd postprocessing module, you can add this file to" \
+        " your PYTHONPATH,\nand import \"postnamd\" in your python scripts.\n" \
         "\nFor more informations, you can email to zhenfacn@gmail.com.\n"
     print(intro)

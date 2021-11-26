@@ -51,7 +51,58 @@ module epcoup
     if ( allocated(epc%cellmd) ) deallocate(epc%cellmd)
     if ( allocated(epc%displ) ) deallocate(epc%displ)
 
-  end subroutine releaseEPC
+  end subroutine
+
+
+  subroutine readEPCinfo(inp, epc)
+    implicit none
+
+    type(namdInfo), intent(inout) :: inp
+    type(epCoupling), intent(inout) :: epc
+
+    integer :: hdferror, info(4)
+    integer(hsize_t) :: dim1(1)
+    integer :: nk, nq, nb, nm, nat
+    integer(hid_t) :: file_id, gr_id, dset_id
+    character(len=256) :: fname, grname, dsetname
+
+    fname = inp%FILEPM
+    call h5open_f(hdferror)
+    call h5fopen_f(fname, H5F_ACC_RDONLY_F, file_id, hdferror)
+    grname = 'el_ph_band_info'
+    call h5gopen_f(file_id, grname, gr_id, hdferror)
+    dsetname = 'information'
+    dim1 = shape(info, kind=hsize_t)
+    call h5dopen_f(gr_id, dsetname, dset_id, hdferror)
+
+    call h5dread_f(dset_id, H5T_NATIVE_INTEGER, info, dim1, hdferror)
+
+    call h5dclose_f(dset_id, hdferror)
+    call h5gclose_f(gr_id, hdferror)
+    call h5fclose_f(file_id, hdferror)
+
+    nk = info(1); epc%nkpts  = nk
+    nq = info(2); epc%nqpts  = nq
+    nb = info(3); epc%nbands = nb
+    nm = info(4); epc%nmodes = nm
+    nat = nm/3  ; epc%natepc = nat
+
+    if (inp%NBANDS .NE. nb) then
+      write(*,*) 'NBANDS seems to be wrong!'
+      stop
+    end if
+    if (inp%NKPOINTS .NE. nk) then
+      write(*,*) 'NKPOINTS seems to be wrong!'
+      stop
+    end if
+    if ( (inp%NMODES .NE. 1) .AND. (inp%NMODES .NE. nm) ) then
+      write(*,*) 'NMODES seems to be wrong!'
+      stop
+    end if
+    if ( inp%Np==1 ) inp%Np = nq
+    inp%NMODES = nm
+
+  end subroutine
 
 
   subroutine readEPCpert(inp, epc, olap)
@@ -65,7 +116,7 @@ module epcoup
     type(epCoupling), intent(inout) :: epc
     type(overlap), intent(inout) :: olap
 
-    integer :: hdferror, info(4)
+    integer :: hdferror
     integer :: nk, nq, nb, nm, nat
     integer :: ib, jb, ik, jk, im, iq, it, ibas, jbas
     integer(hid_t) :: file_id, gr_id, dset_id
@@ -74,6 +125,12 @@ module epcoup
     real(kind=q), allocatable, dimension(:,:) :: kqltemp, pos, lattvec
     real(kind=q), allocatable, dimension(:,:,:,:) :: eptemp_r, eptemp_i, phmtemp
     complex(kind=q), allocatable, dimension(:,:,:,:) :: eptemp
+
+    nk  = epc%nkpts
+    nq  = epc%nqpts
+    nb  = epc%nbands
+    nm  = epc%nmodes
+    nat = epc%natepc
 
     write(*,*) "Reading ephmat.h5 file."
 
@@ -85,19 +142,6 @@ module epcoup
     ! Read el bands, ph dispersion, k & q lists.
     grname = 'el_ph_band_info'
     call h5gopen_f(file_id, grname, gr_id, hdferror)
-
-    dsetname = 'information'
-    dim1 = shape(info, kind=hsize_t)
-    call h5dopen_f(gr_id, dsetname, dset_id, hdferror)
-    call h5dread_f(dset_id, H5T_NATIVE_INTEGER, info, dim1, hdferror)
-    call h5dclose_f(dset_id, hdferror)
-    nk = info(1); epc%nkpts  = nk
-    nq = info(2); epc%nqpts  = nq
-    nb = info(3); epc%nbands = nb
-    nm = info(4); epc%nmodes = nm
-    nat = nm/3  ; epc%natepc = nat
-    olap%Np = nq
-    ! write(*,*) info
 
     dsetname = 'k_list'
     allocate(kqltemp(3,nk), epc%kptsep(nk,3))
@@ -244,7 +288,7 @@ module epcoup
 
     call h5fclose_f(file_id, hdferror)
 
-  end subroutine readEPCpert
+  end subroutine
 
 
   subroutine readDISPL(inp, epc)
@@ -319,7 +363,7 @@ module epcoup
 
     close(33)
 
-  end subroutine readDISPL
+  end subroutine
 
 
   subroutine cellPROJ(epc)
@@ -355,7 +399,7 @@ module epcoup
       enddo
     enddo
 
-  end subroutine cellPROJ
+  end subroutine
 
 
   subroutine phDecomp(inp, olap, epc)
@@ -423,14 +467,14 @@ module epcoup
         end do
       end do
     end do
-    
+
     deallocate(tempQ)
 
     ! Np is the number of unit cells in MD cell.
     Np = epc%natmd / epc%natepc
     olap%PhQ = olap%PhQ / SQRT(Np)
 
-  end subroutine phDecomp
+  end subroutine
 
 
   subroutine kqMatch(epc)
@@ -466,7 +510,7 @@ module epcoup
       end do
     end do
 
-  end subroutine kqMatch
+  end subroutine
 
 
   subroutine calcEPC(olap, inp)
@@ -574,8 +618,8 @@ module epcoup
      olap%Dij = olap%Dij / SQRT(olap%Np)
 
     end if
-    
-  end subroutine calcEPC
+
+  end subroutine
 
 
   subroutine TDepCoupIJ(olap, olap_sec, inp, epc)
@@ -594,12 +638,14 @@ module epcoup
     complex(kind=q) :: temp
     logical :: lcoup
 
+    write(*,*)
+    write(*,'(A)') "------------------------------------------------------------"
+
+    call readEPCinfo(inp, epc)
+
     ! Initialization
     if ( .not. ( inp%LCPTXT .and. inp%LBASSEL) ) &
       call initOlap(olap, inp, inp%NBANDS * inp%NKPOINTS)
-
-    write(*,*)
-    write(*,'(A)') "------------------------------------------------------------"
 
     inquire(file='EPCAR', exist=lcoup)
     if (lcoup) then
@@ -648,7 +694,7 @@ module epcoup
     write(*,'(A)') "------------------------------------------------------------"
     write(*,*)
 
-  end subroutine TDepCoupIJ
+  end subroutine
 
 
   subroutine readBasis(inp)
@@ -673,7 +719,7 @@ module epcoup
 
     close(unit=38)
 
-  end subroutine readBasis
+  end subroutine
 
 
   subroutine selBasis(inp, olap)
@@ -720,7 +766,7 @@ module epcoup
     !! number >0 represent ik,ib state is selected as basis,
     !! and the number is the state's serial number among the basises.
 
-  end subroutine selBasis
+  end subroutine
 
 
   subroutine sortBasis(inp, olap)
@@ -771,7 +817,7 @@ module epcoup
     end do
     close(unit=39)
 
-  end subroutine sortBasis
+  end subroutine
 
 
   subroutine initOlap(olap, inp, nb)
@@ -781,7 +827,7 @@ module epcoup
     integer, intent(in) :: nb
     integer :: nmodes, nsw
 
-    nmodes = 6
+    nmodes = inp%NMODES
     nsw = inp%NSW
 
     olap%NBANDS = nb
@@ -789,6 +835,7 @@ module epcoup
     olap%dt = inp%POTIM
     olap%NMODES = nmodes
     olap%COUPTYPE = inp%EPCTYPE
+    olap%Np = inp%Np
 
     allocate(olap%Eig(nb, nsw-1))
     allocate(olap%gij(nb, nb, nmodes))
@@ -803,7 +850,7 @@ module epcoup
     olap%Phfreq = 0.0_q
     olap%Eig = 0.0_q
 
-  end subroutine initOlap
+  end subroutine
 
 
   subroutine copyToSec(olap, olap_sec, inp)
@@ -813,29 +860,33 @@ module epcoup
     type(overlap), intent(in) :: olap
 
     integer :: ik, jk, ib, jb, nb, iBas, jBas
+    integer :: kmin, kmax, bmin, bmax
 
     if (inp%LBASSEL) then
+    ! If .TRUE., BMIN, BMAX, KMIN, KMAX, EMIN, EMAX are ignored!!!
       call readBasis(inp)
     else
+    ! selected basises whose energies are between EMIN ~ EMAX,
+    ! in the range BMIN ~ BMAX and KMIN ~ KMAX.
       call selBasis(inp, olap)
     end if
 
     if (inp%LSORT) call sortBasis(inp, olap)
+    call initOlap(olap_sec, inp, inp%NBASIS)
 
     nb = inp%NBANDS
+    kmin = inp%KMIN; kmax = inp%KMAX
+    bmin = inp%BMIN; bmax = inp%BMAX
 
-    call initOlap(olap_sec, inp, inp%NBASIS)
-    olap_sec%Np = olap%Np
-
-    do ik=inp%KMIN, inp%KMAX
-      do ib=inp%BMIN, inp%BMAX
+    do ik=kmin, kmax
+      do ib=bmin, bmax
 
         if (inp%BASSEL(ik,ib)<0) cycle
         iBas = inp%BASSEL(ik,ib)
         olap_sec%Eig(iBas, :) = olap%Eig((ik-1)*nb+ib, :)
 
-        do jk=inp%KMIN, inp%KMAX
-          do jb=inp%BMIN, inp%BMAX
+        do jk=kmin, kmax
+          do jb=bmin, bmax
 
             if (inp%BASSEL(jk,jb)<0) cycle
             jBas = inp%BASSEL(jk,jb)
@@ -859,7 +910,7 @@ module epcoup
       end do
     end do
 
-  end subroutine copyToSec
+  end subroutine
 
 
   subroutine CoupToFileEP(olap)
@@ -920,7 +971,7 @@ module epcoup
 
     close(unit=30)
 
-  end subroutine CoupToFileEP
+  end subroutine
 
 
   subroutine CoupFromFileEP(olap)
@@ -990,7 +1041,7 @@ module epcoup
 
     close(unit=31)
 
-  end subroutine CoupFromFileEP
+  end subroutine
 
 
   subroutine writeEP(olap)
@@ -1008,7 +1059,7 @@ module epcoup
         (( SUM(olap%EPcoup(ib,jb,:,:,it)), jb=1,nb ), ib=1,nb)
     end do
 
-  end subroutine writeEP
+  end subroutine
 
 
 end module epcoup

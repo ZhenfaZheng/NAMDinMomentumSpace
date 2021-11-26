@@ -1,0 +1,29 @@
+&NAMDPARA
+  BMIN       = 1
+  BMAX       = 2
+  KMIN       = 1
+  KMAX       = 40
+  EMIN       = -4.6
+  EMAX       = -1.5
+  NBANDS     = 2
+  NKPOINTS   = 81
+  Np         = 81
+
+  NSW        = 1200
+  POTIM      = 1.0
+  TEMP       = 300
+
+  NSAMPLE    = 12
+  NAMDTIME   = 1000
+  NELM       = 1000
+  NTRAJ      = 1000
+  LHOLE      = .F.
+  LCPEXT     = .F.
+
+  LEPC       = .T.
+  LBASSEL    = .T.
+  LSORT      = .F.
+  EPCTYPE    = 1
+  FILEPM     = 'graphene_ephmat_p1.h5'
+  FILMD      = 'XDATCAR'
+/
