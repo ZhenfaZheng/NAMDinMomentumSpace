@@ -14,8 +14,8 @@ def main():
 
     fileptxt = 'EPTXT'
     figname = 'COUPLE_corr.png'
-    coup = pn.read_couple(fileptxt, ctype=1)
-    coup_av = np.average(np.abs(coup), axis=0)
+    coup = pn.read_couple(fileptxt, ctype=2)
+    coup_av = np.average(np.abs(np.sum(coup, axis=0)), axis=0)
     pn.plot_couple(coup_av, figname)
 
     tag = 'SHPROP'

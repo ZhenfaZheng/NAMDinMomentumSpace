@@ -13,13 +13,14 @@ def read_couple(filcoup='NATXT', filcoup_i='', ctype=0):
     Parameters:
     filcoup  : string, coupling file.
     filcoup_i: string, file name of imaginary part, for ctype==2.
-    ctype    : integer, different forms of NATXT files. 0: origin type, NAC
-               data are real number; 1: NAC are complex, and restore in two
-               real numbers; 2: NAC are complex, real and imaginary part are
-               restore in two files; 3: NAC are complex, and restore in forms
-               of '( xxx , yyy )'.
+    ctype    : integer, different forms of NATXT files.
+               0: origin type, NAC data are real number;
+               1: NAC are complex, and restore in two real numbers;
+               2: EPC divide into NM (this number stored in first
+               line) parts, each part has same form with type 1;
 
     Returns: ndarray, coupling data in forms of coup[nsw-1, nb, nb]
+             or coup[NM, nsw-1, nb, nb] (type 2)
     '''
 
     if ctype==0:
@@ -35,6 +36,17 @@ def read_couple(filcoup='NATXT', filcoup_i='', ctype=0):
 
         coup = data[:,0::2] + data[:,1::2]*(1.0j)
         coup.resize(nt,nb,nb)
+
+    elif ctype==2:
+        data = np.loadtxt(filcoup, skiprows=1)
+        with open(filcoup) as f:
+            first_line = f.readline()
+        nm = int( first_line.split()[0] )
+        nb = int( np.sqrt(data.shape[1]/2) )
+        nt = int(data.shape[0] / nm)
+
+        coup = data[:,0::2] + data[:,1::2]*(1.0j)
+        coup.resize(nm,nt,nb,nb)
 
     return coup
 

@@ -6,7 +6,7 @@ module hamil
   use epcoup
   implicit none
 
-  type TDKS 
+  type TDKS
     integer :: ndim
     ! _[c,p,n] means current, previous, next
     complex(kind=q), allocatable, dimension(:) :: psi_c
@@ -22,12 +22,12 @@ module hamil
     complex(kind=q), allocatable, dimension(:,:) :: ham_c
     ! complex(kind=q), allocatable, dimension(:,:) :: ham_p
     ! complex(kind=q), allocatable, dimension(:,:) :: ham_n
-    
+
     ! KS eigenvalues
     real(kind=q), allocatable, dimension(:,:) :: eigKs
     ! Non-adiabatic couplings
     complex(kind=q), allocatable, dimension(:,:,:) :: NAcoup
-    complex(kind=q), allocatable, dimension(:,:,:,:,:) :: EPcoup
+    complex(kind=q), allocatable, dimension(:,:,:) :: EPcoup
 
     ! surface hopping related
 
@@ -56,7 +56,6 @@ module hamil
     ! memory allocation
 
     N = inp%NBASIS
-    NM = olap%NMODES
     ks%ndim = inp%NBASIS
     Nt = inp%NAMDTIME / inp%POTIM
 
@@ -73,11 +72,7 @@ module hamil
 
       allocate(ks%eigKs(N, Nt))
       allocate(ks%NAcoup(N,N, Nt))
-      if (olap%COUPTYPE==1) then
-        allocate(ks%EPcoup(N,N, NM, 2, Nt))
-      else if (olap%COUPTYPE==2) then
-        allocate(ks%EPcoup(N,N, NM, 1, Nt))
-      end if
+      allocate(ks%EPcoup(N,N, Nt))
 
       allocate(ks%sh_pops(N, Nt))
       allocate(ks%sh_prop(N, Nt))
@@ -107,7 +102,8 @@ module hamil
         i = MOD(initstep+t, nsteps) + 1
         ks%eigKs(:,t) = olap%Eig(:, i)
         ks%NAcoup(:,:,t) = olap%Dij(:,:, i)
-        ks%EPcoup(:,:,:,:,t) = olap%EPcoup(:,:,:,:,i)
+        ks%EPcoup(:,:,t) = &
+          SUM( SUM(olap%EPcoup(:,:,:,:,i), dim=4), dim=3)
       end do
     else
       do t=1, Nt
@@ -143,8 +139,8 @@ module hamil
                    (ks%NAcoup(:,:,TION+1) - ks%NAcoup(:,:,TION)) * TELE / inp%NELM
 
     ! multiply by -i * hbar
-    if (.not. inp%LEPC) ks%ham_c = -imgUnit * hbar * ks%ham_c 
-    
+    if (.not. inp%LEPC) ks%ham_c = -imgUnit * hbar * ks%ham_c
+
     ! the energy eigenvalue part
     do i=1, ks%ndim
       ks%ham_c(i,i) = ks%ham_c(i,i) + ks%eigKs(i,TION) + &

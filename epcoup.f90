@@ -630,12 +630,7 @@ module epcoup
     type(overlap), intent(inout) :: olap
     type(overlap), intent(inout) :: olap_sec
 
-    real(kind=q) :: proj, norm
-    real(kind=q), allocatable, dimension(:) :: dkq, dq
-    integer :: iq, jq1, jq2, im
-    integer :: nqs, nmodes, nat
-    integer :: ik, jk, ib, jb
-    complex(kind=q) :: temp
+    integer :: nmodes, nb, nsw
     logical :: lcoup
 
     write(*,*)
@@ -652,8 +647,17 @@ module epcoup
       ! file containing couplings exists, then read it
       if (inp%LCPTXT .and. inp%LBASSEL) then
         call readBasis(inp)
-        call initOlap(olap_sec, inp, inp%NBASIS)
+        nb = inp%NBASIS
+        call initOlap(olap_sec, inp, nb)
+
+        nsw = inp%NSW
+        nmodes = inp%NMODES
+        allocate(olap_sec%Dij(nb, nb, nsw-1))
+        allocate(olap_sec%EPcoup(nb, nb, nmodes, 1, nsw-1))
+        olap%Dij = cero ; olap%EPcoup = cero
+
         call readNaEig(olap_sec, inp)
+        call readEP(olap_sec)
       else
         call CoupFromFileEP(olap)
         call copyToSec(olap, olap_sec, inp)
@@ -1048,16 +1052,55 @@ module epcoup
     implicit none
 
     type(overlap), intent(inout) :: olap
-    integer :: i, ib, jb, nb, it, nsw, ierr
+    integer :: im, nmodes, ib, jb, nb, it, nsw, ierr
 
     nb = olap%NBANDS
     nsw = olap%TSTEPS
+    nmodes = olap%NMODES
 
     open(unit=32, file='EPTXT', status='unknown', action='write')
-    do it=1,nsw-1
-      write(unit=32, fmt='(*(f15.9))') &
-        (( SUM(olap%EPcoup(ib,jb,:,:,it)), jb=1,nb ), ib=1,nb)
+
+    write(unit=32, fmt='(I6)') nmodes
+
+    do im=1,nmodes
+      do it=1,nsw-1
+        write(unit=32, fmt='(*(f15.9))') &
+          (( SUM(olap%EPcoup(ib,jb,im,:,it)), jb=1,nb ), ib=1,nb)
+      end do
+      write(unit=32,fmt=*)
     end do
+
+    close(unit=32)
+
+  end subroutine
+
+
+  subroutine readEP(olap)
+    implicit none
+
+    type(overlap), intent(inout) :: olap
+    integer :: im, nmodes, ib, jb, nb, it, nsw, ierr
+
+    open(unit=33, file='EPTXT', status='unknown', &
+         action='read', iostat=ierr)
+    if (ierr /= 0) then
+      write(*,*) "EPTXT does NOT exist!"
+      stop
+    end if
+
+    nb = olap%NBANDS
+    nsw = olap%TSTEPS
+    read(unit=33, fmt=*) nmodes
+
+    do im=1,nmodes
+      do it=1,nsw-1
+        read(unit=33, fmt='(*(f15.9))') &
+          (( olap%EPcoup(ib,jb,im,1,it), jb=1,nb ), ib=1,nb)
+      end do
+      read(unit=33,fmt=*)
+    end do
+
+    close(unit=33)
 
   end subroutine
 

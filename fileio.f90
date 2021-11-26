@@ -326,9 +326,10 @@ module fileio
         write(*,'(A30,A3,L6)')     'LSORT', ' = ', inp%LSORT
         write(*,'(A30,A3,L6)')    'LCPEXT', ' = ', inp%LCPTXT
         write(*,'(A30,A3,L6)')     'LHOLE', ' = ', inp%LHOLE
-        write(*,'(A30,A3,A)' )    'EPMFIL', ' = ', TRIM(ADJUSTL(inp%FILEPM))
+
         if (inp%EPCTYPE==2) &
           write(*,'(A30,A3,A)')    'MDFIL', ' = ', TRIM(ADJUSTL(inp%FILMD))
+        write(*,'(A30,A3,A)' )    'EPMFIL', ' = ', TRIM(ADJUSTL(inp%FILEPM))
 
         write(*,'(A)') &
           "------------------------------------------------------------"
