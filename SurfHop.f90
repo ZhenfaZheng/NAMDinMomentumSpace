@@ -194,7 +194,7 @@ module shop
         write(io,'(A,A12,A3,I6)')     '#', 'NKPOINTS', ' = ', inp%NKPOINTS
         write(io,'(A,A12,A3,I6)')     '#', 'INIBAND',  ' = ', inp%INIBAND
         write(io,'(A,A12,A3,I6)')     '#', 'INIKPT',   ' = ', inp%INIKPT
-                                      
+
         write(io,'(A,A12,A3,I6)')     '#', 'NSW',      ' = ', inp%NSW
         write(io,'(A,A12,A3,F6.1)')   '#', 'POTIM',    ' = ', inp%POTIM
         write(io,'(A,A12,A3,F6.1)')   '#', 'TEMP',     ' = ', inp%TEMP
@@ -202,7 +202,7 @@ module shop
         write(io,'(A,A12,A3,I6)')     '#', 'NAMDTIME', ' = ', inp%NAMDTIME
         write(io,'(A,A12,A3,I6)')     '#', 'NTRAJ',    ' = ', inp%NTRAJ
         write(io,'(A,A12,A3,I6)')     '#', 'NELM',     ' = ', inp%NELM
-                                      
+
         write(io,'(A,A12,A3,L6)')     '#', 'LEPC',     ' = ', inp%LEPC
         write(io,'(A,A12,A3,I6)')     '#', 'EPCTYPE',  ' = ', inp%EPCTYPE
         write(io,'(A,A12,A3,L6)')     '#', 'LBASSEL',  ' = ', inp%LBASSEL

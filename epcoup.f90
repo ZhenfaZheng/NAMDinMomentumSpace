@@ -13,21 +13,13 @@ module epcoup
     !! mapping of each atom in MD cell to atom in unit cell for epc calculation.
     integer, allocatable, dimension(:,:) :: Rp
     !! number of lattice vector of each atom in MD cell, Rp(natmd,3)
-    integer, allocatable, dimension(:) :: qqmap
-    !! map q points in phonon calculation to q points in e-p calcultion.
     integer, allocatable, dimension(:,:) :: kkqmap
     !! map ik & jk of electronic states to q or -q of e-p matrix.
     real(kind=q), allocatable, dimension(:) :: mass
-    real(kind=q), allocatable, dimension(:,:) :: energy
-    real(kind=q), allocatable, dimension(:,:) :: cellep
-    real(kind=q), allocatable, dimension(:,:) :: kptsep
-    real(kind=q), allocatable, dimension(:,:) :: qptsep
-    real(kind=q), allocatable, dimension(:,:) :: freqep
-    real(kind=q), allocatable, dimension(:,:) :: freqph
-    complex(kind=q), allocatable, dimension(:,:,:) :: normcoord
-    complex(kind=q), allocatable, dimension(:,:,:,:) :: phmodes
-    real(kind=q), allocatable, dimension(:,:) :: cellmd
     real(kind=q), allocatable, dimension(:,:,:) :: displ
+    real(kind=q), allocatable, dimension(:,:) :: kpts, qpts
+    real(kind=q), allocatable, dimension(:,:) :: cellep, cellmd
+    complex(kind=q), allocatable, dimension(:,:,:,:) :: phmodes
   end type
 
   contains
@@ -39,17 +31,13 @@ module epcoup
 
     if ( allocated(epc%Rp) ) deallocate(epc%Rp)
     if ( allocated(epc%atmap) ) deallocate(epc%atmap)
-    if ( allocated(epc%qqmap) ) deallocate(epc%qqmap)
     if ( allocated(epc%kkqmap) ) deallocate(epc%kkqmap)
-    if ( allocated(epc%energy) ) deallocate(epc%energy)
+    if ( allocated(epc%kpts) ) deallocate(epc%kpts)
+    if ( allocated(epc%qpts) ) deallocate(epc%qpts)
     if ( allocated(epc%cellep) ) deallocate(epc%cellep)
-    if ( allocated(epc%kptsep) ) deallocate(epc%kptsep)
-    if ( allocated(epc%qptsep) ) deallocate(epc%qptsep)
-    if ( allocated(epc%freqep) ) deallocate(epc%freqep)
-    if ( allocated(epc%freqph) ) deallocate(epc%freqph)
-    if ( allocated(epc%phmodes) ) deallocate(epc%phmodes)
     if ( allocated(epc%cellmd) ) deallocate(epc%cellmd)
     if ( allocated(epc%displ) ) deallocate(epc%displ)
+    if ( allocated(epc%phmodes) ) deallocate(epc%phmodes)
 
   end subroutine
 
@@ -122,6 +110,7 @@ module epcoup
     integer(hid_t) :: file_id, gr_id, dset_id
     integer(hsize_t) :: dim1(1), dim2(2), dim4(4)
     character(len=72) :: tagk, fname, grname, dsetname
+    real(kind=q), allocatable, dimension(:,:) :: freqtemp, entemp
     real(kind=q), allocatable, dimension(:,:) :: kqltemp, pos, lattvec
     real(kind=q), allocatable, dimension(:,:,:,:) :: eptemp_r, eptemp_i, phmtemp
     complex(kind=q), allocatable, dimension(:,:,:,:) :: eptemp
@@ -144,43 +133,43 @@ module epcoup
     call h5gopen_f(file_id, grname, gr_id, hdferror)
 
     dsetname = 'k_list'
-    allocate(kqltemp(3,nk), epc%kptsep(nk,3))
+    allocate(kqltemp(3,nk), epc%kpts(nk,3))
     dim2 = shape(kqltemp, kind=hsize_t)
     call h5dopen_f(gr_id, dsetname, dset_id, hdferror)
     call h5dread_f(dset_id, H5T_NATIVE_DOUBLE, kqltemp, dim2, hdferror)
     call h5dclose_f(dset_id, hdferror)
-    epc%kptsep = transpose(kqltemp)
+    epc%kpts = transpose(kqltemp)
     deallocate(kqltemp)
 
     dsetname = 'q_list'
-    allocate(kqltemp(3,nq), epc%qptsep(nq,3))
+    allocate(kqltemp(3,nq), epc%qpts(nq,3))
     dim2 = shape(kqltemp, kind=hsize_t)
     call h5dopen_f(gr_id, dsetname, dset_id, hdferror)
     call h5dread_f(dset_id, H5T_NATIVE_DOUBLE, kqltemp, dim2, hdferror)
     call h5dclose_f(dset_id, hdferror)
-    epc%qptsep = transpose(kqltemp)
+    epc%qpts = transpose(kqltemp)
     deallocate(kqltemp)
 
     dsetname = 'el_band_eV'
-    allocate(epc%energy(nb,nk))
-    dim2 = shape(epc%energy, kind=hsize_t)
+    allocate(entemp(nb,nk))
+    dim2 = shape(entemp, kind=hsize_t)
     call h5dopen_f(gr_id, dsetname, dset_id, hdferror)
-    call h5dread_f(dset_id, H5T_NATIVE_DOUBLE, epc%energy, dim2, hdferror)
+    call h5dread_f(dset_id, H5T_NATIVE_DOUBLE, entemp, dim2, hdferror)
     call h5dclose_f(dset_id, hdferror)
 
     do ik=1,nk
       do ib=1,nb
-        olap%Eig(ib+nb*(ik-1),:) = epc%energy(ib,ik)
+        olap%Eig(ib+nb*(ik-1),:) = entemp(ib,ik)
       end do
     end do
 
     dsetname = 'ph_disp_meV'
-    allocate(epc%freqep(nm,nq))
-    dim2 = shape(epc%freqep, kind=hsize_t)
+    allocate(freqtemp(nm,nq))
+    dim2 = shape(freqtemp, kind=hsize_t)
     call h5dopen_f(gr_id, dsetname, dset_id, hdferror)
-    call h5dread_f(dset_id, H5T_NATIVE_DOUBLE, epc%freqep, dim2, hdferror)
+    call h5dread_f(dset_id, H5T_NATIVE_DOUBLE, freqtemp, dim2, hdferror)
     call h5dclose_f(dset_id, hdferror)
-    epc%freqep = epc%freqep / 1000.0_q ! transform unit to eV
+    freqtemp = freqtemp / 1000.0_q ! transform unit to eV
 
 
     if (inp%EPCTYPE==2) then
@@ -259,13 +248,9 @@ module epcoup
         iq = epc%kkqmap(ik, jk)
         if (iq<0) cycle
 
-        ! print '(4(3(F10.5,3x)))', &
-        ! epc%kptsep(ik,:), epc%kptsep(jk,:), epc%qptsep(iq,:), &
-        ! epc%kptsep(ik,:)-epc%kptsep(jk,:)-epc%qptsep(iq,:)
-
         do im=1,nm
 
-          if (epc%freqep(im,iq)<5.0E-3_q) cycle
+          if (freqtemp(im,iq)<5.0E-3_q) cycle
 
           do jb=1,nb
             do ib=1,nb
@@ -273,7 +258,7 @@ module epcoup
               ibas = nb*(ik-1)+ib
               jbas = nb*(jk-1)+jb
               olap%gij(ibas, jbas, im) = eptemp(ib, jb, im, iq)
-              olap%Phfreq(ibas, jbas, im) = epc%freqep(im,iq)
+              olap%Phfreq(ibas, jbas, im) = freqtemp(im,iq)
 
             end do ! ib loop
           end do ! jb loop
@@ -435,7 +420,7 @@ module epcoup
 
     do iq=1,nqs
       do ia=1,nat
-        theta = 2 * PI * DOT_PRODUCT( epc%qptsep(iq,:), epc%Rp(ia,:) )
+        theta = 2 * PI * DOT_PRODUCT( epc%qpts(iq,:), epc%Rp(ia,:) )
         eiqR(iq, ia) = EXP(-imgUnit*theta)
       end do
     end do
@@ -490,15 +475,14 @@ module epcoup
     ! If k1-k2 < norm, recognize k1 and k2 as same k point.
     ! So, number of kx, ky, kz or qx, qy, qz must not supass 1/norm = 1000
 
-    allocate(epc%kkqmap(epc%nkpts,epc%nkpts), epc%qqmap(epc%nqpts))
+    allocate(epc%kkqmap(epc%nkpts,epc%nkpts))
 
     epc%kkqmap = -1
-    epc%qqmap = -1
 
     do ik=1,epc%nkpts
       do jk=1,epc%nkpts
         do iq=1,epc%nqpts
-          dkq = epc%kptsep(ik,:) - epc%kptsep(jk,:) - epc%qptsep(iq,:)
+          dkq = epc%kpts(ik,:) - epc%kpts(jk,:) - epc%qpts(iq,:)
           do iax=1,3
             dkq(iax) = ABS(dkq(iax)-NINT(dkq(iax)))
           end do
@@ -619,6 +603,8 @@ module epcoup
 
     end if
 
+    call releaseOlap(olap)
+
   end subroutine
 
 
@@ -634,68 +620,61 @@ module epcoup
     logical :: lcoup
 
     write(*,*)
-    write(*,'(A)') "------------------------------------------------------------"
+    write(*,'(A)') &
+      "------------------------------------------------------------"
 
     call readEPCinfo(inp, epc)
 
-    ! Initialization
-    if ( .not. ( inp%LCPTXT .and. inp%LBASSEL) ) &
-      call initOlap(olap, inp, inp%NBANDS * inp%NKPOINTS)
+    if (inp%LCPTXT .and. inp%LBASSEL) then
 
-    inquire(file='EPCAR', exist=lcoup)
-    if (lcoup) then
-      ! file containing couplings exists, then read it
-      if (inp%LCPTXT .and. inp%LBASSEL) then
-        call readBasis(inp)
-        nb = inp%NBASIS
-        call initOlap(olap_sec, inp, nb)
+      write(*,*) "Reading couplings from TXT files..."
 
-        nsw = inp%NSW
-        nmodes = inp%NMODES
-        allocate(olap_sec%Dij(nb, nb, nsw-1))
-        allocate(olap_sec%EPcoup(nb, nb, nmodes, 1, nsw-1))
-        olap%Dij = cero ; olap%EPcoup = cero
+      call readBasis(inp)
+      nb = inp%NBASIS
+      call initOlap(olap_sec, inp, nb)
 
-        call readNaEig(olap_sec, inp)
-        call readEP(olap_sec)
-      else
-        call CoupFromFileEP(olap)
-        call copyToSec(olap, olap_sec, inp)
-        call calcEPC(olap_sec, inp)
-        call writeNaEig(olap_sec, inp)
-        call writeEP(olap_sec)
-      end if
+      nsw = inp%NSW
+      nmodes = inp%NMODES
+      allocate(olap_sec%Dij(nb, nb, nsw-1))
+      allocate(olap_sec%EPcoup(nb, nb, nmodes, 1, nsw-1))
+      olap%Dij = cero ; olap%EPcoup = cero
 
-    else if (inp%EPCTYPE==1) then
-
-      write(*,*) "TypeI e-ph coupling calculation."
-
-      call readEPCpert(inp, epc, olap)
-      call CoupToFileEP(olap)
-      call copyToSec(olap, olap_sec, inp)
-      call calcEPC(olap_sec, inp)
-      call writeNaEig(olap_sec, inp)
-      call writeEP(olap_sec)
+      call readNaEig(olap_sec, inp)
+      call readEP(olap_sec)
+      call releaseOlap(olap_sec)
 
     else
 
-      write(*,*) "TypeII e-ph coupling calculation."
+      inquire(file='EPCAR', exist=lcoup)
+      call initOlap(olap, inp, inp%NBANDS * inp%NKPOINTS)
+      if (lcoup) then
+        call CoupFromFileEP(olap)
+      else
+        if (inp%EPCTYPE==1) then
+          write(*,*) "TypeI e-ph coupling calculation."
+          call readEPCpert(inp, epc, olap)
+        else
+          write(*,*) "TypeII e-ph coupling calculation."
+          call readEPCpert(inp, epc, olap)
+          call phDecomp(inp, olap, epc)
+        end if
+        call CoupToFileEP(olap)
+      end if
 
-      call readEPCpert(inp, epc, olap)
-      call phDecomp(inp, olap, epc)
-      call CoupToFileEP(olap)
       call copyToSec(olap, olap_sec, inp)
       call calcEPC(olap_sec, inp)
       call writeNaEig(olap_sec, inp)
       call writeEP(olap_sec)
 
+      call releaseEPC(epc)
+      call releaseOlap(olap)
+      deallocate(olap%Eig)
+
     end if
 
-    call releaseEPC(epc)
-    if ( allocated(olap%Dij) )deallocate(olap%Dij, olap%Eig)
-
     write(*,*) "Done!"
-    write(*,'(A)') "------------------------------------------------------------"
+    write(*,'(A)') &
+      "------------------------------------------------------------"
     write(*,*)
 
   end subroutine
@@ -853,6 +832,17 @@ module epcoup
     olap%gij = cero
     olap%Phfreq = 0.0_q
     olap%Eig = 0.0_q
+
+  end subroutine
+
+
+  subroutine releaseOlap(olap)
+    implicit none
+    type(overlap), intent(inout) :: olap
+
+    if ( allocated(olap%gij) ) deallocate(olap%gij)
+    if ( allocated(olap%Phfreq) ) deallocate(olap%Phfreq)
+    if ( allocated(olap%PhQ) ) deallocate(olap%PhQ)
 
   end subroutine
 
