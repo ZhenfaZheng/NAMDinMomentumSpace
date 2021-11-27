@@ -72,27 +72,10 @@ module shop
     else
       ks%Bkm = 2. * REAL(CONJG(ks%psi_a(cstat, tion)) * ks%psi_a(:, tion) * &
                     ks%NAcoup(cstat, :, tion))
-    end if
-    ks%sh_prop(:,tion) = ks%Bkm / Akk * inp%POTIM
-
-    kbT = inp%TEMP * BOLKEV
-
-    if (inp%LHOLE) then
-      do i=1, ks%ndim
-        dE = ks%eigKs(cstat, tion) - ks%eigKs(i,tion)
-        if (dE<0) then
-          ks%sh_prop(i,tion) = ks%sh_prop(i,tion) * exp(dE / kbT)
-        end if
-      end do
-    else
-      do i=1, ks%ndim
-        dE = ks%eigKs(i,tion) - ks%eigKs(cstat, tion)
-        if (dE>0) then
-          ks%sh_prop(i,tion) = ks%sh_prop(i,tion) * exp(-dE / kbT)
-        end if
-      end do
+      call calcBfactor(ks, inp, cstat, tion)
     end if
 
+    ks%sh_prop(:,tion) = ks%Bkm / Akk * inp%POTIM * ks%sh_Bfactor(cstat,:)
     forall (i=1:ks%ndim, ks%sh_prop(i,tion) < 0) ks%sh_prop(i,tion) = 0
     ! write(*,*) (ks%Bkm(i), i=1, ks%ndim)
     ! write(*,*) (ks%sh_prop(i, tion), i=1, ks%ndim)
@@ -116,6 +99,8 @@ module shop
     ! initialize the random seed for ramdom number production
     call init_random_seed()
 
+    if (inp%LEPC) call calcBftot(ks, inp)
+
     do i=1, inp%NTRAJ
       ! in the first step, current step always equal initial step
       cstat = istat
@@ -133,6 +118,54 @@ module shop
     ! do tion=1, Nt
     !   write(*,*) (ks%sh_pops(i,tion), i=1, ks%ndim)
     ! end do
+  end subroutine
+
+  ! Calculate Boltzmann factors for SH probability correction.
+  subroutine calcBfactor(ks, inp, cstat, tion)
+    implicit none
+    type(TDKS), intent(inout) :: ks
+    type(namdInfo), intent(in) :: inp
+    integer, intent(in) :: tion
+    integer, intent(in) :: cstat
+
+    integer :: jb, nb
+    real(kind=q) :: dE, kbT
+
+    nb = ks%ndim
+    kbT = inp%TEMP * BOLKEV
+    ks%sh_Bfactor(cstat,:) = 1.0_q
+
+    if (inp%LHOLE) then
+      do jb=1, nb
+        dE = ks%eigKs(jb, tion) - ks%eigKs(cstat,tion)
+        if (dE<0) then
+          ks%sh_Bfactor(cstat,jb) = exp(dE / kbT)
+        end if
+      end do
+    else
+      do jb=1, nb
+        dE = ks%eigKs(jb,tion) - ks%eigKs(cstat, tion)
+        if (dE>0) then
+          ks%sh_Bfactor(cstat,jb) = exp(-dE / kbT)
+        end if
+      end do
+    end if
+
+  end subroutine
+
+  subroutine calcBftot(ks, inp)
+    ! Calculate total Boltzmann factors only once
+    ! if ks eigs are invariable.
+    implicit none
+    type(TDKS), intent(inout) :: ks
+    type(namdInfo), intent(in) :: inp
+
+    integer :: ib, nb
+
+    nb = ks%ndim
+    do ib=1, nb
+      call calcBfactor(ks, inp, ib, 1)
+    end do
   end subroutine
 
   ! need a subroutine here to write the results we need
@@ -190,6 +223,7 @@ module shop
         if (inp%EMAX <  1.0E5_q) &
           write(io,'(A,A12,A3,F6.2)') '#', 'EMAX',     ' = ', inp%EMAX
 
+        write(io,'(A,A12,A3,I6)')     '#', 'NBASIS',   ' = ', inp%NBASIS
         write(io,'(A,A12,A3,I6)')     '#', 'NBANDS',   ' = ', inp%NBANDS
         write(io,'(A,A12,A3,I6)')     '#', 'NKPOINTS', ' = ', inp%NKPOINTS
         write(io,'(A,A12,A3,I6)')     '#', 'INIBAND',  ' = ', inp%INIBAND

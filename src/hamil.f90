@@ -35,6 +35,8 @@ module hamil
     real(kind=q), allocatable, dimension(:) :: Bkm
     real(kind=q), allocatable, dimension(:,:) :: sh_pops
     real(kind=q), allocatable, dimension(:,:) :: sh_prop
+    ! Blotzmann factor for SH probability scaling.
+    real(kind=q), allocatable, dimension(:,:) :: sh_Bfactor
 
     ! whether the memory has been allocated
     logical :: LALLO = .FALSE.
@@ -76,6 +78,7 @@ module hamil
 
       allocate(ks%sh_pops(N, Nt))
       allocate(ks%sh_prop(N, Nt))
+      allocate(ks%sh_Bfactor(N,N))
       allocate(ks%Bkm(N))
       ! allocate(ks%ham_p(N,N))
       ! allocate(ks%ham_n(N,N))
@@ -131,12 +134,12 @@ module hamil
 
     integer :: i
 
-    ! the hamiltonian contains two parts, which are obtained by interpolation
-    ! method between two ionic tims step
+    ! the hamiltonian contains two parts, which are obtained by
+    ! interpolation method between two ionic tims step
 
     ! The non-adiabatic coupling part
     ks%ham_c(:,:) = ks%NAcoup(:,:,TION) + &
-                   (ks%NAcoup(:,:,TION+1) - ks%NAcoup(:,:,TION)) * TELE / inp%NELM
+      (ks%NAcoup(:,:,TION+1) - ks%NAcoup(:,:,TION)) * TELE / inp%NELM
 
     ! multiply by -i * hbar
     if (.not. inp%LEPC) ks%ham_c = -imgUnit * hbar * ks%ham_c
@@ -144,7 +147,7 @@ module hamil
     ! the energy eigenvalue part
     do i=1, ks%ndim
       ks%ham_c(i,i) = ks%ham_c(i,i) + ks%eigKs(i,TION) + &
-                     (ks%eigKs(i,TION+1) - ks%eigKs(i,TION)) * TELE / inp%NELM
+        (ks%eigKs(i,TION+1) - ks%eigKs(i,TION)) * TELE / inp%NELM
     end do
   end subroutine
 
