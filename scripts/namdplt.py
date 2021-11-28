@@ -13,7 +13,7 @@ def main():
     pn.plot_couple(coup_av)
 
     fileptxt = 'EPTXT'
-    figname = 'COUPLE_corr.png'
+    figname = 'COUPLE_sh.png'
     coup = pn.read_couple(fileptxt, ctype=2)
     coup_av = np.average(np.abs(np.sum(coup, axis=0)), axis=0)
     pn.plot_couple(coup_av, figname)
@@ -22,12 +22,15 @@ def main():
     fileig = 'EIGTXT'
     figname = 'TDEN.png'
     filshps = glob(tag+'.*')
-    filephmat = 'graphene_ephmat_p1.h5'
+    filephmat = '../graphene_ephmat_p1.h5'
     shp = pn.readshp(filshps)
     en, kpts = pn.ek_selected(filephmat)
     # Make sure shp & ksen have same Eref!!!
+    # pn.plot_namd_3D(shp, kpts[:,:2], en, Eref=Eref)
     pn.plot_tdprop(shp, Eref, lplot=2, ksen=en, figname=figname)
-    pn.plot_namd_3D(kpts[:,:2], en, shp, Eref=Eref)
+    en_tot = pn.read_ephmath5(filephmat, igroup=0, idset=3)
+    kpts_tot = pn.read_ephmath5(filephmat, igroup=0, idset=1)
+    pn.plot_namd_3D(shp, kpts[:,:2], en, kpts_tot[:,:2], en_tot[:,1], Eref)
 
     tag = 'PSICT'
     fileig = 'EIGTXT'

@@ -13,15 +13,15 @@
   POTIM      = 1.0
   TEMP       = 300
 
-  NSAMPLE    = 12
+  NSAMPLE    = 6
   NAMDTIME   = 1000
   NELM       = 1000
-  NTRAJ      = 1000
+  NTRAJ      = 10000
   LHOLE      = .F.
   LCPEXT     = .F.
 
   LEPC       = .T.
-  LBASSEL    = .T.
+  LBASSEL    = .F.
   LSORT      = .F.
   EPCTYPE    = 1
   FILEPM     = 'graphene_ephmat_p1.h5'

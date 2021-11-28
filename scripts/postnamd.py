@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 import h5py
+import math
 import numpy as np
 import matplotlib as mpl; mpl.use('agg')
 import matplotlib.pyplot as plt
@@ -103,6 +104,13 @@ def ek_selected(filephmat, filbassel='BASSEL'):
 
     return en, kpts
 
+def read_inicon(filinicon='INICON'):
+    '''
+    This function loads data from INICON file.
+    '''
+    inicon = np.loadtxt(filinicon)
+    return inicon
+
 
 def readshp(filshps):
     '''
@@ -157,6 +165,7 @@ def plot_tdprop(shp, Eref=0.0, lplot=1, ksen=None, figname='tdshp.png'):
         ntsteps = shp.shape[0]
         nbands = shp.shape[1] -2
         cmin = 0.0; cmax = np.max(shp[:,2:])
+        cmax = math.ceil(cmax*10)/10
         norm = mpl.colors.Normalize(cmin,cmax)
 
         if (ksen.shape[0]!=nbands):
@@ -222,12 +231,20 @@ def read_ephmath5(filname, igroup=-1, idset=-1, dset=""):
         return None
 
 
-def plot_namd_3D(kpts, en, shp, kpts_tot=None, en_tot=None, Eref=0.0,
+def plot_namd(kpts, en, shp, kpts_tot=None, en_tot=None, Eref=0.0,
+              figname='NAMD_3D.png'):
+    '''
+    '''
+
+
+def plot_namd_3D(shp, kpts, en, kpts_tot=None, en_tot=None, Eref=0.0,
                  figname='NAMD_3D.png'):
     '''
     Plot 3D elctronic evolution.
 
     Parameters:
+    shp     : ndarray, part for plotting average data from SHPROP.xxx files,
+              which in forms of shp[ntsteps, nb+2]
     kpts    : ndarray, 2D cartisian coordinates of K-points in forms of
               kpts[nks,2].
     en      : ndarray, ks energies for plot in forms of en[nb]. Here nb must
@@ -237,8 +254,6 @@ def plot_namd_3D(kpts, en, shp, kpts_tot=None, en_tot=None, Eref=0.0,
     en_tot  : ndarray, total energies for background plot, which in forms of
               en_tot[nks_tot, nb_tot]
     Eref    : float, energy reference. Make sure en & en_tot have same Eref!!!
-    shp     : ndarray, part for plotting average data from SHPROP.xxx files,
-              which in forms of shp[ntsteps, nb+2]
     figname : string, output figure file name.
     '''
 
@@ -256,8 +271,7 @@ def plot_namd_3D(kpts, en, shp, kpts_tot=None, en_tot=None, Eref=0.0,
     else:
         X_tot = kpts_tot[:,0]
         Y_tot = kpts_tot[:,1]
-        Z_tot = en_tot[:,1] - Eref
-
+        Z_tot = en_tot - Eref
 
     from matplotlib import cm
     from mpl_toolkits.mplot3d import Axes3D
@@ -281,11 +295,17 @@ def plot_namd_3D(kpts, en, shp, kpts_tot=None, en_tot=None, Eref=0.0,
     cbar.set_label('Time (fs)')
 
     # Plot background
+    try:
+        nb_tot = Z_tot.shape[1]
+    except IndexError:
+        ax.plot_wireframe(X_tot,Y_tot,Z_tot, lw=0.1)
+    else:
+        for ib in range(nb_tot):
+            ax.plot_wireframe(X_tot,Y_tot,Z_tot[:,ib], lw=0.1)
     # ax.plot_surface(X_tot,Y_tot,Z_tot,
     #     cmap=cm.coolwarm, antialiased=False)
     # ax.plot_trisurf(X_tot,Y_tot,Z_tot, lw=0.1,
     #     antialiased=True, alpha=0.05)
-    ax.plot_wireframe(X_tot,Y_tot,Z_tot, lw=0.1)
     # ax.scatter(X_tot,Y_tot,Z_tot, lw=0.3)
 
     ax.set_zlim(Z.min(),Z.max())

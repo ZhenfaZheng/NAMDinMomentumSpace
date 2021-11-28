@@ -515,7 +515,7 @@ module epcoup
     nb  = olap%NBANDS
     nm  = olap%NMODES
     kbT = inp%TEMP * BOLKEV
-    idwt = imgUnit / kbT
+    idwt = imgUnit / kbT * TPI
     ! iwt = i * (dE/hbar) * (hbar/kbT)
 
     write(*,*) "Calculating e-ph couplings."
@@ -536,7 +536,7 @@ module epcoup
 
           if (olap%Phfreq(ib, jb, im)<5.0E-3_q) cycle
           phn = 1.0 / ( exp(olap%Phfreq(ib, jb, im)/kbT) - 1.0 )
-          eptemp = olap%gij(ib, jb, im) * SQRT(2.0 * phn + 1.0) * 0.5
+          eptemp = olap%gij(ib, jb, im) * SQRT(phn+0.5)
           if (jb==ib)  eptemp = ABS(eptemp)
           iw = iwtemp * olap%Phfreq(ib, jb, im)
 
@@ -590,7 +590,7 @@ module epcoup
           dE2 = dE + olap%Phfreq(ib, jb, im) + 1.0E-8_q
           olap%EPcoup(ib,jb,im,1,:) = olap%EPcoup(ib,jb,im,1,:) * &
             ( (exp(idwt * dE1) - 1.0) / (idwt * dE1) + &
-              (exp(idwt * dE2) - 1.0) / (idwt * dE2) ) / 2.0
+              (exp(idwt * dE2) - 1.0) / (idwt * dE2) ) / SQRT(2.0)
         end do
 
         olap%Dij(jb,ib,:) = CONJG(olap%Dij(ib,jb,:))
