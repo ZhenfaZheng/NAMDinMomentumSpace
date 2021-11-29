@@ -17,7 +17,8 @@ module couplings
     complex(kind=q), allocatable, dimension(:,:,:,:) :: PhQ
     complex(kind=q), allocatable, dimension(:,:,:,:,:) :: EPcoup
     real(kind=q), allocatable, dimension(:,:,:) :: Phfreq
-    integer :: NMODES
+    integer, allocatable, dimension(:,:) :: kkqmap
+    integer :: NQ, NMODES
     integer :: COUPTYPE
     real(kind=q) :: Np
   end type

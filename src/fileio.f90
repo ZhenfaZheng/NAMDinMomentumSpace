@@ -35,6 +35,7 @@ module fileio
     logical :: LGAMMA
 
     logical :: LEPC    ! whether to use e-p matrix as NA couplings
+    logical :: LARGEBS ! whether the basis set large or not
     logical :: LBASSEL ! whether to read BASSEL file. If not, will generate it.
                        ! If .TRUE., BMIN, BMAX, KMIN, KMAX, EMIN, EMAX ignored!
                        ! Only available for LEPC=.TRUE.!!!
