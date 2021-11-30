@@ -20,14 +20,16 @@ module hamil
     real(kind=q), allocatable, dimension(:) :: norm
 
     complex(kind=q), allocatable, dimension(:,:) :: ham_c
-    ! complex(kind=q), allocatable, dimension(:,:) :: ham_p
-    ! complex(kind=q), allocatable, dimension(:,:) :: ham_n
+    complex(kind=q), allocatable, dimension(:,:) :: ham_p
+    complex(kind=q), allocatable, dimension(:,:) :: ham_n
 
     ! KS eigenvalues
     real(kind=q), allocatable, dimension(:,:) :: eigKs
     ! Non-adiabatic couplings
     complex(kind=q), allocatable, dimension(:,:,:) :: NAcoup
+
     complex(kind=q), allocatable, dimension(:,:,:) :: EPcoup
+    complex(kind=q), allocatable, dimension(:,:,:,:) :: PhQ
 
     ! surface hopping related
 
@@ -71,10 +73,17 @@ module hamil
       allocate(ks%norm(Nt))
 
       allocate(ks%ham_c(N,N))
+      allocate(ks%ham_p(N,N))
+      allocate(ks%ham_n(N,N))
 
       allocate(ks%eigKs(N, Nt))
-      allocate(ks%NAcoup(N,N, Nt))
-      allocate(ks%EPcoup(N,N, Nt))
+
+      if (.NOT. inp%LARGEBS) then
+        allocate(ks%NAcoup(N,N, Nt))
+        if (inp%LEPC) allocate(ks%EPcoup(N,N, Nt))
+      else
+        allocate(ks%PhQ(olap%NQ, olap%NMODES, 2, Nt))
+      end if
 
       allocate(ks%sh_pops(N, Nt))
       allocate(ks%sh_prop(N, Nt))
@@ -99,15 +108,23 @@ module hamil
     nsteps = inp%NSW - 1
 
     if (inp%LEPC) then
-      do t=1, Nt
-        ! If time step > NSW-1, use Eig & couplings
-        ! from initial time repeatedly.
-        i = MOD(initstep+t, nsteps) + 1
-        ks%eigKs(:,t) = olap%Eig(:, i)
-        ks%NAcoup(:,:,t) = olap%Dij(:,:, i)
-        ks%EPcoup(:,:,t) = &
-          SUM( SUM(olap%EPcoup(:,:,:,:,i), dim=4), dim=3)
-      end do
+      if (inp%LARGEBS) then
+        do t=1, Nt
+          i = MOD(initstep+t, nsteps) + 1
+          ks%eigKs(:,t) = olap%Eig(:,i)
+          ks%PhQ(:,:,:,t) = olap%PhQ(:,:,:,i)
+        end do
+      else
+        do t=1, Nt
+          ! If time step > NSW-1, use Eig & couplings
+          ! from initial time repeatedly.
+          i = MOD(initstep+t, nsteps) + 1
+          ks%eigKs(:,t) = olap%Eig(:, i)
+          ks%NAcoup(:,:,t) = olap%Dij(:,:, i)
+          ks%EPcoup(:,:,t) = &
+            SUM( SUM(olap%EPcoup(:,:,:,:,i), dim=4), dim=3)
+        end do
+      end if
     else
       do t=1, Nt
         ! If time step > NSW-1, use Eig & couplings
@@ -120,6 +137,49 @@ module hamil
         ks%NAcoup(:,:,t) = olap%Dij(:,:, i) / (2*inp%POTIM)
       end do
     end if
+
+  end subroutine
+
+
+  subroutine calc_hamil_ion(tion, ks, inp, olap)
+    implicit none
+
+    type(TDKS), intent(inout) :: ks
+    type(namdInfo), intent(in) :: inp
+    integer, intent(in) :: TION
+    type(overlap), intent(in) :: olap
+
+    integer :: ib, jb, iq
+
+    ks%ham_p = ks%ham_n
+    do ib=1,ks%ndim
+      do jb=ib,ks%ndim
+        iq = olap%kkqmap(ib,jb)
+        ks%ham_n(ib,jb) = SUM( olap%gij(ib,jb,:) * &
+            SUM(ks%PhQ(iq,:,:,tion), dim=2) ) / SQRT(olap%Np)
+        ks%ham_n(jb,ib) = CONJG(ks%ham_n(ib,jb))
+      end do
+      ks%ham_n(ib,ib) = ks%ham_n(ib,ib) + ks%eigKs(ib,1)
+    end do
+
+  end subroutine
+
+
+  subroutine make_hamil_LBS(tion, tele, ks, inp, olap)
+    implicit none
+
+    type(TDKS), intent(inout) :: ks
+    type(namdInfo), intent(in) :: inp
+    integer, intent(in) :: tion, tele
+    type(overlap), intent(in) :: olap
+
+    integer :: ib, jb, iq
+    complex(kind=q), allocatable :: tempQ(:,:,:)
+
+    if (tion==1 .AND. tele==1) call calc_hamil_ion(tion, ks, inp, olap)
+    if (tele==1) call calc_hamil_ion(tion+1, ks, inp, olap)
+
+    ks%ham_c = ks%ham_p + (ks%ham_n - ks%ham_p) * TELE / inp%NELM
 
   end subroutine
 

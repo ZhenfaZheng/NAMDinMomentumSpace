@@ -2,6 +2,7 @@ module shop
   use prec
   use fileio
   use hamil
+  use couplings
   implicit none
 
   contains
@@ -53,6 +54,34 @@ module shop
 
   end subroutine
 
+  subroutine calcprop_LBS(tion, cstat, ks, inp, olap)
+    implicit none
+
+    type(TDKS), intent(inout) :: ks
+    type(namdInfo), intent(in) :: inp
+    integer, intent(in) :: tion
+    integer, intent(in) :: cstat
+    type(overlap), intent(in) :: olap
+
+    real(kind=q) :: Akk
+    complex(kind=q), allocatable :: epcoup(:)
+    integer :: i, iq
+
+    allocate(epcoup(ks%ndim))
+    do i=1,ks%ndim
+      iq = olap%kkqmap(cstat, i)
+      epcoup(i) = SUM(olap%EPcoup(cstat,i,:,:,1) * ks%PhQ(iq,:,:,tion))
+    end do
+
+    Akk = CONJG(ks%psi_a(cstat, tion)) * ks%psi_a(cstat, tion)
+    ks%Bkm = -2. / hbar * AIMAG( CONJG(ks%psi_a(cstat, tion)) * &
+             ks%psi_a(:, tion) * epcoup(:) )
+
+    ks%sh_prop(:,tion) = ks%Bkm / Akk * inp%POTIM * ks%sh_Bfactor(cstat,:)
+    forall (i=1:ks%ndim, ks%sh_prop(i,tion) < 0) ks%sh_prop(i,tion) = 0
+
+  end subroutine
+
   subroutine calcprop(tion, cstat, ks, inp)
     implicit none
 
@@ -62,7 +91,7 @@ module shop
     integer, intent(in) :: cstat
 
     integer :: i, j
-    real(kind=q) :: Akk, dE, kbT
+    real(kind=q) :: Akk
 
     Akk = CONJG(ks%psi_a(cstat, tion)) * ks%psi_a(cstat, tion)
 
@@ -83,11 +112,12 @@ module shop
   end subroutine
 
   ! calculate surface hopping probabilities
-  subroutine runSH(ks, inp)
+  subroutine runSH(ks, inp, olap)
     implicit none
 
     type(TDKS), intent(inout) :: ks
     type(namdInfo), intent(in) :: inp
+    type(overlap), intent(in) :: olap
     integer :: i, j, tion, Nt
     integer :: istat, cstat, which
 
@@ -105,7 +135,11 @@ module shop
       ! in the first step, current step always equal initial step
       cstat = istat
       do tion=1, Nt
-        call calcprop(tion, cstat, ks, inp)
+        if (inp%LARGEBS) then
+          call calcprop_LBS(tion, cstat, ks, inp, olap)
+        else
+          call calcprop(tion, cstat, ks, inp)
+        end if
         call whichToHop(tion, ks, which)
         if (which > 0) cstat = which
         ks%sh_pops(cstat, tion) = ks%sh_pops(cstat, tion) + 1

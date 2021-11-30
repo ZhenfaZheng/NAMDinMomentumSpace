@@ -20,7 +20,7 @@ Program main
   integer :: ns
 
   write(*,*)
-  write(*,*) "Hefei-NAMD (epc version 1.5.6, Nov 29, 2021)"
+  write(*,*) "Hefei-NAMD (epc version 1.5.7, Nov 29, 2021)"
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   ! First, get user inputs
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -53,10 +53,10 @@ Program main
     call cpu_time(start)
     call initTDKS(ks, inp, olap_sec)
     ! Time propagation
-    call Propagation(ks, inp)
+    call Propagation(ks, inp, olap_sec)
     ! Run surface hopping
     if (inp%LSHP) then
-      call runSH(ks, inp)
+      call runSH(ks, inp, olap_sec)
       call printSH(ks, inp)
     end if
     call cpu_time(fin)

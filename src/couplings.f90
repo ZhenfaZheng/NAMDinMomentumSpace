@@ -16,7 +16,7 @@ module couplings
     complex(kind=q), allocatable, dimension(:,:,:) :: gij
     complex(kind=q), allocatable, dimension(:,:,:,:) :: PhQ
     complex(kind=q), allocatable, dimension(:,:,:,:,:) :: EPcoup
-    real(kind=q), allocatable, dimension(:,:,:) :: Phfreq
+    real(kind=q), allocatable, dimension(:,:) :: Phfreq
     integer, allocatable, dimension(:,:) :: kkqmap
     integer :: NQ, NMODES
     integer :: COUPTYPE

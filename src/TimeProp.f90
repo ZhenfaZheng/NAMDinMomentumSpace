@@ -7,10 +7,11 @@ module TimeProp
 
   contains 
 
-  subroutine Propagation(ks, inp)
+  subroutine Propagation(ks, inp, olap)
     implicit none
     type(TDKS), intent(inout)  :: ks
     type(namdInfo), intent(in) :: inp
+    type(overlap), intent(in) :: olap
 
     integer :: tion, tele, Nt
     integer :: i, j
@@ -34,7 +35,11 @@ module TimeProp
       ! do tele = 1, inp%NELM-1
       do tele = 1, inp%NELM-1
         ! construct hamiltonian matrix
-        call make_hamil(tion, tele, ks, inp)
+        if (inp%LARGEBS) then
+          call make_hamil_LBS(tion, tele, ks, inp, olap)
+        else
+          call make_hamil(tion, tele, ks, inp)
+        end if
         ! apply hamiltonian to state vector
         call hamil_act(ks)
         if (tion == 1 .AND. tele == 1) then
