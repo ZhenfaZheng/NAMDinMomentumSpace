@@ -8,14 +8,15 @@ def main():
 
     Eref = -4.52862
 
-    coup = pn.read_couple(ctype=1)
+    filcoup = 'EPTXT'
+    coup = pn.read_couple(filcoup, ctype=1)
     coup_av = np.average(np.abs(coup), axis=0)
     pn.plot_couple(coup_av)
 
-    fileptxt = 'EPTXT'
+    fileptxt = 'EPECTXT'
     figname = 'COUPLE_sh.png'
-    coup = pn.read_couple(fileptxt, ctype=2)
-    coup_av = np.average(np.abs(np.sum(coup, axis=0)), axis=0)
+    coup = pn.read_couple(fileptxt, ctype=1)
+    coup_av = np.average(np.abs(coup), axis=0)
     pn.plot_couple(coup_av, figname)
 
     tag = 'SHPROP'

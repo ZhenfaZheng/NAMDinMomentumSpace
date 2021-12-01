@@ -290,28 +290,28 @@ module epcoup
     nsw = inp%NSW
     write(*,*) 'Reading MD traj.'
 
-    open(unit=33, file=inp%FILMD, status='unknown', action='read', iostat=ierr)
+    open(unit=35, file=inp%FILMD, status='unknown', action='read', iostat=ierr)
     if (ierr /= 0) then
       write(*,*) "XDATCAR file does NOT exist!"
       stop
     end if
 
-    read(unit=33, fmt=*)
-    read(unit=33, fmt=*) scal
+    read(unit=35, fmt=*)
+    read(unit=35, fmt=*) scal
     do i=1,3
-      read(unit=33, fmt=*) (lattvec(i, iax), iax=1,3)
+      read(unit=35, fmt=*) (lattvec(i, iax), iax=1,3)
       lattvec(i,:) = lattvec(i,:) * scal
     end do
-    read(unit=33, fmt=*)
-    read(unit=33, fmt=*) nat
+    read(unit=35, fmt=*)
+    read(unit=35, fmt=*) nat
     epc%natmd = nat
 
     allocate(epc%displ(nsw, nat, 3))
 
     do it=1,nsw
-      read(unit=33, fmt=*)
+      read(unit=35, fmt=*)
       do ia=1,nat
-        read(unit=33, fmt=*) (epc%displ(it, ia, iax), iax=1, 3)
+        read(unit=35, fmt=*) (epc%displ(it, ia, iax), iax=1, 3)
         do iax=1,3
           if (it==1) cycle
           ! Modify atom position if atom moves to other cell.
@@ -347,7 +347,7 @@ module epcoup
       end do
     end do
 
-    close(33)
+    close(unit=35)
 
   end subroutine
 
@@ -684,8 +684,8 @@ module epcoup
       olap%Dij = cero ; olap%EPcoup = cero
       call initOlap(olap_sec, inp, epc%nqpts, nb)
 
-      call readNaEig(olap_sec, inp)
-      call readEP(olap_sec)
+      ! call readNaEig(olap_sec, inp)
+      call readEPTXTs(olap_sec)
       call releaseOlap(olap_sec)
 
     else
@@ -713,8 +713,7 @@ module epcoup
         call writeTXT_LBS(olap_sec)
       else
         call calcEPC(olap_sec, inp)
-        call writeNaEig(olap_sec, inp)
-        call writeEP(olap_sec)
+        call writeEPTXTs(olap_sec)
       end if
 
       call releaseEPC(epc)
@@ -977,6 +976,7 @@ module epcoup
          status='unknown', recl=recordL, iostat=ierr)
     if(ierr /= 0) then
         write(*,*) "File I/O error with EPCAR"
+        write(*,*)
         stop
     end if
 
@@ -1027,6 +1027,7 @@ module epcoup
          status = 'unknown', recl=256, iostat=ierr)
     if(ierr /= 0) then
       write(*,*) "File I/O error with EPCAR"
+      write(*,*)
       stop
     end if
 
@@ -1037,6 +1038,7 @@ module epcoup
        olap%COUPTYPE /= NINT(rctype) .or. olap%NMODES /= NINT(rnmodes)) then
       ! write(*,*) olap%NBANDS, NINT(rnbands), olap%TSTEPS, NINT(rnsw)
       write(*,*) "The EPCAR seems to be wrong..."
+      write(*,*)
       stop
     end if
 
@@ -1109,23 +1111,23 @@ module epcoup
     natxt = natxt / (nsw-1)
     eptxt = eptxt / (nsw-1)
 
-    open(unit=34, file='EIGTXT', status='unknown', action='write')
-    open(unit=35, file='NATXT', status='unknown', action='write')
-    open(unit=36, file='EPTXT', status='unknown', action='write')
+    open(unit=32, file='EIGTXT', status='unknown', action='write')
+    open(unit=33, file='EPTXT', status='unknown', action='write')
+    open(unit=34, file='EPECTXT', status='unknown', action='write')
 
 
-    write(unit=34, fmt='(*(f12.6))') (olap%Eig(ib,1), ib=1,nb)
-    write(unit=35, fmt='(*(f15.9))') (( natxt(ib,jb), jb=1,nb ), ib=1,nb)
-    write(unit=36, fmt='(*(f15.9))') (( eptxt(ib,jb), jb=1,nb ), ib=1,nb)
+    write(unit=32, fmt='(*(f12.6))') (olap%Eig(ib,1), ib=1,nb)
+    write(unit=33, fmt='(*(f15.9))') (( natxt(ib,jb), jb=1,nb ), ib=1,nb)
+    write(unit=34, fmt='(*(f15.9))') (( eptxt(ib,jb), jb=1,nb ), ib=1,nb)
 
+    close(unit=32)
+    close(unit=33)
     close(unit=34)
-    close(unit=35)
-    close(unit=36)
 
   end subroutine
 
 
-  subroutine writeEP(olap)
+  subroutine writeEPTXTs(olap)
     implicit none
 
     type(overlap), intent(in) :: olap
@@ -1135,39 +1137,66 @@ module epcoup
     nsw = olap%TSTEPS
     nmodes = olap%NMODES
 
-    open(unit=32, file='EPTXT', status='unknown', action='write')
+    open(unit=32, file='EIGTXT',  status='unknown', action='write')
+    open(unit=33, file='EPTXT',   status='unknown', action='write')
+    open(unit=34, file='EPECTXT', status='unknown', action='write')
 
     do it=1,nsw-1
-      write(unit=32, fmt='(*(f15.9))') &
+      write(unit=32, fmt='(*(f12.6))') (olap%Eig(ib,it), ib=1,nb)
+      write(unit=33, fmt='(*(f15.9))') &
+        ((olap%Dij(ib,jb,it), jb=1,nb), ib=1,nb)
+      write(unit=34, fmt='(*(f15.9))') &
         (( SUM(olap%EPcoup(ib,jb,:,:,it)), jb=1,nb ), ib=1,nb)
     end do
 
     close(unit=32)
+    close(unit=33)
+    close(unit=34)
 
   end subroutine
 
 
-  subroutine readEP(olap)
+  subroutine readEPTXTs(olap)
     implicit none
 
     type(overlap), intent(inout) :: olap
     integer :: im, nmodes, ib, jb, nb, it, nsw, ierr
 
+    open(unit=32, file='EIGTXT', status='unknown', &
+         action='read', iostat=ierr)
+    if (ierr /= 0) then
+      write(*,*) "EIGTXT does NOT exist!"
+      write(*,*)
+      stop
+    end if
     open(unit=33, file='EPTXT', status='unknown', &
          action='read', iostat=ierr)
     if (ierr /= 0) then
       write(*,*) "EPTXT does NOT exist!"
+      write(*,*)
+      stop
+    end if
+    open(unit=34, file='EPECTXT', status='unknown', &
+         action='read', iostat=ierr)
+    if (ierr /= 0) then
+      write(*,*) "EPECTXT does NOT exist!"
+      write(*,*)
       stop
     end if
 
     nb = olap%NBANDS
     nsw = olap%TSTEPS
     do it=1,nsw-1
+      read(unit=32, fmt=*) (olap%Eig(ib,it), ib=1,nb)
       read(unit=33, fmt='(*(f15.9))') &
+        ((olap%Dij(ib,jb,it), jb=1,nb), ib=1,nb)
+      read(unit=34, fmt='(*(f15.9))') &
         (( olap%EPcoup(ib,jb,1,1,it), jb=1,nb ), ib=1,nb)
     end do
 
+    close(unit=32)
     close(unit=33)
+    close(unit=34)
 
   end subroutine
 

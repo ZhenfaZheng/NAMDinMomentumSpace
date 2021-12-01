@@ -26,8 +26,13 @@ def read_couple(filcoup='NATXT', filcoup_i='', ctype=0):
 
     if ctype==0:
         coup = np.loadtxt(filcoup)
-        nb = int( np.sqrt(coup.shape[1]) )
-        nt = int(coup.shape[0])
+        try:
+            nt = int(coup.shape[0])
+            nb = int( np.sqrt(coup.shape[1]) )
+        except IndexError:
+            nt = 1
+            nb = int( np.sqrt(coup.shape[0]) )
+
         coup.resize(nt,nb,nb)
 
     elif ctype==1:
