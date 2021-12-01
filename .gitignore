@@ -15,3 +15,6 @@ src/namd-epc
 test
 perttest
 copy
+
+# others
+patch/calc_ephmat_ZJJ_modified.f90
