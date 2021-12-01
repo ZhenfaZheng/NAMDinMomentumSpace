@@ -90,6 +90,7 @@ module fileio
 
       logical :: lgamma
       logical :: lepc
+      logical :: largebs
       integer :: epctype
       logical :: lbassel
       logical :: lsort
@@ -106,7 +107,7 @@ module fileio
         bmin, bmax, nsw, nbands, potim, namdtime, &
         nsample, ntraj, nelm, temp, &
         rundir, lhole, lshp, lcpext, tbinit, lgamma, &
-        lepc, epctype, lbassel, lsort, &
+        lepc, largebs, epctype, lbassel, lsort, &
         Np, nkpoints, nmodes, kmin, kmax, emin, emax, &
         filepm, filmd
 
@@ -133,6 +134,7 @@ module fileio
       lgamma = .TRUE.
 
       lepc = .FALSE.
+      largebs = .FALSE.
       epctype = 1
       lbassel = .FALSE.
       lsort = .TRUE.
@@ -195,6 +197,7 @@ module fileio
                                inp%INIKPT_A(i)
           end do
         else
+          largebs = .FALSE. ! largebs only available for lepc=.TRUE.
           inp%INIKPT_A = 1
           do i=1, nsample
             read(unit=9,fmt=*) inp%NAMDTINI_A(i), inp%INIBAND_A(i)
@@ -246,8 +249,7 @@ module fileio
       inp%LGAMMA   = lgamma
 
       inp%LEPC     = lepc
-      inp%LARGEBS  = .FALSE.
-      inp%LARGEBS  = .TRUE.
+      inp%LARGEBS  = largebs
       inp%EPCTYPE  = epctype
       inp%LBASSEL  = lbassel
       inp%LSORT    = lsort

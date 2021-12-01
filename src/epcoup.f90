@@ -666,6 +666,12 @@ module epcoup
 
     if (inp%LCPTXT .and. inp%LBASSEL) then
 
+      if (inp%LARGEBS) then
+        write(*,*) "For large basis set, LCPEXT is not available!"
+        write(*,*)
+        stop
+      end if
+
       write(*,*) "Reading couplings from TXT files..."
 
       call readBasis(inp)
@@ -704,6 +710,7 @@ module epcoup
       call copyToSec(olap, olap_sec, inp)
       if (inp%LARGEBS) then
         call calcEPC_LBS(olap_sec, inp)
+        call writeTXT_LBS(olap_sec)
       else
         call calcEPC(olap_sec, inp)
         call writeNaEig(olap_sec, inp)
@@ -1072,11 +1079,56 @@ module epcoup
 
   end subroutine
 
+  subroutine writeTXT_LBS(olap)
+    implicit none
+
+    type(overlap), intent(inout) :: olap
+    integer :: im, nmodes, ib, jb, nb, iq, ierr, it, nsw
+    real(kind=q), allocatable :: natxt(:,:), eptxt(:,:)
+
+    nb = olap%NBANDS
+    nmodes = olap%NMODES
+    nsw = olap%TSTEPS
+
+    allocate(natxt(nb,nb), eptxt(nb,nb))
+    natxt = 0.0_q; eptxt = 0.0_q
+
+    do ib=1,nb
+      do jb=ib,nb
+        iq = olap%kkqmap(ib,jb)
+        do it=1,nsw-1
+          natxt(ib,jb) = natxt(ib,jb) + ABS( SUM(olap%gij(ib,jb,:) * &
+            SUM(olap%PhQ(iq,:,:,it), dim=2)) ) / SQRT(olap%Np)
+          eptxt(ib,jb) = eptxt(ib,jb) + &
+            ABS( SUM(olap%EPcoup(ib,jb,:,:,1) * olap%PhQ(iq,:,:,it)) )
+        end do
+        natxt(jb,ib) = natxt(ib,jb)
+        eptxt(jb,ib) = eptxt(ib,jb)
+      end do
+    end do
+    natxt = natxt / (nsw-1)
+    eptxt = eptxt / (nsw-1)
+
+    open(unit=34, file='EIGTXT', status='unknown', action='write')
+    open(unit=35, file='NATXT', status='unknown', action='write')
+    open(unit=36, file='EPTXT', status='unknown', action='write')
+
+
+    write(unit=34, fmt='(*(f12.6))') (olap%Eig(ib,1), ib=1,nb)
+    write(unit=35, fmt='(*(f15.9))') (( natxt(ib,jb), jb=1,nb ), ib=1,nb)
+    write(unit=36, fmt='(*(f15.9))') (( eptxt(ib,jb), jb=1,nb ), ib=1,nb)
+
+    close(unit=34)
+    close(unit=35)
+    close(unit=36)
+
+  end subroutine
+
 
   subroutine writeEP(olap)
     implicit none
 
-    type(overlap), intent(inout) :: olap
+    type(overlap), intent(in) :: olap
     integer :: im, nmodes, ib, jb, nb, it, nsw, ierr
 
     nb = olap%NBANDS
@@ -1085,14 +1137,9 @@ module epcoup
 
     open(unit=32, file='EPTXT', status='unknown', action='write')
 
-    write(unit=32, fmt='(I6)') nmodes
-
-    do im=1,nmodes
-      do it=1,nsw-1
-        write(unit=32, fmt='(*(f15.9))') &
-          (( SUM(olap%EPcoup(ib,jb,im,:,it)), jb=1,nb ), ib=1,nb)
-      end do
-      write(unit=32,fmt=*)
+    do it=1,nsw-1
+      write(unit=32, fmt='(*(f15.9))') &
+        (( SUM(olap%EPcoup(ib,jb,:,:,it)), jb=1,nb ), ib=1,nb)
     end do
 
     close(unit=32)
@@ -1115,14 +1162,9 @@ module epcoup
 
     nb = olap%NBANDS
     nsw = olap%TSTEPS
-    read(unit=33, fmt=*) nmodes
-
-    do im=1,nmodes
-      do it=1,nsw-1
-        read(unit=33, fmt='(*(f15.9))') &
-          (( olap%EPcoup(ib,jb,im,1,it), jb=1,nb ), ib=1,nb)
-      end do
-      read(unit=33,fmt=*)
+    do it=1,nsw-1
+      read(unit=33, fmt='(*(f15.9))') &
+        (( olap%EPcoup(ib,jb,1,1,it), jb=1,nb ), ib=1,nb)
     end do
 
     close(unit=33)

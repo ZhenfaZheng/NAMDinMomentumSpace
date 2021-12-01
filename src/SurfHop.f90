@@ -272,6 +272,7 @@ module shop
         write(io,'(A,A12,A3,I6)')     '#', 'NELM',     ' = ', inp%NELM
 
         write(io,'(A,A12,A3,L6)')     '#', 'LEPC',     ' = ', inp%LEPC
+        write(io,'(A,A12,A3,L6)')     '#', 'LARGEBS',  ' = ', inp%LARGEBS
         write(io,'(A,A12,A3,I6)')     '#', 'EPCTYPE',  ' = ', inp%EPCTYPE
         write(io,'(A,A12,A3,L6)')     '#', 'LBASSEL',  ' = ', inp%LBASSEL
         write(io,'(A,A12,A3,L6)')     '#', 'LSORT',    ' = ', inp%LSORT
