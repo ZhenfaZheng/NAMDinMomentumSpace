@@ -439,7 +439,7 @@ module epcoup
                    DOT_PRODUCT( CONJG(epc%phmodes(iq, im, ja, :)), &
                    epc%displ(it, ia, :) )
           end do
-          olap%PhQ(iq,im,:,it) = temp / lqv
+          olap%PhQ(iq,im,:,it) = temp / lqv / 2.0_q
         end do
       end do
     end do
@@ -563,6 +563,7 @@ module epcoup
 
      end do
     end do
+    olap%gij = olap%gij / SQRT(olap%Np)
     olap%EPcoup = olap%EPcoup / SQRT(olap%Np)
 
   end subroutine
@@ -634,12 +635,11 @@ module epcoup
      end do
     end do
 
+    olap%Dij = olap%Dij / SQRT(olap%Np)
     if (olap%COUPTYPE==1) then
-      olap%Dij = olap%Dij / SQRT(olap%Np)
       olap%EPcoup = olap%EPcoup / SQRT(olap%Np)
     else
-      olap%Dij = olap%Dij / SQRT(olap%Np) / 2.0
-      olap%EPcoup = olap%EPcoup / SQRT(olap%Np * 2.0)
+      olap%EPcoup = olap%EPcoup / SQRT(olap%Np * 0.5)
     end if
 
     call releaseOlap(olap)
@@ -1100,7 +1100,7 @@ module epcoup
         iq = olap%kkqmap(ib,jb)
         do it=1,nsw-1
           natxt(ib,jb) = natxt(ib,jb) + ABS( SUM(olap%gij(ib,jb,:) * &
-            SUM(olap%PhQ(iq,:,:,it), dim=2)) ) / SQRT(olap%Np)
+            SUM(olap%PhQ(iq,:,:,it), dim=2)) )
           eptxt(ib,jb) = eptxt(ib,jb) + &
             ABS( SUM(olap%EPcoup(ib,jb,:,:,1) * olap%PhQ(iq,:,:,it)) )
         end do

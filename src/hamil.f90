@@ -141,49 +141,6 @@ module hamil
   end subroutine
 
 
-  subroutine calc_hamil_ion(tion, ks, inp, olap)
-    implicit none
-
-    type(TDKS), intent(inout) :: ks
-    type(namdInfo), intent(in) :: inp
-    integer, intent(in) :: TION
-    type(overlap), intent(in) :: olap
-
-    integer :: ib, jb, iq
-
-    ks%ham_p = ks%ham_n
-    do ib=1,ks%ndim
-      do jb=ib,ks%ndim
-        iq = olap%kkqmap(ib,jb)
-        ks%ham_n(ib,jb) = SUM( olap%gij(ib,jb,:) * &
-            SUM(ks%PhQ(iq,:,:,tion), dim=2) ) / SQRT(olap%Np)
-        ks%ham_n(jb,ib) = CONJG(ks%ham_n(ib,jb))
-      end do
-      ks%ham_n(ib,ib) = ks%ham_n(ib,ib) + ks%eigKs(ib,1)
-    end do
-
-  end subroutine
-
-
-  subroutine make_hamil_LBS(tion, tele, ks, inp, olap)
-    implicit none
-
-    type(TDKS), intent(inout) :: ks
-    type(namdInfo), intent(in) :: inp
-    integer, intent(in) :: tion, tele
-    type(overlap), intent(in) :: olap
-
-    integer :: ib, jb, iq
-    complex(kind=q), allocatable :: tempQ(:,:,:)
-
-    if (tion==1 .AND. tele==1) call calc_hamil_ion(tion, ks, inp, olap)
-    if (tele==1) call calc_hamil_ion(tion+1, ks, inp, olap)
-
-    ks%ham_c = ks%ham_p + (ks%ham_n - ks%ham_p) * TELE / inp%NELM
-
-  end subroutine
-
-
   ! constructing the hamiltonian
   subroutine make_hamil(TION, TELE, ks, inp)
     implicit none
@@ -209,6 +166,49 @@ module hamil
       ks%ham_c(i,i) = ks%ham_c(i,i) + ks%eigKs(i,TION) + &
         (ks%eigKs(i,TION+1) - ks%eigKs(i,TION)) * TELE / inp%NELM
     end do
+  end subroutine
+
+
+  subroutine make_hamil_LBS(tion, tele, ks, inp, olap)
+    implicit none
+
+    type(TDKS), intent(inout) :: ks
+    type(namdInfo), intent(in) :: inp
+    integer, intent(in) :: tion, tele
+    type(overlap), intent(in) :: olap
+
+    integer :: ib, jb, iq
+    complex(kind=q), allocatable :: tempQ(:,:,:)
+
+    if (tion==1 .AND. tele==1) call calc_hamil_LBS(tion, ks, inp, olap)
+    if (tele==1) call calc_hamil_LBS(tion+1, ks, inp, olap)
+
+    ks%ham_c = ks%ham_p + (ks%ham_n - ks%ham_p) * TELE / inp%NELM
+
+  end subroutine
+
+
+  subroutine calc_hamil_LBS(tion, ks, inp, olap)
+    implicit none
+
+    type(TDKS), intent(inout) :: ks
+    type(namdInfo), intent(in) :: inp
+    integer, intent(in) :: TION
+    type(overlap), intent(in) :: olap
+
+    integer :: ib, jb, iq
+
+    ks%ham_p = ks%ham_n
+    do ib=1,ks%ndim
+      do jb=ib,ks%ndim
+        iq = olap%kkqmap(ib,jb)
+        ks%ham_n(ib,jb) = SUM( olap%gij(ib,jb,:) * &
+            SUM(ks%PhQ(iq,:,:,tion), dim=2) )
+        ks%ham_n(jb,ib) = CONJG(ks%ham_n(ib,jb))
+      end do
+      ks%ham_n(ib,ib) = ks%ham_n(ib,ib) + ks%eigKs(ib,1)
+    end do
+
   end subroutine
 
   ! Acting the hamiltonian on the state vector
