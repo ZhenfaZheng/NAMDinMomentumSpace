@@ -22,6 +22,7 @@
 
   LEPC       = .T.
   LBASSEL    = .F.
+  LARGEBS    = .F.
   LSORT      = .F.
   EPCTYPE    = 1
   FILEPM     = 'graphene_ephmat_p1.h5'

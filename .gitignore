@@ -6,6 +6,7 @@ src/*.mod
 
 # ignore .pyc files
 scripts/*.pyc
+scripts/__pycache__
 
 # ignore compiled file namd.
 src/namd
