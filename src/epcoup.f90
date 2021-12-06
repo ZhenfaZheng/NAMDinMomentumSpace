@@ -745,9 +745,12 @@ module epcoup
 
     inp%BASSEL = -1
     read(unit=38, fmt=*) inp%NBASIS
+    allocate(inp%BASLIST(inp%NBASIS, 3))
     do ibas=1,inp%NBASIS
       read(unit=38, fmt=*) ik, ib
       inp%BASSEL(ik, ib) = ibas
+      inp%BASLIST(ibas, 1) = ik
+      inp%BASLIST(ibas, 2) = ib
     end do
 
     close(unit=38)
@@ -761,7 +764,7 @@ module epcoup
     type(overlap), intent(in) :: olap
     type(namdInfo), intent(inout) :: inp
 
-    integer :: ik, ib, nb
+    integer :: ik, ib, nb, ibas
     real :: emin, emax
 
     nb = inp%NBANDS
@@ -781,14 +784,21 @@ module epcoup
       end do
     end do
 
+    allocate(inp%BASLIST(inp%NBASIS, 3))
+
     open(unit=39, file='BASSEL', status='unknown', action='write')
 
     write(unit=39, fmt='(I18)') inp%NBASIS
 
+    ibas = 0
     do ik=inp%KMIN, inp%KMAX
       do ib=inp%BMIN, inp%BMAX
-        if (inp%BASSEL(ik,ib)>0) &
+        if (inp%BASSEL(ik,ib)>0) then
+          ibas = ibas + 1
+          inp%BASLIST(ibas, 1) = ik
+          inp%BASLIST(ibas, 2) = ib
           write(unit=39, fmt='(2I12)') ik, ib
+        end if
       end do
     end do
 
@@ -808,33 +818,23 @@ module epcoup
     type(overlap), intent(in) :: olap
     type(namdInfo), intent(inout) :: inp
 
-    integer :: ibas, i, j, ik, nk, ib, nb, nbas
-    real(kind=q), dimension(:,:), allocatable :: basis
-    real(kind=q) :: temp(3)
+    integer :: ibas, i, j, ik, ib, nb, nbas
+    integer :: temp(3)
 
     nb = inp%NBANDS
-    nk = inp%NKPOINTS
     nbas = inp%NBASIS
-    allocate(basis(nbas, 3))
-
-    ibas = 0
-    do ik=1,nk
-      do ib=1,nb
-        if (inp%BASSEL(ik,ib)>0) then
-          ibas = ibas + 1
-          basis(ibas,1) = ik
-          basis(ibas,2) = ib
-          basis(ibas,3) = olap%Eig((ik-1)*nb+ib, 1)
-        end if
-      end do
+    do ibas=1,nbas
+      ik = inp%BASLIST(ibas,1)
+      ib = inp%BASLIST(ibas,2)
+      inp%BASLIST(ibas,3) = olap%Eig((ik-1)*nb+ib, 1) * 1000
     end do
 
     do i=1,nbas-1
       do j=1,nbas-i
-        if ( basis(j+1,3) < basis(j,3) ) then
-          temp = basis(j,:)
-          basis(j,:) = basis(j+1,:)
-          basis(j+1,:) = temp
+        if ( inp%BASLIST(j+1,3) < inp%BASLIST(j,3) ) then
+          temp = inp%BASLIST(j,:)
+          inp%BASLIST(j,:) = inp%BASLIST(j+1,:)
+          inp%BASLIST(j+1,:) = temp
         end if
       end do
     end do
@@ -843,8 +843,8 @@ module epcoup
     write(unit=39, fmt='(I18)') inp%NBASIS
 
     do ibas=1,nbas
-      ik = NINT(basis(ibas,1))
-      ib = NINT(basis(ibas,2))
+      ik = inp%BASLIST(ibas,1)
+      ib = inp%BASLIST(ibas,2)
       inp%BASSEL(ik, ib) = ibas
       write(unit=39, fmt='(2I12)') ik, ib
     end do
@@ -903,8 +903,9 @@ module epcoup
     type(overlap), intent(inout) :: olap_sec
     type(overlap), intent(in) :: olap
 
-    integer :: ik, jk, ib, jb, nb, iBas, jBas
+    integer :: ik, jk, ib, jb, nb, ibas, jbas, nbas
     integer :: kmin, kmax, bmin, bmax
+    real :: t
 
     if (inp%LBASSEL) then
     ! If .TRUE., BMIN, BMAX, KMIN, KMAX, EMIN, EMAX are ignored!!!
@@ -919,39 +920,27 @@ module epcoup
     call initOlap(olap_sec, inp, olap%NQ, inp%NBASIS)
 
     nb = inp%NBANDS
-    kmin = inp%KMIN; kmax = inp%KMAX
-    bmin = inp%BMIN; bmax = inp%BMAX
+    nbas = inp%NBASIS
 
-    do ik=kmin, kmax
-      do ib=bmin, bmax
+    do ibas=1,nbas
+      ik = inp%BASLIST(ibas,1)
+      ib = inp%BASLIST(ibas,2)
+      olap_sec%Eig(ibas, :) = olap%Eig((ik-1)*nb+ib, :)
+      do jbas=1,nbas
+        jk = inp%BASLIST(jbas,1)
+        jb = inp%BASLIST(jbas,2)
 
-        if (inp%BASSEL(ik,ib)<0) cycle
-        iBas = inp%BASSEL(ik,ib)
-        olap_sec%Eig(iBas, :) = olap%Eig((ik-1)*nb+ib, :)
+        olap_sec%kkqmap(ibas, jbas) = &
+        olap%kkqmap( (ik-1)*nb+ib, (jk-1)*nb+jb )
 
-        do jk=kmin, kmax
-          do jb=bmin, bmax
-
-            if (inp%BASSEL(jk,jb)<0) cycle
-            jBas = inp%BASSEL(jk,jb)
-
-            ! olap_sec%Dij(iBas, jBas, :) = &
-            ! olap%Dij( (ik-1)*nb+ib, (jk-1)*nb+jb, : )
-
-            olap_sec%kkqmap(iBas, jBas) = &
-            olap%kkqmap( (ik-1)*nb+ib, (jk-1)*nb+jb )
-
-            olap_sec%gij(iBas, jBas, :) = &
-            olap%gij( (ik-1)*nb+ib, (jk-1)*nb+jb, : )
-
-            olap_sec%Phfreq = olap%Phfreq
-            olap_sec%PhQ = olap%PhQ
-
-          end do
-        end do
+        olap_sec%gij(ibas, jbas, :) = &
+        olap%gij( (ik-1)*nb+ib, (jk-1)*nb+jb, : )
 
       end do
     end do
+
+    olap_sec%Phfreq = olap%Phfreq
+    olap_sec%PhQ = olap%PhQ
 
   end subroutine
 

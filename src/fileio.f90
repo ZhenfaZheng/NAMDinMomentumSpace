@@ -50,7 +50,10 @@ module fileio
     integer :: Np    ! No. of unit cells in Born-von Kamann boundary conditions
     integer, allocatable, dimension(:) :: INIKPT_A   ! all initial k-points
     ! selected basises among the nk*nb eigen states
-    integer, allocatable, dimension(:,:) :: BASSEL
+    ! BASLIST(ibas, 1) = ik
+    ! BASLIST(ibas, 2) = ib
+    ! BASLIST(ibas, 3) = int( en(ibas) * 1000 )
+    integer, allocatable, dimension(:,:) :: BASSEL, BASLIST
     ! selected basises whose energies are between EMIN ~ EMAX, in the range
     ! BMIN ~ BMAX and KMIN ~ KMAX.
     real(kind=q) :: EMIN, EMAX
