@@ -41,7 +41,8 @@ module TimeProp
           call make_hamil(tion, tele, ks, inp)
         end if
         ! apply hamiltonian to state vector
-        call hamil_act(ks)
+        ! call hamil_act(ks)
+        ks%hpsi = matmul(ks%ham_c, ks%psi_c)
         if (tion == 1 .AND. tele == 1) then
           ! write(*,*) ((ks%ham_c(i,j), j=1, ks%ndim), i=1, ks%ndim)
           ! This is the very first step of the time propagation

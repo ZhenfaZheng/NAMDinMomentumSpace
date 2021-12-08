@@ -17,15 +17,17 @@ Program main
   type(epCoupling) :: epc
 
   real(kind=q) :: start, fin
+  integer :: t1, t2, rate
   integer :: ns
 
   write(*,*)
-  write(*,*) "Hefei-NAMD (epc version 1.6.3, Dec 08, 2021)"
+  write(*,*) "Hefei-NAMD (epc version 1.6.4, Dec 08, 2021)"
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   ! First, get user inputs
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   call getUserInp(inp)
   ! call printUserInp(inp)
+  call system_clock(count_rate=rate)
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   ! Secondly, get couplings
   ! In the very first run, the following subroutine will calculate the
@@ -50,7 +52,7 @@ Program main
     inp%INIKPT  = inp%INIKPT_A(ns)
     call printUserInp(inp)
     ! initiate KS matrix
-    call cpu_time(start)
+    call system_clock(t1)
     call initTDKS(ks, inp, olap_sec)
     ! Time propagation
     call Propagation(ks, inp, olap_sec)
@@ -59,8 +61,8 @@ Program main
       call runSH(ks, inp, olap_sec)
       call printSH(ks, inp)
     end if
-    call cpu_time(fin)
-    write(*,'(A, F8.2)') "CPU Time [s]:", fin - start
+    call system_clock(t2)
+    write(*,'(A, F10.2)') "CPU Time [s]:", (t2-t1)/real(rate)
   end do
 
 end Program
