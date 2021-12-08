@@ -42,6 +42,6 @@ clean:
 	rm -f *.mod *.a namd
 	rm -f $(OBJ) $(EXE)
 tar:
-	tar -czvf namdepc.tgz *.f90 Makefile
+	tar -czvf namd-epc.tgz *.f90 Makefile
 tag:
 	ctags *.f90
