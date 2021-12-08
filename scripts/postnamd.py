@@ -5,6 +5,7 @@ import math
 import numpy as np
 import matplotlib as mpl; mpl.use('agg')
 import matplotlib.pyplot as plt
+from scipy.optimize import curve_fit
 
 
 def read_couple(filcoup='NATXT', filcoup_i='', ctype=0):
@@ -322,6 +323,53 @@ def plot_namd_3D(shp, kpts, en, kpts_tot=None, en_tot=None, Eref=0.0,
 
     plt.tight_layout()
     plt.savefig(figname, dpi=400)
+
+
+def fit_decaytime(ft, time, ftype=1):
+    '''
+    Fit decay time.
+
+    Parameters:
+    ft   : ndarray, time evolution of a specified quantity, in forms of
+           ft[nt].
+    time : ndarray, evolution time, in forms of time[nt].
+    ftype: integer, fitting type. 1: exponential; 2: gaussian.
+
+    Returns:
+    ffit: ndarray, fitting function, in forms of ffit[nt].
+    dct : float, decay time.
+    '''
+
+    if ftype==1:
+        popt, pcov = curve_fit(func_exp, time, ft)
+        ffit = func_exp(time, *popt)
+    elif ftype==2:
+        popt, pcov = curve_fit(func_gauss, time, ft)
+        ffit = func_gauss(time, *popt)
+
+    return ffit, popt[1]
+
+
+def func_exp(x, a, b, c):
+    '''
+    Exponential function.
+
+    Parameters:
+    x : ndarray, function variable.
+    a, b, c : float, function patameters.
+    '''
+    return a * np.exp(-x/b) + c
+
+
+def func_gauss(x, a, b, c):
+    '''
+    Gaussian function.
+
+    Parameters:
+    x : ndarray, function variable.
+    a, b, c : float, function patameters.
+    '''
+    return a * np.exp( -0.5 * ((x-b)/c)**2 )
 
 
 if __name__=='__main__':
