@@ -86,11 +86,10 @@ module hamil
       end if
 
       allocate(ks%sh_pops(N, Nt))
-      allocate(ks%sh_prop(N, Nt))
+      allocate(ks%sh_prop(N,N))
       allocate(ks%sh_Bfactor(N,N))
       allocate(ks%Bkm(N))
-      ! allocate(ks%ham_p(N,N))
-      ! allocate(ks%ham_n(N,N))
+
       ks%LALLO = .TRUE.
     end if
 
