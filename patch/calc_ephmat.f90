@@ -176,13 +176,13 @@ subroutine calc_ephmat()
    !
    call hdf_create_group(file_id, 'el_ph_band_info')
    call hdf_open_group(file_id, 'el_ph_band_info', group_id)
-   call mp_sum(enk_tot, inter_pool_comm)
+   ! call mp_sum(enk_tot, inter_pool_comm)
    dset_name = 'k_list'
-   call hdf_write_dataset(group_id, trim(dset_name), kl%vec)
+   call hdf_write_dataset(group_id, trim(dset_name), kl%vec(:,kst:kend))
    dset_name = 'q_list'
    call hdf_write_dataset(group_id, trim(dset_name), ql%vec)
    dset_name = 'el_band_eV'
-   call hdf_write_dataset(group_id, trim(dset_name), enk_tot(band_min:band_max,:)*ryd2ev)
+   call hdf_write_dataset(group_id, trim(dset_name), enk_tot(band_min:band_max,kst:kend)*ryd2ev)
    dset_name = 'ph_disp_meV'
    call hdf_write_dataset(group_id, trim(dset_name), wq*ryd2mev)
    dset_name = 'phmod_ev_r'
@@ -196,7 +196,7 @@ subroutine calc_ephmat()
    dset_name = 'mass_a.u.'
    call hdf_write_dataset(group_id, trim(dset_name), mass/amu_ry)
    dset_name = 'information'
-   call hdf_write_dataset(group_id, trim(dset_name), (/kl%nvec, ql%nvec, numb, nmod/))
+   call hdf_write_dataset(group_id, trim(dset_name), (/kend-kst+1, ql%nvec, numb, nmod/))
    call hdf_close_group(group_id)
    !
    call hdf_close_file(file_id)
