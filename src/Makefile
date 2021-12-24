@@ -10,8 +10,8 @@ MAKE = make
 #path to HDF5 library
 IFLAGS = -I/cluster/apps/hdf5/hdf5-1.12.0/build64/include
 LFLAGS = -L/cluster/apps/hdf5/hdf5-1.12.0/build64/lib -lhdf5 -lhdf5_fortran
-IFLAGS = -I/public/apps/qe/q-e-qe-6.5_epc/perturbo/h5lib/include
-LFLAGS = -L/public/apps/qe/q-e-qe-6.5_epc/perturbo/h5lib/lib -lhdf5 -lhdf5_fortran
+#IFLAGS = -I/public/apps/qe/q-e-qe-6.5_epc/perturbo/h5lib/include
+#LFLAGS = -L/public/apps/qe/q-e-qe-6.5_epc/perturbo/h5lib/lib -lhdf5 -lhdf5_fortran
 FFLAGS += $(IFLAGS)
 SPGLIB += $(LFLAGS)
 #-------------------------------------------------------------------------------

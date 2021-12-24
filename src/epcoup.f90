@@ -17,7 +17,7 @@ module epcoup
     !! map ik & jk of electronic states to q of phonon modes.
     real(kind=q), allocatable, dimension(:) :: mass
     real(kind=q), allocatable, dimension(:,:,:) :: displ
-    real(kind=q), allocatable, dimension(:,:) :: kpts, qpts
+    real(kind=q), allocatable, dimension(:,:) :: kpts, qpts, phfreq
     real(kind=q), allocatable, dimension(:,:) :: cellep, cellmd
     complex(kind=q), allocatable, dimension(:,:,:,:) :: phmodes
   end type
@@ -42,7 +42,22 @@ module epcoup
   end subroutine
 
 
-  subroutine readEPCinfo(inp, epc)
+  subroutine readEPC(inp, epc, olap)
+    implicit none
+
+    type(namdInfo), intent(inout) :: inp
+    type(epCoupling), intent(inout) :: epc
+    type(overlap), intent(inout) :: olap
+
+    write(*,*) "Reading ephmat.h5 file."
+
+    call readEPHinfo(inp, epc, olap)
+    call readEPHmat(inp, epc, olap)
+
+  end subroutine
+
+
+  subroutine readBasicInfo(inp, epc)
     implicit none
 
     type(namdInfo), intent(inout) :: inp
@@ -93,7 +108,7 @@ module epcoup
   end subroutine
 
 
-  subroutine readEPCpert(inp, epc, olap)
+  subroutine readEPHinfo(inp, epc, olap)
     ! Read information of e-ph coupling from perturbo.x output file
     ! (prefix_ephmat_p1.h5), which is in form of hdf5.
     ! Extract informations include: el bands, ph dispersion, k & q lists, ephmat
@@ -110,7 +125,7 @@ module epcoup
     integer(hid_t) :: file_id, gr_id, dset_id
     integer(hsize_t) :: dim1(1), dim2(2), dim4(4)
     character(len=72) :: tagk, fname, grname, dsetname
-    real(kind=q), allocatable, dimension(:,:) :: entemp, freqtemp
+    real(kind=q), allocatable, dimension(:,:) :: entemp
     real(kind=q), allocatable, dimension(:,:) :: kqltemp, pos, lattvec
     real(kind=q), allocatable, dimension(:,:,:,:) :: eptemp_r, eptemp_i, phmtemp
     complex(kind=q), allocatable, dimension(:,:,:,:) :: eptemp
@@ -120,8 +135,6 @@ module epcoup
     nb  = epc%nbands
     nm  = epc%nmodes
     nat = epc%natepc
-
-    write(*,*) "Reading ephmat.h5 file."
 
     fname = inp%FILEPM
 
@@ -164,12 +177,12 @@ module epcoup
     end do
 
     dsetname = 'ph_disp_meV'
-    allocate(freqtemp(nm,nq))
-    dim2 = shape(freqtemp, kind=hsize_t)
+    allocate(epc%phfreq(nm,nq))
+    dim2 = shape(epc%phfreq, kind=hsize_t)
     call h5dopen_f(gr_id, dsetname, dset_id, hdferror)
-    call h5dread_f(dset_id, H5T_NATIVE_DOUBLE, freqtemp, dim2, hdferror)
+    call h5dread_f(dset_id, H5T_NATIVE_DOUBLE, epc%phfreq, dim2, hdferror)
     call h5dclose_f(dset_id, hdferror)
-    freqtemp = freqtemp / 1000.0_q ! transform unit to eV
+    epc%phfreq = epc%phfreq / 1000.0_q ! transform unit to eV
 
 
     if (inp%EPCTYPE==2) then
@@ -214,6 +227,38 @@ module epcoup
 
     call h5gclose_f(gr_id, hdferror)
 
+    call h5fclose_f(file_id, hdferror)
+
+  end subroutine
+
+
+  subroutine readEPHmat(inp, epc, olap)
+    implicit none
+
+    type(namdInfo), intent(in) :: inp
+    type(epCoupling), intent(inout) :: epc
+    type(overlap), intent(inout) :: olap
+
+    integer :: hdferror
+    integer :: nk, nq, nb, nm
+    integer :: ib, jb, ik, jk, im, iq, it, ibas, jbas
+    integer(hid_t) :: file_id, gr_id, dset_id
+    integer(hsize_t) :: dim1(1), dim2(2), dim4(4)
+    character(len=72) :: tagk, fname, grname, dsetname
+    real(kind=q), allocatable, dimension(:,:) :: entemp
+    real(kind=q), allocatable, dimension(:,:) :: kqltemp, pos, lattvec
+    real(kind=q), allocatable, dimension(:,:,:,:) :: eptemp_r, eptemp_i, phmtemp
+    complex(kind=q), allocatable, dimension(:,:,:,:) :: eptemp
+
+    nk  = epc%nkpts
+    nq  = epc%nqpts
+    nb  = epc%nbands
+    nm  = epc%nmodes
+
+    fname = inp%FILEPM
+
+    call h5open_f(hdferror)
+    call h5fopen_f(fname, H5F_ACC_RDONLY_F, file_id, hdferror)
 
     ! Read e-ph matrix for every k.
     grname = 'g_ephmat_total_meV'
@@ -250,7 +295,7 @@ module epcoup
 
         do im=1,nm
 
-          if (freqtemp(im,iq)<5.0E-3_q) cycle
+          if (epc%phfreq(im,iq)<5.0E-3_q) cycle
 
           do jb=1,nb
             do ib=1,nb
@@ -258,7 +303,7 @@ module epcoup
               ibas = nb*(ik-1)+ib
               jbas = nb*(jk-1)+jb
               olap%kkqmap(ibas, jbas) = iq
-              olap%Phfreq(iq,im) = freqtemp(im,iq)
+              olap%Phfreq(iq,im) = epc%phfreq(im,iq)
               olap%gij(ibas, jbas, im) = eptemp(ib, jb, im, iq)
 
             end do ! ib loop
@@ -275,6 +320,7 @@ module epcoup
     call h5fclose_f(file_id, hdferror)
 
   end subroutine
+
 
 
   subroutine readDISPL(inp, epc)
@@ -662,7 +708,7 @@ module epcoup
     write(*,'(A)') &
       "------------------------------------------------------------"
 
-    call readEPCinfo(inp, epc)
+    call readBasicInfo(inp, epc)
 
     if (inp%LCPTXT .and. inp%LBASSEL) then
 
@@ -697,11 +743,11 @@ module epcoup
       else
         if (inp%EPCTYPE==1) then
           write(*,*) "TypeI e-ph coupling calculation."
-          call readEPCpert(inp, epc, olap)
+          call readEPC(inp, epc, olap)
           call calcPhQ(olap, inp)
         else
           write(*,*) "TypeII e-ph coupling calculation."
-          call readEPCpert(inp, epc, olap)
+          call readEPC(inp, epc, olap)
           call phDecomp(inp, olap, epc)
         end if
         ! call CoupToFileEP(olap)
