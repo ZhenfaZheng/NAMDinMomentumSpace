@@ -47,6 +47,7 @@ module fileio
     integer :: INIKPT      ! inititial k-point of excited state
     integer :: NKPOINTS    ! No. of k-points of the system
     integer :: NMODES      ! No. of phonon modes for each q
+    integer :: NPARTS      ! No. of parts of ephmat information.
     integer :: Np    ! No. of unit cells in Born-von Kamann boundary conditions
     integer, allocatable, dimension(:) :: INIKPT_A   ! all initial k-points
     ! selected basises among the nk*nb eigen states
@@ -100,6 +101,7 @@ module fileio
       integer :: Np
       integer :: nkpoints
       integer :: nmodes
+      integer :: nparts
       integer :: kmin
       integer :: kmax
       real(kind=q) :: emin
@@ -111,7 +113,7 @@ module fileio
         nsample, ntraj, nelm, temp, &
         rundir, lhole, lshp, lcpext, tbinit, lgamma, &
         lepc, largebs, epctype, lbassel, lsort, &
-        Np, nkpoints, nmodes, kmin, kmax, emin, emax, &
+        Np, nkpoints, nmodes, nparts, kmin, kmax, emin, emax, &
         filepm, filmd
 
       integer :: ik, ib, num
@@ -144,6 +146,7 @@ module fileio
       Np = 1
       nkpoints = 1
       nmodes = 1
+      nparts = 1
       kmin = 1
       kmax = 0
       emin = -1.0E5_q
@@ -259,6 +262,7 @@ module fileio
       inp%Np       = Np
       inp%NKPOINTS = nkpoints
       inp%NMODES   = nmodes
+      inp%NPARTS   = nparts
       inp%KMIN     = kmin
       inp%KMAX     = kmax
       inp%NBASIS   = inp%NBASIS * ( kmax - kmin + 1 )
