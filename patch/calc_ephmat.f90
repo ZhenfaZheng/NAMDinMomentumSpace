@@ -166,9 +166,9 @@ subroutine calc_ephmat()
       !
       !outout g
       ! output to hdf5 files
-      dset_name = "g_ik_r_" // trim( int_to_char(ik) )
+      dset_name = "g_ik_r_" // trim( int_to_char(ik-kst+1) )
       call hdf_write_dataset(group_id, trim(dset_name), real(g_ephmat))
-      dset_name = "g_ik_i_" // trim( int_to_char(ik) )
+      dset_name = "g_ik_i_" // trim( int_to_char(ik-kst+1) )
       call hdf_write_dataset(group_id, trim(dset_name), aimag(g_ephmat))
    enddo
    !
