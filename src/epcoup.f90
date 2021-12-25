@@ -8,7 +8,8 @@ module epcoup
   implicit none
 
   type epCoupling
-    integer :: nbands, nkpts, nmodes, nqpts, natepc, natmd
+    integer :: nbands, nkpts, nmodes, nqpts, natepc, natmd, ipart
+    integer, allocatable, dimension(:) :: nkpts_ps
     integer, allocatable, dimension(:) :: atmap
     !! mapping of each atom in MD cell to atom in unit cell for epc calculation.
     integer, allocatable, dimension(:,:) :: Rp
@@ -17,12 +18,42 @@ module epcoup
     !! map ik & jk of electronic states to q of phonon modes.
     real(kind=q), allocatable, dimension(:) :: mass
     real(kind=q), allocatable, dimension(:,:,:) :: displ
-    real(kind=q), allocatable, dimension(:,:) :: kpts, qpts, phfreq
+    real(kind=q), allocatable, dimension(:,:) :: kpts, qpts
     real(kind=q), allocatable, dimension(:,:) :: cellep, cellmd
     complex(kind=q), allocatable, dimension(:,:,:,:) :: phmodes
   end type
 
   contains
+
+
+  subroutine initEPC(inp, epc)
+    implicit none
+
+    type(namdInfo), intent(inout) :: inp
+    type(epCoupling), intent(inout) :: epc
+
+    integer :: nk, nq, nb, nm, nat
+
+    nk  = SUM(epc%nkpts_ps) ; epc%nkpts = nk
+    if (inp%NKPOINTS .NE. epc%nkpts) then
+      write(*,*) 'NKPOINTS seems to be wrong!'
+      stop
+    end if
+
+    nq  = epc%nqpts
+    nb  = epc%nbands
+    nm  = epc%nmodes
+    nat = epc%natepc
+
+    allocate(epc%mass(nat))
+    allocate(epc%cellep(nat+3,3))
+    allocate(epc%kpts(nk, 3))
+    allocate(epc%kkqmap(nk, nk))
+    allocate(epc%qpts(nq, 3))
+    allocate(epc%phmodes(nq, nm, nat, 3))
+
+  end subroutine
+
 
   subroutine releaseEPC(epc)
     implicit none
@@ -49,10 +80,32 @@ module epcoup
     type(epCoupling), intent(inout) :: epc
     type(overlap), intent(inout) :: olap
 
+    integer :: ip, nparts, nk
+
     write(*,*) "Reading ephmat.h5 file."
 
-    call readEPHinfo(inp, epc, olap)
-    call readEPHmat(inp, epc, olap)
+    nk = inp%NKPOINTS
+    nparts = inp%NPARTS
+    allocate(epc%nkpts_ps(nparts))
+
+    do ip=1, nparts
+      epc%ipart = ip
+      call readBasicInfo(inp, epc)
+    end do
+
+    call initEPC(inp, epc)
+
+    do ip=1, nparts
+      epc%ipart = ip
+      call readEPHinfo(inp, epc, olap)
+    end do
+
+    call kqMatch(epc)
+
+    do ip=1, nparts
+      epc%ipart = ip
+      call readEPHmat(inp, epc, olap)
+    end do
 
   end subroutine
 
@@ -65,11 +118,17 @@ module epcoup
 
     integer :: hdferror, info(4)
     integer(hsize_t) :: dim1(1)
-    integer :: nk, nq, nb, nm, nat
+    integer :: nq, nb, nm, nat
     integer(hid_t) :: file_id, gr_id, dset_id
     character(len=256) :: fname, grname, dsetname
+    character(len=256) :: epmdir, prefix, iptag
 
-    fname = inp%FILEPM
+    epmdir = './'
+    prefix = 'graphene'
+    write(iptag, '(I8)') epc%ipart
+    fname = trim(epmdir) // trim(prefix) // '_ephmat_p' &
+         // trim( adjustl(iptag) ) // '.h5'
+
     call h5open_f(hdferror)
     call h5fopen_f(fname, H5F_ACC_RDONLY_F, file_id, hdferror)
     grname = 'el_ph_band_info'
@@ -84,7 +143,8 @@ module epcoup
     call h5gclose_f(gr_id, hdferror)
     call h5fclose_f(file_id, hdferror)
 
-    nk = info(1); epc%nkpts  = nk
+    if(allocated(epc%nkpts_ps)) epc%nkpts_ps(epc%ipart) = info(1)
+
     nq = info(2); epc%nqpts  = nq
     nb = info(3); epc%nbands = nb
     nm = info(4); epc%nmodes = nm
@@ -92,10 +152,6 @@ module epcoup
 
     if (inp%NBANDS .NE. nb) then
       write(*,*) 'NBANDS seems to be wrong!'
-      stop
-    end if
-    if (inp%NKPOINTS .NE. nk) then
-      write(*,*) 'NKPOINTS seems to be wrong!'
       stop
     end if
     if ( (inp%NMODES .NE. 1) .AND. (inp%NMODES .NE. nm) ) then
@@ -120,23 +176,37 @@ module epcoup
     type(overlap), intent(inout) :: olap
 
     integer :: hdferror
-    integer :: nk, nq, nb, nm, nat
+    integer :: nq, nb, nm, nat
+    integer :: ipart, kst, kend, nk
     integer :: ib, jb, ik, jk, im, iq, it, ibas, jbas
     integer(hid_t) :: file_id, gr_id, dset_id
     integer(hsize_t) :: dim1(1), dim2(2), dim4(4)
-    character(len=72) :: tagk, fname, grname, dsetname
-    real(kind=q), allocatable, dimension(:,:) :: entemp
+    character(len=72) :: fname, grname, dsetname
+    character(len=256) :: epmdir, prefix, iptag
+    real(kind=q), allocatable, dimension(:,:) :: entemp, freqtemp
     real(kind=q), allocatable, dimension(:,:) :: kqltemp, pos, lattvec
     real(kind=q), allocatable, dimension(:,:,:,:) :: eptemp_r, eptemp_i, phmtemp
     complex(kind=q), allocatable, dimension(:,:,:,:) :: eptemp
 
-    nk  = epc%nkpts
     nq  = epc%nqpts
     nb  = epc%nbands
     nm  = epc%nmodes
     nat = epc%natepc
 
-    fname = inp%FILEPM
+    ipart = epc%ipart
+    if (ipart==1) then
+      kst = 1
+    else
+      kst = SUM(epc%nkpts_ps(1:ipart-1)) + 1
+    end if
+    nk  = epc%nkpts_ps(ipart)
+    kend = kst + nk - 1
+
+    epmdir = './'
+    prefix = 'graphene'
+    write(iptag, '(I8)') ipart
+    fname = trim(epmdir) // trim(prefix) // '_ephmat_p' &
+         // trim( adjustl(iptag) ) // '.h5'
 
     call h5open_f(hdferror)
     call h5fopen_f(fname, H5F_ACC_RDONLY_F, file_id, hdferror)
@@ -146,16 +216,16 @@ module epcoup
     call h5gopen_f(file_id, grname, gr_id, hdferror)
 
     dsetname = 'k_list'
-    allocate(kqltemp(3,nk), epc%kpts(nk,3))
+    allocate(kqltemp(3,nk))
     dim2 = shape(kqltemp, kind=hsize_t)
     call h5dopen_f(gr_id, dsetname, dset_id, hdferror)
     call h5dread_f(dset_id, H5T_NATIVE_DOUBLE, kqltemp, dim2, hdferror)
     call h5dclose_f(dset_id, hdferror)
-    epc%kpts = transpose(kqltemp)
+    epc%kpts(kst:kend, :) = transpose(kqltemp)
     deallocate(kqltemp)
 
     dsetname = 'q_list'
-    allocate(kqltemp(3,nq), epc%qpts(nq,3))
+    allocate(kqltemp(3,nq))
     dim2 = shape(kqltemp, kind=hsize_t)
     call h5dopen_f(gr_id, dsetname, dset_id, hdferror)
     call h5dread_f(dset_id, H5T_NATIVE_DOUBLE, kqltemp, dim2, hdferror)
@@ -170,31 +240,32 @@ module epcoup
     call h5dread_f(dset_id, H5T_NATIVE_DOUBLE, entemp, dim2, hdferror)
     call h5dclose_f(dset_id, hdferror)
 
-    do ik=1,nk
+    do ik=1, nk
+      jk = ik + kst - 1
       do ib=1,nb
-        olap%Eig(ib+nb*(ik-1),:) = entemp(ib,ik)
+        olap%Eig(ib+nb*(jk-1),:) = entemp(ib,ik)
       end do
     end do
 
     dsetname = 'ph_disp_meV'
-    allocate(epc%phfreq(nm,nq))
-    dim2 = shape(epc%phfreq, kind=hsize_t)
+    allocate(freqtemp(nm, nq))
+    dim2 = shape(freqtemp, kind=hsize_t)
     call h5dopen_f(gr_id, dsetname, dset_id, hdferror)
-    call h5dread_f(dset_id, H5T_NATIVE_DOUBLE, epc%phfreq, dim2, hdferror)
+    call h5dread_f(dset_id, H5T_NATIVE_DOUBLE, freqtemp, dim2, hdferror)
     call h5dclose_f(dset_id, hdferror)
-    epc%phfreq = epc%phfreq / 1000.0_q ! transform unit to eV
+    freqtemp = freqtemp / 1000.0_q ! transform unit to eV
+    olap%Phfreq = transpose(freqtemp)
 
 
     if (inp%EPCTYPE==2) then
       dsetname = 'mass_a.u.'
-      allocate(epc%mass(nat))
       dim1 = shape(epc%mass, kind=hsize_t)
       call h5dopen_f(gr_id, dsetname, dset_id, hdferror)
       call h5dread_f(dset_id, H5T_NATIVE_DOUBLE, epc%mass, dim1, hdferror)
       call h5dclose_f(dset_id, hdferror)
 
       dsetname = 'lattice_vec_angstrom'
-      allocate(epc%cellep(nat+3,3), lattvec(3,3))
+      allocate(lattvec(3,3))
       dim2 = shape(lattvec, kind=hsize_t)
       call h5dopen_f(gr_id, dsetname, dset_id, hdferror)
       call h5dread_f(dset_id, H5T_NATIVE_DOUBLE, lattvec, dim2, hdferror)
@@ -210,7 +281,6 @@ module epcoup
       epc%cellep(4:,:) = transpose(pos)
 
       dsetname = 'phmod_ev_r'
-      allocate(epc%phmodes(nq, nm, nat, 3))
       allocate(phmtemp(nq, nm, nat, 3))
       dim4 = shape(phmtemp, kind=hsize_t)
       call h5dopen_f(gr_id, dsetname, dset_id, hdferror)
@@ -240,22 +310,36 @@ module epcoup
     type(overlap), intent(inout) :: olap
 
     integer :: hdferror
-    integer :: nk, nq, nb, nm
+    integer :: nq, nb, nm
+    integer :: ipart, kst, nk, nk_tot
     integer :: ib, jb, ik, jk, im, iq, it, ibas, jbas
     integer(hid_t) :: file_id, gr_id, dset_id
     integer(hsize_t) :: dim1(1), dim2(2), dim4(4)
     character(len=72) :: tagk, fname, grname, dsetname
+    character(len=256) :: epmdir, prefix, iptag
     real(kind=q), allocatable, dimension(:,:) :: entemp
     real(kind=q), allocatable, dimension(:,:) :: kqltemp, pos, lattvec
     real(kind=q), allocatable, dimension(:,:,:,:) :: eptemp_r, eptemp_i, phmtemp
     complex(kind=q), allocatable, dimension(:,:,:,:) :: eptemp
 
-    nk  = epc%nkpts
     nq  = epc%nqpts
     nb  = epc%nbands
     nm  = epc%nmodes
 
-    fname = inp%FILEPM
+    ipart = epc%ipart
+    if (ipart==1) then
+      kst = 1
+    else
+      kst = SUM(epc%nkpts_ps(1:ipart-1)) + 1
+    end if
+    nk  = epc%nkpts_ps(ipart)
+    nk_tot = epc%nkpts
+
+    epmdir = './'
+    prefix = 'graphene'
+    write(iptag, '(I8)') epc%ipart
+    fname = trim(epmdir) // trim(prefix) // '_ephmat_p' &
+         // trim( adjustl(iptag) ) // '.h5'
 
     call h5open_f(hdferror)
     call h5fopen_f(fname, H5F_ACC_RDONLY_F, file_id, hdferror)
@@ -267,9 +351,7 @@ module epcoup
     allocate(eptemp_r(nb, nb, nm, nq))
     allocate(eptemp_i(nb, nb, nm, nq))
 
-    call kqMatch(epc)
-
-    do ik=1,nk
+    do ik=1, nk
 
       write(tagk, '(I8)') ik
 
@@ -288,22 +370,21 @@ module epcoup
 
       eptemp = ( eptemp_r + imgUnit * eptemp_i ) / 1000.0_q
 
-      do jk=1,nk
+      do jk=1, nk_tot
 
-        iq = epc%kkqmap(ik, jk)
+        iq = epc%kkqmap(ik+kst-1, jk)
         if (iq<0) cycle
 
         do im=1,nm
 
-          if (epc%phfreq(im,iq)<5.0E-3_q) cycle
+          if (olap%Phfreq(iq,im)<5.0E-3_q) cycle
 
           do jb=1,nb
             do ib=1,nb
 
-              ibas = nb*(ik-1)+ib
+              ibas = nb*(ik+kst-2)+ib
               jbas = nb*(jk-1)+jb
               olap%kkqmap(ibas, jbas) = iq
-              olap%Phfreq(iq,im) = epc%phfreq(im,iq)
               olap%gij(ibas, jbas, im) = eptemp(ib, jb, im, iq)
 
             end do ! ib loop
@@ -510,8 +591,6 @@ module epcoup
     ! If k1-k2 < norm, recognize k1 and k2 as same k point.
     ! So, number of kx, ky, kz or qx, qy, qz must not supass 1/norm = 1000
 
-    allocate(epc%kkqmap(epc%nkpts,epc%nkpts))
-
     epc%kkqmap = -1
 
     do ik=1,epc%nkpts
@@ -708,6 +787,7 @@ module epcoup
     write(*,'(A)') &
       "------------------------------------------------------------"
 
+    epc%ipart = 1
     call readBasicInfo(inp, epc)
 
     if (inp%LCPTXT .and. inp%LBASSEL) then
