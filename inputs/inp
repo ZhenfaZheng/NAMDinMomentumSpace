@@ -25,6 +25,8 @@
   LARGEBS    = .F.
   LSORT      = .F.
   EPCTYPE    = 1
-  FILEPM     = 'graphene_ephmat_p1.h5'
+  NPARTS     = 1
+  EPMDIR     = './'
+  EPMPREF    = 'graphene'
   FILMD      = 'XDATCAR'
 /
