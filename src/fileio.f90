@@ -58,6 +58,8 @@ module fileio
     ! selected basises whose energies are between EMIN ~ EMAX, in the range
     ! BMIN ~ BMAX and KMIN ~ KMAX.
     real(kind=q) :: EMIN, EMAX
+    character(len=256) :: EPMDIR  ! directory of ephmat.h5 files
+    character(len=256) :: EPMPREF ! prefix of ephmat.h5 files
     character(len=256) :: FILEPM  ! epc file from EPW package, if LEPC=.TRUE.
     character(len=256) :: FILMD   ! MD trajetory (XDATCAR) from VASP, only need
                                   ! for EPCTYPE=2
@@ -106,6 +108,7 @@ module fileio
       integer :: kmax
       real(kind=q) :: emin
       real(kind=q) :: emax
+      character(len=256) :: epmdir, epmpref
       character(len=256) :: filepm, filmd
 
       namelist /NAMDPARA/ &
@@ -114,7 +117,7 @@ module fileio
         rundir, lhole, lshp, lcpext, tbinit, lgamma, &
         lepc, largebs, epctype, lbassel, lsort, &
         Np, nkpoints, nmodes, nparts, kmin, kmax, emin, emax, &
-        filepm, filmd
+        epmdir, epmpref, filepm, filmd
 
       integer :: ik, ib, num
       integer :: ierr, i
@@ -151,7 +154,9 @@ module fileio
       kmax = 0
       emin = -1.0E5_q
       emax =  1.0E5_q
-      filepm = 'ephmat.h5'
+      epmdir = './'
+      epmpref = ''
+      filepm = ''
       filmd = 'XDATCAR'
 
       open(file="inp", unit=8, status='unknown', &
@@ -268,8 +273,15 @@ module fileio
       inp%NBASIS   = inp%NBASIS * ( kmax - kmin + 1 )
       inp%EMIN     = emin
       inp%EMAX     = emax
+      inp%EPMDIR   = trim(epmdir)
+      inp%EPMPREF  = trim(epmpref)
       inp%FILEPM   = trim(filepm)
       inp%FILMD    = trim(filmd)
+
+      if ((inp%FILEPM .NE. '') .AND. (inp%EPMPREF=='')) then
+          inp%EPMPREF = inp%FILEPM(1:len(trim(inp%FILEPM))-13)
+          print *, inp%EPMPREF
+      end if
 
     end subroutine
 

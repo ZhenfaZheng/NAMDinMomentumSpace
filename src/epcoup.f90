@@ -123,8 +123,8 @@ module epcoup
     character(len=256) :: fname, grname, dsetname
     character(len=256) :: epmdir, prefix, iptag
 
-    epmdir = './'
-    prefix = 'graphene'
+    epmdir = inp%EPMDIR
+    prefix = inp%EPMPREF
     write(iptag, '(I8)') epc%ipart
     fname = trim(epmdir) // trim(prefix) // '_ephmat_p' &
          // trim( adjustl(iptag) ) // '.h5'
@@ -202,8 +202,8 @@ module epcoup
     nk  = epc%nkpts_ps(ipart)
     kend = kst + nk - 1
 
-    epmdir = './'
-    prefix = 'graphene'
+    epmdir = inp%EPMDIR
+    prefix = inp%EPMPREF
     write(iptag, '(I8)') ipart
     fname = trim(epmdir) // trim(prefix) // '_ephmat_p' &
          // trim( adjustl(iptag) ) // '.h5'
@@ -335,8 +335,8 @@ module epcoup
     nk  = epc%nkpts_ps(ipart)
     nk_tot = epc%nkpts
 
-    epmdir = './'
-    prefix = 'graphene'
+    epmdir = inp%EPMDIR
+    prefix = inp%EPMPREF
     write(iptag, '(I8)') epc%ipart
     fname = trim(epmdir) // trim(prefix) // '_ephmat_p' &
          // trim( adjustl(iptag) ) // '.h5'
