@@ -278,9 +278,50 @@ module fileio
       inp%FILEPM   = trim(filepm)
       inp%FILMD    = trim(filmd)
 
-      if ((inp%FILEPM .NE. '') .AND. (inp%EPMPREF=='')) then
-          inp%EPMPREF = inp%FILEPM(1:len(trim(inp%FILEPM))-13)
-          print *, inp%EPMPREF
+      call checkInp(inp)
+      ! if ((inp%FILEPM .NE. '') .AND. (inp%EPMPREF=='')) then
+      !     inp%EPMPREF = inp%FILEPM(1:len(trim(inp%FILEPM))-13)
+      !     print *, inp%EPMPREF
+      ! end if
+
+    end subroutine
+
+    subroutine checkInp(inp)
+      implicit none
+      type(namdInfo), intent(inout) :: inp
+
+      integer :: nl1, nl2
+
+      nl1 = len( trim(inp%FILEPM) )
+      nl2 = len( trim(inp%EPMPREF) )
+
+      if (nl1==0) then
+        if (nl2==0) then
+          write(*,*) "ERROR: lack of EPMPREF, &
+            need to specify prefix of 'prefix_ephmat_pX.h5' file!"
+          stop
+        end if
+        inp%FILEPM = trim(inp%EPMDIR) // trim(inp%EPMPREF) &
+          // '_ephmat_p1.h5'
+
+      else if (nl1>0) then
+        if ( (nl1<14) .OR. &
+             (inp%FILEPM(nl1-12:nl1-4) .NE. '_ephmat_p') .OR. &
+             (inp%FILEPM(nl1-2:nl1) .NE. '.h5') ) then
+          write(*,*) "ERROR: EPM file name must be in form of &
+            'prefix_ephmat_pX.h5'!"
+          stop
+        end if
+
+        if (nl2>0) then
+          if (inp%EPMPREF .NE. inp%FILEPM(1:nl1-13)) then
+            write(*,*) "ERROR: FILEPM and EPMPREF do not match!"
+            stop
+          end if
+        end if
+
+        inp%EPMPREF = inp%FILEPM(1:nl1-13)
+
       end if
 
     end subroutine
