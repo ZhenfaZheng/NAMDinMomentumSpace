@@ -95,27 +95,80 @@ module epcoup
 
     do ip=1, nparts
       epc%ipart = ip
-      call readBasicInfo(inp, epc)
+      call readBasicInfo_p(inp, epc)
     end do
 
     call initEPC(inp, epc)
 
     do ip=1, nparts
       epc%ipart = ip
-      call readEPHinfo(inp, epc, olap)
+      call readEPHinfo_p(inp, epc, olap)
     end do
 
     call kqMatch(epc)
 
     do ip=1, nparts
       epc%ipart = ip
-      call readEPHmat(inp, epc, olap)
+      call readEPHmat_p(inp, epc, olap)
+    end do
+
+  end subroutine
+
+  subroutine readBasicInfo(inp, epc)
+    implicit none
+
+    type(namdInfo), intent(inout) :: inp
+    type(epCoupling), intent(inout) :: epc
+
+    integer :: ip, nparts, nk
+
+    nk = inp%NKPOINTS
+    nparts = inp%NPARTS
+    allocate(epc%nkpts_ps(nparts))
+
+    do ip=1, nparts
+      epc%ipart = ip
+      call readBasicInfo_p(inp, epc)
     end do
 
   end subroutine
 
 
-  subroutine readBasicInfo(inp, epc)
+  subroutine readEPHinfo(inp, epc, olap)
+    implicit none
+
+    type(namdInfo), intent(inout) :: inp
+    type(epCoupling), intent(inout) :: epc
+    type(overlap), intent(inout) :: olap
+
+    integer :: ip, nparts, nk
+
+    do ip=1, nparts
+      epc%ipart = ip
+      call readEPHinfo_p(inp, epc, olap)
+    end do
+
+  end subroutine
+
+
+  subroutine readEPHmat(inp, epc, olap)
+    implicit none
+
+    type(namdInfo), intent(inout) :: inp
+    type(epCoupling), intent(inout) :: epc
+    type(overlap), intent(inout) :: olap
+
+    integer :: ip, nparts, nk
+
+    do ip=1, nparts
+      epc%ipart = ip
+      call readEPHmat_p(inp, epc, olap)
+    end do
+
+  end subroutine
+
+
+  subroutine readBasicInfo_p(inp, epc)
     implicit none
 
     type(namdInfo), intent(inout) :: inp
@@ -169,7 +222,7 @@ module epcoup
   end subroutine
 
 
-  subroutine readEPHinfo(inp, epc, olap)
+  subroutine readEPHinfo_p(inp, epc, olap)
     ! Read information of e-ph coupling from perturbo.x output file
     ! (prefix_ephmat_p1.h5), which is in form of hdf5.
     ! Extract informations include: el bands, ph dispersion, k & q lists, ephmat
@@ -310,7 +363,7 @@ module epcoup
   end subroutine
 
 
-  subroutine readEPHmat(inp, epc, olap)
+  subroutine readEPHmat_p(inp, epc, olap)
     implicit none
 
     type(namdInfo), intent(in) :: inp
@@ -795,10 +848,9 @@ module epcoup
     write(*,'(A)') &
       "------------------------------------------------------------"
 
-    epc%ipart = 1
-    call readBasicInfo(inp, epc)
-
     if (inp%LCPTXT .and. inp%LBASSEL) then
+
+      call readBasicInfo(inp, epc)
 
       if (inp%LARGEBS) then
         write(*,*) "For large basis set, LCPEXT is not available!"
@@ -824,21 +876,29 @@ module epcoup
 
     else
 
-      inquire(file='EPCAR', exist=lcoup)
       call initOlap(olap, inp, epc%nqpts, inp%NBANDS * inp%NKPOINTS)
-      if (lcoup) then
-        call CoupFromFileEP(olap)
+
+      write(*,*) "Reading el \& ph information."
+
+      call readBasicInfo(inp, epc)
+      call initEPC(inp, epc)
+      call readEPHinfo(inp, epc, olap)
+
+      call selBasis(inp, epc)
+      if (inp%LSORT) call sortBasis(inp, epc)
+
+      call initOlap(olap_sec, inp, olap%NQ, inp%NBASIS)
+
+      call kqMatch(epc)
+
+      if (inp%EPCTYPE==1) then
+        write(*,*) "TypeI e-ph coupling calculation."
+        call readEPC(inp, epc, olap)
+        call calcPhQ(olap, inp)
       else
-        if (inp%EPCTYPE==1) then
-          write(*,*) "TypeI e-ph coupling calculation."
-          call readEPC(inp, epc, olap)
-          call calcPhQ(olap, inp)
-        else
-          write(*,*) "TypeII e-ph coupling calculation."
-          call readEPC(inp, epc, olap)
-          call phDecomp(inp, olap, epc)
-        end if
-        ! call CoupToFileEP(olap)
+        write(*,*) "TypeII e-ph coupling calculation."
+        call readEPC(inp, epc, olap)
+        call phDecomp(inp, olap, epc)
       end if
 
       call copyToSec(olap, olap_sec, inp)
@@ -892,14 +952,19 @@ module epcoup
   end subroutine
 
 
-  subroutine selBasis(inp, olap)
+  subroutine selBasis(inp, epc)
     implicit none
 
-    type(overlap), intent(in) :: olap
     type(namdInfo), intent(inout) :: inp
+    type(epCoupling), intent(in) :: epc
 
     integer :: ik, ib, nb, ibas
     real :: emin, emax
+
+    if (inp%LBASSEL) then
+      call readBasis(inp)
+      return
+    end if
 
     nb = inp%NBANDS
     emin = inp%EMIN
@@ -910,8 +975,7 @@ module epcoup
 
     do ik=inp%KMIN, inp%KMAX
       do ib=inp%BMIN, inp%BMAX
-        if ( olap%Eig((ik-1)*nb+ib, 1)>emin .and. &
-             olap%Eig((ik-1)*nb+ib, 1)<emax ) then
+        if ( epc%elen(ik,ib)>emin .and. epc%elen(ik,ib)<emax ) then
           inp%NBASIS = inp%NBASIS + 1
           inp%BASSEL(ik,ib) = inp%NBASIS
         end if
@@ -946,11 +1010,11 @@ module epcoup
   end subroutine
 
 
-  subroutine sortBasis(inp, olap)
+  subroutine sortBasis(inp, epc)
     implicit none
 
-    type(overlap), intent(in) :: olap
     type(namdInfo), intent(inout) :: inp
+    type(epCoupling), intent(in) :: epc
 
     integer :: ibas, i, j, ik, ib, nb, nbas
     integer :: temp(3)
@@ -960,7 +1024,7 @@ module epcoup
     do ibas=1,nbas
       ik = inp%BASLIST(ibas,1)
       ib = inp%BASLIST(ibas,2)
-      inp%BASLIST(ibas,3) = olap%Eig((ik-1)*nb+ib, 1) * 1000
+      inp%BASLIST(ibas,3) = epc%elen(ik, ib) * 1000
     end do
 
     do i=1,nbas-1
@@ -1040,18 +1104,6 @@ module epcoup
     integer :: ik, jk, ib, jb, nb, ibas, jbas, nbas
     integer :: kmin, kmax, bmin, bmax
     real :: t
-
-    if (inp%LBASSEL) then
-    ! If .TRUE., BMIN, BMAX, KMIN, KMAX, EMIN, EMAX are ignored!!!
-      call readBasis(inp)
-    else
-    ! selected basises whose energies are between EMIN ~ EMAX,
-    ! in the range BMIN ~ BMAX and KMIN ~ KMAX.
-      call selBasis(inp, olap)
-    end if
-
-    if (inp%LSORT) call sortBasis(inp, olap)
-    call initOlap(olap_sec, inp, olap%NQ, inp%NBASIS)
 
     nb = inp%NBANDS
     nbas = inp%NBASIS
