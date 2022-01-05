@@ -19,6 +19,7 @@ module epcoup
     real(kind=q), allocatable, dimension(:) :: mass
     real(kind=q), allocatable, dimension(:,:,:) :: displ
     real(kind=q), allocatable, dimension(:,:) :: kpts, qpts
+    real(kind=q), allocatable, dimension(:,:) :: elen, phfreq
     real(kind=q), allocatable, dimension(:,:) :: cellep, cellmd
     complex(kind=q), allocatable, dimension(:,:,:,:) :: phmodes
   end type
@@ -48,9 +49,11 @@ module epcoup
     allocate(epc%mass(nat))
     allocate(epc%cellep(nat+3,3))
     allocate(epc%kpts(nk, 3))
-    allocate(epc%kkqmap(nk, nk))
+    allocate(epc%elen(nk, nb))
     allocate(epc%qpts(nq, 3))
+    allocate(epc%phfreq(nq, nm))
     allocate(epc%phmodes(nq, nm, nat, 3))
+    allocate(epc%kkqmap(nk, nk))
 
   end subroutine
 
@@ -65,6 +68,8 @@ module epcoup
     if ( allocated(epc%kkqmap) ) deallocate(epc%kkqmap)
     if ( allocated(epc%kpts) ) deallocate(epc%kpts)
     if ( allocated(epc%qpts) ) deallocate(epc%qpts)
+    if ( allocated(epc%elen) ) deallocate(epc%elen)
+    if ( allocated(epc%phfreq) ) deallocate(epc%phfreq)
     if ( allocated(epc%cellep) ) deallocate(epc%cellep)
     if ( allocated(epc%cellmd) ) deallocate(epc%cellmd)
     if ( allocated(epc%displ) ) deallocate(epc%displ)
@@ -240,6 +245,8 @@ module epcoup
     call h5dread_f(dset_id, H5T_NATIVE_DOUBLE, entemp, dim2, hdferror)
     call h5dclose_f(dset_id, hdferror)
 
+    epc%elen(kst:kend, :) = transpose(entemp)
+
     do ik=1, nk
       jk = ik + kst - 1
       do ib=1,nb
@@ -255,6 +262,7 @@ module epcoup
     call h5dclose_f(dset_id, hdferror)
     freqtemp = freqtemp / 1000.0_q ! transform unit to eV
     olap%Phfreq = transpose(freqtemp)
+    epc%phfreq = transpose(freqtemp)
 
 
     if (inp%EPCTYPE==2) then
