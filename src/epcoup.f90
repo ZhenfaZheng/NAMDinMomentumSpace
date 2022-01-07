@@ -77,42 +77,6 @@ module epcoup
   end subroutine
 
 
-  subroutine readEPC(inp, epc, olap)
-    implicit none
-
-    type(namdInfo), intent(inout) :: inp
-    type(epCoupling), intent(inout) :: epc
-    type(overlap), intent(inout) :: olap
-
-    integer :: ip, nparts, nk
-
-    write(*,*) "Reading ephmat.h5 file."
-
-    nk = inp%NKPOINTS
-    nparts = inp%NPARTS
-    allocate(epc%nkpts_ps(nparts))
-
-    do ip=1, nparts
-      epc%ipart = ip
-      call readBasicInfo_p(inp, epc)
-    end do
-
-    call initEPC(inp, epc)
-
-    do ip=1, nparts
-      epc%ipart = ip
-      call readEPHinfo_p(inp, epc, olap)
-    end do
-
-    call kqMatch(epc)
-
-    do ip=1, nparts
-      epc%ipart = ip
-      call readEPHmat_p(inp, epc, olap)
-    end do
-
-  end subroutine
-
   subroutine readBasicInfo(inp, epc)
     implicit none
 
@@ -133,18 +97,18 @@ module epcoup
   end subroutine
 
 
-  subroutine readEPHinfo(inp, epc, olap)
+  subroutine readEPHinfo(inp, epc)
     implicit none
 
     type(namdInfo), intent(inout) :: inp
     type(epCoupling), intent(inout) :: epc
-    type(overlap), intent(inout) :: olap
 
     integer :: ip, nparts, nk
 
+    nparts = inp%NPARTS
     do ip=1, nparts
       epc%ipart = ip
-      call readEPHinfo_p(inp, epc, olap)
+      call readEPHinfo_p(inp, epc)
     end do
 
   end subroutine
@@ -159,6 +123,7 @@ module epcoup
 
     integer :: ip, nparts, nk
 
+    nparts = inp%NPARTS
     do ip=1, nparts
       epc%ipart = ip
       call readEPHmatSec_p(inp, epc, olap_sec)
@@ -221,7 +186,7 @@ module epcoup
   end subroutine
 
 
-  subroutine readEPHinfo_p(inp, epc, olap)
+  subroutine readEPHinfo_p(inp, epc)
     ! Read information of e-ph coupling from perturbo.x output file
     ! (prefix_ephmat_p1.h5), which is in form of hdf5.
     ! Extract informations include: el bands, ph dispersion, k & q lists, ephmat
@@ -230,7 +195,6 @@ module epcoup
 
     type(namdInfo), intent(in) :: inp
     type(epCoupling), intent(inout) :: epc
-    type(overlap), intent(inout) :: olap
 
     integer :: hdferror
     integer :: nq, nb, nm, nat
@@ -296,15 +260,7 @@ module epcoup
     call h5dopen_f(gr_id, dsetname, dset_id, hdferror)
     call h5dread_f(dset_id, H5T_NATIVE_DOUBLE, entemp, dim2, hdferror)
     call h5dclose_f(dset_id, hdferror)
-
     epc%elen(kst:kend, :) = transpose(entemp)
-
-    do ik=1, nk
-      jk = ik + kst - 1
-      do ib=1,nb
-        olap%Eig(ib+nb*(jk-1),:) = entemp(ib,ik)
-      end do
-    end do
 
     dsetname = 'ph_disp_meV'
     allocate(freqtemp(nm, nq))
@@ -313,7 +269,6 @@ module epcoup
     call h5dread_f(dset_id, H5T_NATIVE_DOUBLE, freqtemp, dim2, hdferror)
     call h5dclose_f(dset_id, hdferror)
     freqtemp = freqtemp / 1000.0_q ! transform unit to eV
-    olap%Phfreq = transpose(freqtemp)
     epc%phfreq = transpose(freqtemp)
 
 
@@ -564,7 +519,6 @@ module epcoup
   end subroutine
 
 
-
   subroutine readDISPL(inp, epc)
     implicit none
 
@@ -695,8 +649,6 @@ module epcoup
     call readDISPL(inp, epc)
     call cellPROJ(epc)
 
-    write(*,*) "Decomposing phonon modes from MD traj."
-
     nks = epc%nkpts
     nb = inp%NBANDS
     nqs = epc%nqpts
@@ -810,7 +762,7 @@ module epcoup
             dkq(iax) = ABS(dkq(iax)-NINT(dkq(iax)))
           end do
           if (SUM(dkq)<norm) then
-            epc%kkqmap(ibas,jbas) = iq
+            olap_sec%kkqmap(ibas,jbas) = iq
             exit
           end if
         end do
@@ -853,6 +805,7 @@ module epcoup
 
   end subroutine
 
+
   subroutine calcEPC_LBS(olap, inp)
   ! EPC calculations for large basis set.
     implicit none
@@ -864,8 +817,6 @@ module epcoup
     real(kind=q) :: dE, dE1, dE2
     real(kind=q) :: kbT
     complex(kind=q) :: idwt
-
-    write(*,*) "Calculating e-ph couplings."
 
     nb  = olap%NBANDS
     nm  = olap%NMODES
@@ -923,8 +874,6 @@ module epcoup
     kbT = inp%TEMP * BOLKEV
     idwt = imgUnit / kbT * TPI
     ! iwt = i * (dE/hbar) * (hbar/kbT)
-
-    write(*,*) "Calculating e-ph couplings."
 
     allocate(olap%Dij(nb, nb, nsw-1))
     olap%Dij = cero
@@ -1015,41 +964,44 @@ module epcoup
       nmodes = inp%NMODES
       allocate(olap_sec%Dij(nb, nb, nsw-1))
       allocate(olap_sec%EPcoup(nb, nb, nmodes, 1, nsw-1))
-      olap%Dij = cero ; olap%EPcoup = cero
+      olap_sec%Dij = cero ; olap_sec%EPcoup = cero
       call initOlap(olap_sec, inp, epc%nqpts, nb)
 
-      ! call readNaEig(olap_sec, inp)
       call readEPTXTs(olap_sec)
       call releaseOlap(olap_sec)
 
     else
 
-      call initOlap(olap, inp, epc%nqpts, inp%NBANDS * inp%NKPOINTS)
+      if (inp%EPCTYPE==1) then
+        write(*,*) "TypeI e-ph coupling calculation."
+      else
+        write(*,*) "TypeII e-ph coupling calculation."
+      end if
 
-      write(*,*) "Reading el \& ph information."
-
+      write(*,*) "Reading el & ph information."
       call readBasicInfo(inp, epc)
       call initEPC(inp, epc)
-      call readEPHinfo(inp, epc, olap)
+      call readEPHinfo(inp, epc)
 
       call selBasis(inp, epc)
       if (inp%LSORT) call sortBasis(inp, epc)
+      call initOlap(olap_sec, inp, epc%nqpts, inp%NBASIS)
+      call epcToOlapSec(inp, epc, olap_sec)
 
-      call initOlap(olap_sec, inp, olap%NQ, inp%NBASIS)
+      write(*,*) "Mapping k & k' points with q point."
       call kqMatchSec(inp, epc, olap_sec)
+      write(*,*) "Reading e-ph matrix elements."
       call readEPHmatSec(inp, epc, olap_sec)
 
       if (inp%EPCTYPE==1) then
-        write(*,*) "TypeI e-ph coupling calculation."
-        call readEPC(inp, epc, olap)
-        call calcPhQ(olap, inp)
+        write(*,*) "Calculating TD phonon normal modes."
+        call calcPhQ(olap_sec, inp)
       else
-        write(*,*) "TypeII e-ph coupling calculation."
-        call readEPC(inp, epc, olap)
-        call phDecomp(inp, olap, epc)
+        write(*,*) "Decomposing phonon modes from MD traj."
+        call phDecomp(inp, olap_sec, epc)
       end if
 
-      call copyToSec(olap, olap_sec, inp)
+      write(*,*) "Calculating e-ph couplings."
       if (inp%LARGEBS) then
         call calcEPC_LBS(olap_sec, inp)
         call writeTXT_LBS(olap_sec)
@@ -1059,8 +1011,6 @@ module epcoup
       end if
 
       call releaseEPC(epc)
-      call releaseOlap(olap)
-      deallocate(olap%Eig)
 
     end if
 
