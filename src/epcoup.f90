@@ -53,7 +53,6 @@ module epcoup
     allocate(epc%qpts(nq, 3))
     allocate(epc%phfreq(nq, nm))
     allocate(epc%phmodes(nq, nm, nat, 3))
-    allocate(epc%kkqmap(nk, nk))
 
   end subroutine
 
@@ -672,6 +671,54 @@ module epcoup
   end subroutine
 
 
+
+  subroutine kqMatchSec(inp, epc, olap_sec)
+    implicit none
+
+    type(namdInfo), intent(in) :: inp
+    type(overlap), intent(inout) :: olap_sec
+    type(epCoupling), intent(inout) :: epc
+
+    real(kind=q) :: norm
+    real(kind=q) :: dkq(3), dq(3)
+    integer :: ik, jk, iq, jq, iax
+    integer :: ibas, jbas, nbas
+
+    norm = 0.001
+    ! If k1-k2 < norm, recognize k1 and k2 as same k point.
+    ! So, number of kx, ky, kz or qx, qy, qz must not supass 1/norm = 1000
+
+    nbas = inp%NBASIS
+    olap_sec%kkqmap = -1
+
+    do ibas=1,nbas
+      ik = inp%BASLIST(ibas,1)
+      if ( ibas>1 .and. ik==inp%BASLIST(ibas-1,1)) then
+        olap_sec%kkqmap(ibas,:) = olap_sec%kkqmap(ibas-1,:)
+        cycle
+      end if
+      do jbas=1,nbas
+        jk = inp%BASLIST(jbas,1)
+        if ( jbas>1 .and. jk==inp%BASLIST(jbas-1,1)) then
+          olap_sec%kkqmap(ibas,jbas) = olap_sec%kkqmap(ibas,jbas-1)
+          cycle
+        end if
+        do iq=1,epc%nqpts
+          dkq = epc%kpts(ik,:) - epc%kpts(jk,:) - epc%qpts(iq,:)
+          do iax=1,3
+            dkq(iax) = ABS(dkq(iax)-NINT(dkq(iax)))
+          end do
+          if (SUM(dkq)<norm) then
+            epc%kkqmap(ibas,jbas) = iq
+            exit
+          end if
+        end do
+      end do
+    end do
+
+  end subroutine
+
+
   subroutine calcPhQ(olap, inp)
     implicit none
 
@@ -888,8 +935,7 @@ module epcoup
       if (inp%LSORT) call sortBasis(inp, epc)
 
       call initOlap(olap_sec, inp, olap%NQ, inp%NBASIS)
-
-      call kqMatch(epc)
+      call kqMatchSec(inp, epc, olap_sec)
 
       if (inp%EPCTYPE==1) then
         write(*,*) "TypeI e-ph coupling calculation."
