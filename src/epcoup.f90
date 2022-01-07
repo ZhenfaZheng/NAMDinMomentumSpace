@@ -150,18 +150,18 @@ module epcoup
   end subroutine
 
 
-  subroutine readEPHmat(inp, epc, olap)
+  subroutine readEPHmatSec(inp, epc, olap_sec)
     implicit none
 
     type(namdInfo), intent(inout) :: inp
     type(epCoupling), intent(inout) :: epc
-    type(overlap), intent(inout) :: olap
+    type(overlap), intent(inout) :: olap_sec
 
     integer :: ip, nparts, nk
 
     do ip=1, nparts
       epc%ipart = ip
-      call readEPHmat_p(inp, epc, olap)
+      call readEPHmatSec_p(inp, epc, olap_sec)
     end do
 
   end subroutine
@@ -453,6 +453,107 @@ module epcoup
         enddo ! im loop
 
       enddo ! jk loop
+
+    enddo ! ik loop
+
+    call h5gclose_f(gr_id, hdferror)
+
+    call h5fclose_f(file_id, hdferror)
+
+  end subroutine
+
+  subroutine readEPHmatSec_p(inp, epc, olap_sec)
+    implicit none
+
+    type(namdInfo), intent(in) :: inp
+    type(epCoupling), intent(inout) :: epc
+    type(overlap), intent(inout) :: olap_sec
+
+    integer :: hdferror
+    integer :: nq, nb, nm
+    integer :: ipart, kst, kend, nk, nk_tot
+    integer :: ib, jb, ik, jk, im, iq, it, ibas, jbas
+    integer(hid_t) :: file_id, gr_id, dset_id
+    integer(hsize_t) :: dim1(1), dim2(2), dim4(4)
+    character(len=72) :: tagk, fname, grname, dsetname
+    character(len=256) :: epmdir, prefix, iptag
+    real(kind=q), allocatable, dimension(:,:) :: entemp
+    real(kind=q), allocatable, dimension(:,:) :: kqltemp, pos, lattvec
+    real(kind=q), allocatable, dimension(:,:,:,:) :: eptemp_r, eptemp_i, phmtemp
+    complex(kind=q), allocatable, dimension(:,:,:,:) :: eptemp
+
+    nq  = epc%nqpts
+    nb  = epc%nbands
+    nm  = epc%nmodes
+
+    ipart = epc%ipart
+    if (ipart==1) then
+      kst = 1
+    else
+      kst = SUM(epc%nkpts_ps(1:ipart-1)) + 1
+    end if
+    nk  = epc%nkpts_ps(ipart)
+    kend = kst + nk - 1
+    nk_tot = epc%nkpts
+
+    epmdir = inp%EPMDIR
+    prefix = inp%EPMPREF
+    write(iptag, '(I8)') epc%ipart
+    fname = trim(epmdir) // trim(prefix) // '_ephmat_p' &
+         // trim( adjustl(iptag) ) // '.h5'
+
+    call h5open_f(hdferror)
+    call h5fopen_f(fname, H5F_ACC_RDONLY_F, file_id, hdferror)
+
+    ! Read e-ph matrix for every k.
+    grname = 'g_ephmat_total_meV'
+    call h5gopen_f(file_id, grname, gr_id, hdferror)
+    allocate(eptemp(nb, nb, nm, nq))
+    allocate(eptemp_r(nb, nb, nm, nq))
+    allocate(eptemp_i(nb, nb, nm, nq))
+
+    do ik=kst, kend
+
+      if ( SUM(inp%BASSEL(ik,:)) == -nb ) cycle
+
+      write(tagk, '(I8)') ik-kst+1
+
+      dsetname = 'g_ik_r_' // trim( adjustl(tagk) )
+      dim4 = shape(eptemp, kind=hsize_t)
+      call h5dopen_f(gr_id, dsetname, dset_id, hdferror)
+      call h5dread_f(dset_id, H5T_NATIVE_DOUBLE, eptemp_r, dim4, hdferror)
+      call h5dclose_f(dset_id, hdferror)
+      ! if (ik==1) write(*,*) eptemp(1,1,:,2)
+
+      dsetname = 'g_ik_i_' // trim( adjustl(tagk) )
+      dim4 = shape(eptemp, kind=hsize_t)
+      call h5dopen_f(gr_id, dsetname, dset_id, hdferror)
+      call h5dread_f(dset_id, H5T_NATIVE_DOUBLE, eptemp_i, dim4, hdferror)
+      call h5dclose_f(dset_id, hdferror)
+
+      eptemp = ( eptemp_r + imgUnit * eptemp_i ) / 1000.0_q
+
+      do ib=1,nb
+        ibas = inp%BASSEL(ik,ib)
+        if (ibas==-1) cycle
+
+        do jk=1, nk_tot
+          do jb=1,nb
+
+            jbas = inp%BASSEL(jk,jb)
+            if (jbas==-1) cycle
+            iq = olap_sec%kkqmap(ibas, jbas)
+            if (iq<0) cycle
+
+            do im=1,nm
+              if (olap_sec%Phfreq(iq,im)<5.0E-3_q) cycle
+              olap_sec%gij(ibas, jbas, im) = eptemp(ib, jb, im, iq)
+            end do ! im loop
+
+          end do ! jb loop
+        enddo ! jk loop
+
+      enddo ! ib loop
 
     enddo ! ik loop
 
@@ -936,6 +1037,7 @@ module epcoup
 
       call initOlap(olap_sec, inp, olap%NQ, inp%NBASIS)
       call kqMatchSec(inp, epc, olap_sec)
+      call readEPHmatSec(inp, epc, olap_sec)
 
       if (inp%EPCTYPE==1) then
         write(*,*) "TypeI e-ph coupling calculation."
@@ -1157,6 +1259,8 @@ module epcoup
       ib = inp%BASLIST(ibas,2)
       olap_sec%Eig(ibas, :) = epc%elen(ik, ib)
     end do
+
+    olap_sec%Phfreq = epc%phfreq
 
   end subroutine
 
