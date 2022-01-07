@@ -1095,6 +1095,26 @@ module epcoup
   end subroutine
 
 
+  subroutine epcToOlapSec(inp, epc, olap_sec)
+    implicit none
+    type(namdInfo), intent(in) :: inp
+    type(epCoupling), intent(in) :: epc
+    type(overlap), intent(inout) :: olap_sec
+
+    integer :: ik, jk, ib, jb, nb, ibas, jbas, nbas
+
+    nbas = inp%NBASIS
+
+    nb = inp%NBANDS
+    do ibas=1, nbas
+      ik = inp%BASLIST(ibas,1)
+      ib = inp%BASLIST(ibas,2)
+      olap_sec%Eig(ibas, :) = epc%elen(ik, ib)
+    end do
+
+  end subroutine
+
+
   subroutine copyToSec(olap, olap_sec, inp)
     implicit none
     type(namdInfo), intent(inout) :: inp
