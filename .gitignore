@@ -5,6 +5,7 @@ src/*.o
 src/*.mod
 
 # ignore .pyc files
+scripts/*old.py
 scripts/*.pyc
 scripts/__pycache__
 

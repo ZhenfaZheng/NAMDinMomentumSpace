@@ -1,29 +1,57 @@
 #!/usr/bin/env python
 
-import h5py
-import math
 import numpy as np
-import matplotlib as mpl; mpl.use('agg')
-import matplotlib.pyplot as plt
+import os, math, h5py
 from scipy.optimize import curve_fit
 
 
-def read_couple(filcoup='NATXT', filcoup_i='', ctype=0):
+def read_inp(infile='inp'):
+    '''
+    Read input parameters.
+
+    Parameters:
+    infile: string, coupling file.
+
+    Returns: dictionary, the keys and values are all strings.
+    '''
+
+    text = [line for line in open(infile) if line.strip()]
+
+    inp = {}
+    for line in text:
+        if (line[0]=='&' or line[0]=='/' or line[0]=='!'):
+            continue
+        temp = line.split('=')
+        key = temp[0].strip()
+        value = temp[1].strip().strip('\'').strip('\"')
+        inp[key] = value
+
+    return inp
+
+
+def read_couple(filcoup='NATXT', inp=None, ctype=0):
     '''
     This function loads data from NATXT file.
 
     Parameters:
-    filcoup  : string, coupling file.
-    filcoup_i: string, file name of imaginary part, for ctype==2.
-    ctype    : integer, different forms of NATXT files.
-               0: origin type, NAC data are real number;
-               1: NAC are complex, and restore in two real numbers;
-               2: EPC divide into NM (this number stored in first
-               line) parts, each part has same form with type 1;
+    filcoup: string, coupling file.
+    inp    : dictionary, input parameters.
+    ctype  : integer, different forms of NATXT files.
+             0: origin type, NAC data are real number;
+             1: NAC are complex, and restore in two real numbers;
+             2: EPC divide into NM (this number stored in first
+             line) parts, each part has same form with type 1;
 
     Returns: ndarray, coupling data in forms of coup[nsw-1, nb, nb]
              or coup[NM, nsw-1, nb, nb] (type 2)
     '''
+
+    if (inp is not None):
+        largeBS = inp['LARGEBS'].strip('.')[0]
+        if (largeBS=='T' or largeBS=='t'):
+            ctype = 0
+        else:
+            ctype = 1
 
     if ctype==0:
         coup = np.loadtxt(filcoup)
@@ -63,37 +91,7 @@ def read_couple(filcoup='NATXT', filcoup_i='', ctype=0):
     return coup
 
 
-def plot_couple(coup, figname='COUPLE.png'):
-    '''
-    This function plots average couplings.
-
-    Parameters:
-    coup: ndarray, average coupling data in forms of coup[nb, nb]
-    figname: string, output figure file name.
-    '''
-
-    fig = plt.figure()
-    figsize_x = 4.8
-    figsize_y = 3.6 # in inches
-    fig.set_size_inches(figsize_x, figsize_y)
-
-    cmap = 'bwr'
-    n = coup.shape[0]
-    coup *= 1000.0 # change unit to meV
-    Bmin = 0.5; Bmax = n + 0.5
-    cmin = 0.0; cmax = np.max(coup)
-    norm = mpl.colors.Normalize(cmin,cmax)
-    plt.imshow(coup, cmap=cmap, origin='lower', norm=norm,
-        extent=(Bmin,Bmax,Bmin,Bmax), interpolation='none')
-
-    cbar = plt.colorbar()
-    # cbar.ax.set_title('   meV')
-    cbar.set_label('Coupling (meV)')
-    plt.tight_layout()
-    plt.savefig(figname, dpi=400)
-
-
-def ek_selected(filephmat, filbassel='BASSEL'):
+def ek_selected(filephmat='', filbassel='BASSEL', inp=None):
     '''
     Extract energies and k-list that are selected in namd simulation.
     This function will use function read_ephmath5 below.
@@ -101,14 +99,35 @@ def ek_selected(filephmat, filbassel='BASSEL'):
     Parameters:
     filephmat: string, file name or path of PERTURBO output file.
     filbassel: string, file name or path of BASSEL file of namd simulation.
+    inp      : dictionary, input parameters.
 
     Returns: two ndarrays, energies and k-list arrays, in forms of en[nbas]
              and kpts[nbas,3], respectively.
     '''
 
-    bassel  = np.loadtxt(filbassel, dtype=int, skiprows=1) - 1
-    en_tot   = read_ephmath5(filephmat, igroup=0, idset=3)
-    kpts_tot = read_ephmath5(filephmat, igroup=0, idset=1)
+    if inp is not None:
+
+        inp = read_inp()
+        nparts = int(inp['NPARTS'])
+        prefix = inp['EPMPREF']
+        epmdir = inp['EPMDIR']
+
+        bassel  = np.loadtxt(filbassel, dtype=int, skiprows=1) - 1
+        for ip in range(nparts):
+            filepm = prefix + '_ephmat_p%d.h5'%(ip+1)
+            path = os.path.join(epmdir, filepm)
+            en_p   = read_ephmath5(path, igroup=0, idset=3)
+            kpts_p = read_ephmath5(path, igroup=0, idset=1)
+            if ip==0:
+                en_tot = en_p
+                kpts_tot = kpts_p
+            else:
+                en_tot = np.vstack((en_tot, en_p))
+                kpts_tot = np.vstack((kpts_tot, kpts_p))
+
+    else:
+        en_tot   = read_ephmath5(filephmat, igroup=0, idset=3)
+        kpts_tot = read_ephmath5(filephmat, igroup=0, idset=1)
 
     en = en_tot[bassel[:,0], bassel[:,1]]
     kpts = kpts_tot[bassel[:,0]]
@@ -139,64 +158,6 @@ def readshp(filshps):
     return shp
 
 
-def plot_tdprop(shp, Eref=0.0, lplot=1, ksen=None, figname='tdshp.png'):
-    '''
-    This function loads data from SHPROP.xxx files,
-    and plot average evolution of energy & surface hopping proportion of
-    electronic states.
-
-    Parameters:
-    shp    : ndarray, average data of SHPROP.xxx files, in forms of
-             shp[ntsteps, nb+2].
-    Eref   : float, energy reference. Make sure shp & ksen have same Eref!!!
-    lplot  : integer, fig type to plot. 1: plot average proportions; 2: plot
-             average energy evolution with proportions.
-    ksen   : ndarray, KS energies in forms of ksen[nbands]. Here we suppose
-             ksen do not change by time.
-    figname: string, file name of output figure.
-    '''
-
-    figsize_x = 4.8
-    figsize_y = 3.2 # in inches
-    namdtime = shp[-1,0]
-
-    fig, ax = plt.subplots()
-    fig.set_size_inches(figsize_x, figsize_y)
-    mpl.rcParams['axes.unicode_minus'] = False
-
-    if lplot==1:
-        ylabel = 'SHPROP'
-        ax.plot(shp[:,0], shp[:,2:])
-        ax.set_ylim(0.0,1.0)
-        ax.set_ylabel(ylabel)
-    else:
-        cmap = 'hot_r'
-        dotsize = 50
-        ylabel = 'Energy (eV)'
-        ntsteps = shp.shape[0]
-        nbands = shp.shape[1] -2
-        cmin = 0.0; cmax = np.max(shp[:,2:])
-        cmax = math.ceil(cmax*10)/10
-        norm = mpl.colors.Normalize(cmin,cmax)
-
-        if (ksen.shape[0]!=nbands):
-            print('\nNumber of ksen states doesn\'t match with SHPROP data!\n')
-        E = np.tile(ksen-Eref, ntsteps).reshape(ntsteps, nbands)
-        T = np.tile(shp[:,0], nbands).reshape(nbands,ntsteps).T
-        sc = ax.scatter(T, E, s=dotsize, c=shp[:,2:], lw=0,
-                        norm=norm, cmap=cmap)
-        ax.plot(shp[:,1]-Eref, 'r', lw=1, label='Average Energy')
-        plt.colorbar(sc)
-
-        ax.set_ylabel(ylabel)
-
-    ax.set_xlim(0,namdtime)
-    ax.set_xlabel('Time (fs)')
-
-    plt.tight_layout()
-    plt.savefig(figname, dpi=400)
-
-
 def read_ephmath5(filname, igroup=-1, idset=-1, dset=""):
     '''
     Read informations about e-ph coupling from PERTURBO output h5 file.
@@ -206,7 +167,7 @@ def read_ephmath5(filname, igroup=-1, idset=-1, dset=""):
     igroup : integer, which group, start from 0.
     idset  : integer, which data set, start from 0.
     dset   : string, data set name or path, only used when igroup and idset
-             are not provided.
+             are not provided. e.g., "/el_ph_band_info/k_list".
 
     Returns: ndarray, dataset value.
     '''
@@ -226,7 +187,8 @@ def read_ephmath5(filname, igroup=-1, idset=-1, dset=""):
 
         f = h5py.File(filname, 'r')
         group = f[group_list[igroup]]
-        return group[dset_name].value
+        # return group[dset_name].value
+        return group[dset_name][:]
 
     elif (dset!=''):
         path = dset.split('/')[1:]
@@ -234,7 +196,8 @@ def read_ephmath5(filname, igroup=-1, idset=-1, dset=""):
         for item in path:
             dset = f[item]
             f = dset
-        return dset.value
+        # return dset.value
+        return dset[:]
 
     else:
         print("\nNeed input correct args: \'igroup\' & \'idset\' or " \
@@ -242,87 +205,186 @@ def read_ephmath5(filname, igroup=-1, idset=-1, dset=""):
         return None
 
 
-def plot_namd(kpts, en, shp, kpts_tot=None, en_tot=None, Eref=0.0,
-              figname='NAMD_3D.png'):
+def calc_rec_vec(a1, a2, a3):
     '''
+    Calculate reciprocal lattice vectors.
+    Can also calculate basic lattice vectors from reciprocal vectors.
+
+    a1, a2, a3: ndarray, with shape of (3,), basic lattice vectors.
+
+    Returns:
+    b1, b2, b3: ndarray, with shape of (3,), reciprocal lattice vectors.
     '''
+    b1 = 2 * np.pi * np.cross(a2, a3) / np.dot(a1, np.cross(a2, a3))
+    b2 = 2 * np.pi * np.cross(a3, a1) / np.dot(a1, np.cross(a2, a3))
+    b3 = 2 * np.pi * np.cross(a1, a2) / np.dot(a1, np.cross(a2, a3))
+    return b1, b2, b3
 
 
-def plot_namd_3D(shp, kpts, en, kpts_tot=None, en_tot=None, Eref=0.0,
-                 figname='NAMD_3D.png'):
+def frac2cart(X, a1, a2, a3):
     '''
-    Plot 3D elctronic evolution.
+    Convert from fractional coordinates to Cartisian coordinates.
+
+    X: ndarray, with shape of (n,3) or (3,), fractional coordinates.
+    a1, a2, a3: ndarray, with shape of (3,), basic lattice vectors.
+
+    Returns:
+    Y: ndarray, with same shape of X, Cartisian coordinates.
+    '''
+
+    A = np.array([a1, a2, a3])
+    Y = np.matmul(X, A)
+    return Y
+
+
+def cart2frac(X, a1, a2, a3):
+    '''
+    Convert from Cartisian coordinates to fractional coordinates.
+
+    X: ndarray, with shape of (n,3) or (3,), Cartisian coordinates.
+    a1, a2, a3: ndarray, with shape of (3,), basic lattice vectors.
+
+    Returns:
+    Y: ndarray, with same shape of X, fractional coordinates.
+    '''
+
+    b1, b2, b3 = calc_rec_vec(a1, a2, a3)
+    B = np.array([b1, b2, b3]).T / (2*np.pi)
+    Y = np.matmul(X, B)
+    return Y
+
+
+def loc_on_kpath(kpts, k_index, path_index, kpath):
+    '''
+    Calculate locations of k points on path.
 
     Parameters:
-    shp     : ndarray, part for plotting average data from SHPROP.xxx files,
-              which in forms of shp[ntsteps, nb+2]
-    kpts    : ndarray, 2D cartisian coordinates of K-points in forms of
-              kpts[nks,2].
-    en      : ndarray, ks energies for plot in forms of en[nb]. Here nb must
-              equal to nks.
-    kpts_tot: ndarray, total K-points cartisian coordinates for background
-              plot, which in forms of kpts_tot[nks_tot,2]
-    en_tot  : ndarray, total energies for background plot, which in forms of
-              en_tot[nks_tot, nb_tot]
-    Eref    : float, energy reference. Make sure en & en_tot have same Eref!!!
-    figname : string, output figure file name.
+    kpts      : array, with shape of (nks,3) or (3), k point coordinates.
+    k_index   : array, with shape of (nks_onpath), indexes of k points on path.
+    path_index: array, with shape of (nks_onpath), indexes of k path segments.
+    kpath     : array, with shape of (npath+1, 3), coordinates of begin and
+                end points of k path.
+
+    Returns:
+    loc: array, with shape of (nks_onpath), locations of k points on path.
+    '''
+    
+    if (len(kpts.shape)==1):
+        kpts = np.array([kpts])
+
+    npath = kpath.shape[0] - 1
+    dks = np.sum( np.abs(np.diff(kpath, axis=0)), axis=1)
+    nks_onpath = k_index.shape[0]
+
+    kpath_loc = np.zeros(npath+1)
+    segment_length = np.zeros(npath)
+    for ipath in range(npath):
+        dk = kpath[ipath+1] - kpath[ipath]
+        segment_length[ipath] = np.linalg.norm(dk)
+        kpath_loc[ipath+1] = kpath_loc[ipath] + segment_length[ipath]
+
+    loc = np.zeros(nks_onpath)
+    for ii in range(nks_onpath):
+        ik = k_index[ii]
+        ipath = path_index[ii]
+        scale = np.sum( np.abs(kpts[ik] - kpath[ipath]) ) / dks[ipath]
+        loc[ii] = kpath_loc[ipath] + segment_length[ipath] * scale
+
+    return loc, kpath_loc
+
+
+def select_kpts_on_path(kpts, kpath, norm=1e-4):
+    '''
+    Select k points on k path from kpts.
+
+    Parameters:
+    kpts : array, with shape of (nks,3) or (3), k point coordinates.
+    kpath: array, with shape of (npath+1, 3), coordinates of begin and end
+           points of k path.
+    norm : float, stard value to determine whether k point is on path.
+
+    Returns:
+    k_index   : array, with shape of (nks_onpath), indexes of k points on path.
+    path_index: array, with shape of (nks_onpath), indexes of k path segments.
     '''
 
-    nb = en.shape[0]
-    ntsteps = shp.shape[0]
-    namdtime = shp[-1,0]
-    X = np.tile(kpts[:,0], ntsteps).reshape(ntsteps,nb)
-    Y = np.tile(kpts[:,1], ntsteps).reshape(ntsteps,nb)
-    Z = np.tile(en-Eref, ntsteps).reshape(ntsteps,nb)
-
-    if (kpts_tot==None or en_tot==None):
-        X_tot = kpts[:,0]
-        Y_tot = kpts[:,1]
-        Z_tot = en - Eref
+    if (len(kpts.shape)==1):
+        kpts = np.array([kpts])
+        nks = 1
     else:
-        X_tot = kpts_tot[:,0]
-        Y_tot = kpts_tot[:,1]
-        Z_tot = en_tot - Eref
+        nks = kpts.shape[0]
 
-    from matplotlib import cm
-    from mpl_toolkits.mplot3d import Axes3D
+    npath = kpath.shape[0] - 1
 
-    figsize_x = 4.8
-    figsize_y = 3.6 # in inches
-    fig = plt.figure()
-    fig.set_size_inches(figsize_x, figsize_y)
-    ax = fig.add_subplot(111, projection='3d')
-    # ax = Axes3D(fig)
+    if npath==0:
+        print("\nkpath must contain 2 k-points at least!\n")
+        return
 
-    norm = mpl.colors.Normalize(0,namdtime)
-    color_t = np.tile(np.arange(ntsteps), nb).reshape(nb,ntsteps).T
-    s_avg = np.average(shp[:,2:][shp[:,2:]>0])
-    # size = np.log( shp[:,2:] / s_avg + 1 ) * 25
-    size = shp[:,2:] / s_avg * 5
+    pathes = np.zeros( (npath, 2, 3) )
+    pathes[:,0,:] = kpath[:npath, :]
+    pathes[:,1,:] = kpath[1:, :]
+    dks = pathes[:,1,:] - pathes[:,0,:]
 
-    sc = ax.scatter(X,Y,Z, lw=0.0, s=size, c=color_t,
-                    norm=norm, cmap=cm.rainbow)
-    cbar = plt.colorbar(sc, shrink=0.5, fraction=0.05)
-    cbar.set_label('Time (fs)')
+    #k_tag = np.zeros((nks, npath), dtype='int32')
+    k_index = []; path_index = []
+    for ik in range(nks):
+        kpt = kpts[ik,:]
+        for ipath in range(npath):
+            zz = k_on_path(kpt, pathes[ipath], dks[ipath], norm)
+            if (zz):
+                #k_tag[ik, ipath] = 1
+                k_index.append(ik); path_index.append(ipath)
 
-    # Plot background
-    try:
-        nb_tot = Z_tot.shape[1]
-    except IndexError:
-        ax.plot_wireframe(X_tot,Y_tot,Z_tot, lw=0.1)
-    else:
-        for ib in range(nb_tot):
-            ax.plot_wireframe(X_tot,Y_tot,Z_tot[:,ib], lw=0.1)
-    # ax.plot_surface(X_tot,Y_tot,Z_tot,
-    #     cmap=cm.coolwarm, antialiased=False)
-    # ax.plot_trisurf(X_tot,Y_tot,Z_tot, lw=0.1,
-    #     antialiased=True, alpha=0.05)
-    # ax.scatter(X_tot,Y_tot,Z_tot, lw=0.3)
+    k_index = np.array(k_index, dtype='int32')
+    path_index = np.array(path_index, dtype='int32')
+    return k_index, path_index
 
-    ax.set_zlim(Z.min(),Z.max())
 
-    plt.tight_layout()
-    plt.savefig(figname, dpi=400)
+def k_on_path(kpt, path, dk, norm):
+    '''
+    Determine whether k point is on path.
+
+    Parameters:
+    kpt : array, with shape of (3), k point coordinates.
+    path: array, with shape of (2, 3), coordinates of begin and end points
+          of path.
+    dk  : array, with shape of (3), difference between begin and end points
+          of path.
+    norm: float, stard value to determine whether k point is on path.
+
+    Returns: True or False.
+    '''
+
+    # whether kpt in the range of path
+    for iax in range(3):
+        if ( dk[iax] > 0 ):
+            if ( kpt[iax]<(path[0,iax]-norm) or \
+                 kpt[iax]>(path[1,iax]+norm) ):
+                return False
+        else:
+            if ( kpt[iax]>(path[0,iax]+norm) or \
+                 kpt[iax]<(path[1,iax]-norm) ):
+                return False
+
+    # (x-x1) * dy .vs. (y-y1) * dx
+    a = (kpt[0]-path[0,0]) * dk[1]
+    b = (kpt[1]-path[0,1]) * dk[0]
+    if ( abs(b-a)>norm ): return False
+
+    # (y-y1) * dz .vs. (z-z1) * dy
+    a = (kpt[1]-path[0,1]) * dk[2]
+    b = (kpt[2]-path[0,2]) * dk[1]
+    if ( abs(b-a)>norm ): return False
+
+    # (x-x1) * dz .vs. (z-z1) * dx
+    a = (kpt[0]-path[0,0]) * dk[2]
+    b = (kpt[2]-path[0,2]) * dk[0]
+    if ( abs(b-a)>norm ): return False
+
+    # Not including end point of path
+    if (np.sum(np.abs(kpt-path[1,:]))<norm): return False
+
+    return True
 
 
 def fit_decaytime(ft, time, ftype=1):
