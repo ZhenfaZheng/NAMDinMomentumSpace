@@ -134,7 +134,8 @@ module shop
 
     do tion=1, Nt
 
-      if (inp%LARGEBS) then
+      ! if (inp%LARGEBS) then
+      if (inp%LEPC) then
         do ibas=1,nbas
           call calcprop_LBS(tion, ibas, ks, inp, olap)
         end do

@@ -1002,13 +1002,15 @@ module epcoup
       end if
 
       write(*,*) "Calculating e-ph couplings."
-      if (inp%LARGEBS) then
-        call calcEPC_LBS(olap_sec, inp)
-        call writeTXT_LBS(olap_sec)
-      else
-        call calcEPC(olap_sec, inp)
-        call writeEPTXTs(olap_sec)
-      end if
+      ! if (inp%LARGEBS) then
+      !   call calcEPC_LBS(olap_sec, inp)
+      !   call writeTXT_LBS(olap_sec)
+      ! else
+      !   call calcEPC(olap_sec, inp)
+      !   call writeEPTXTs(olap_sec)
+      ! end if
+      call calcEPC_LBS(olap_sec, inp)
+      call writeTXT_LBS(olap_sec)
 
       call releaseEPC(epc)
 

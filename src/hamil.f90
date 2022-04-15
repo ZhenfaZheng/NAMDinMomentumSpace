@@ -78,12 +78,17 @@ module hamil
 
       allocate(ks%eigKs(N, Nt))
 
-      if (.NOT. inp%LARGEBS) then
-        allocate(ks%NAcoup(N,N, Nt))
-        if (inp%LEPC) allocate(ks%EPcoup(N,N, Nt))
-      else
+      if (inp%LEPC) then
         allocate(ks%PhQ(olap%NQ, olap%NMODES, 2, Nt))
+      else
+        allocate(ks%NAcoup(N,N, Nt))
       end if
+      ! if (.NOT. inp%LARGEBS) then
+      !   allocate(ks%NAcoup(N,N, Nt))
+      !   if (inp%LEPC) allocate(ks%EPcoup(N,N, Nt))
+      ! else
+      !   allocate(ks%PhQ(olap%NQ, olap%NMODES, 2, Nt))
+      ! end if
 
       allocate(ks%sh_pops(N, Nt))
       allocate(ks%sh_prop(N,N))
@@ -107,23 +112,28 @@ module hamil
     nsteps = inp%NSW - 1
 
     if (inp%LEPC) then
-      if (inp%LARGEBS) then
-        do t=1, Nt
-          i = MOD(initstep+t, nsteps) + 1
-          ks%eigKs(:,t) = olap%Eig(:,i)
-          ks%PhQ(:,:,:,t) = olap%PhQ(:,:,:,i)
-        end do
-      else
-        do t=1, Nt
-          ! If time step > NSW-1, use Eig & couplings
-          ! from initial time repeatedly.
-          i = MOD(initstep+t, nsteps) + 1
-          ks%eigKs(:,t) = olap%Eig(:, i)
-          ks%NAcoup(:,:,t) = olap%Dij(:,:, i)
-          ks%EPcoup(:,:,t) = &
-            SUM( SUM(olap%EPcoup(:,:,:,:,i), dim=4), dim=3)
-        end do
-      end if
+      do t=1, Nt
+        i = MOD(initstep+t, nsteps) + 1
+        ks%eigKs(:,t) = olap%Eig(:,i)
+        ks%PhQ(:,:,:,t) = olap%PhQ(:,:,:,i)
+      end do
+      ! if (inp%LARGEBS) then
+      !   do t=1, Nt
+      !     i = MOD(initstep+t, nsteps) + 1
+      !     ks%eigKs(:,t) = olap%Eig(:,i)
+      !     ks%PhQ(:,:,:,t) = olap%PhQ(:,:,:,i)
+      !   end do
+      ! else
+      !   do t=1, Nt
+      !     ! If time step > NSW-1, use Eig & couplings
+      !     ! from initial time repeatedly.
+      !     i = MOD(initstep+t, nsteps) + 1
+      !     ks%eigKs(:,t) = olap%Eig(:, i)
+      !     ks%NAcoup(:,:,t) = olap%Dij(:,:, i)
+      !     ks%EPcoup(:,:,t) = &
+      !       SUM( SUM(olap%EPcoup(:,:,:,:,i), dim=4), dim=3)
+      !   end do
+      ! end if
     else
       do t=1, Nt
         ! If time step > NSW-1, use Eig & couplings

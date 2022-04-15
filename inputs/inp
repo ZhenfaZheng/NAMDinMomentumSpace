@@ -22,7 +22,7 @@
 
   LEPC       = .T.
   LBASSEL    = .F.
-  LARGEBS    = .F.
+  LARGEBS    = .T.
   LSORT      = .F.
   EPCTYPE    = 1
   NPARTS     = 1
