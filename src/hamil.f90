@@ -37,6 +37,8 @@ module hamil
     real(kind=q), allocatable, dimension(:) :: Bkm
     real(kind=q), allocatable, dimension(:,:) :: sh_pops
     real(kind=q), allocatable, dimension(:,:) :: sh_prop
+    real(kind=q), allocatable, dimension(:,:,:) :: ph_pops
+    real(kind=q), allocatable, dimension(:,:,:,:) :: ph_prop
     ! Blotzmann factor for SH probability scaling.
     real(kind=q), allocatable, dimension(:,:) :: sh_Bfactor
 
@@ -80,6 +82,8 @@ module hamil
 
       if (inp%LEPC) then
         allocate(ks%PhQ(olap%NQ, olap%NMODES, 2, Nt))
+        allocate(ks%ph_pops(olap%NQ, olap%NMODES, Nt))
+        allocate(ks%ph_prop(N,N, olap%NMODES, 2))
       else
         allocate(ks%NAcoup(N,N, Nt))
       end if

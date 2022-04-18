@@ -181,6 +181,7 @@ module epcoup
       stop
     end if
     if ( inp%Np==1 ) inp%Np = nq
+    inp%NQPOINTS = nq
     inp%NMODES = nm
 
   end subroutine
@@ -1189,7 +1190,7 @@ module epcoup
     type(overlap), intent(inout) :: olap
 
     if ( allocated(olap%gij) ) deallocate(olap%gij)
-    if ( allocated(olap%Phfreq) ) deallocate(olap%Phfreq)
+    ! if ( allocated(olap%Phfreq) ) deallocate(olap%Phfreq)
     if ( allocated(olap%PhQ) ) deallocate(olap%PhQ)
 
   end subroutine

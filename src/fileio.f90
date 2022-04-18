@@ -46,6 +46,7 @@ module fileio
     integer :: KMIN, KMAX
     integer :: INIKPT      ! inititial k-point of excited state
     integer :: NKPOINTS    ! No. of k-points of the system
+    integer :: NQPOINTS    ! No. of q-points of the system
     integer :: NMODES      ! No. of phonon modes for each q
     integer :: NPARTS      ! No. of parts of ephmat information.
     integer :: Np    ! No. of unit cells in Born-von Kamann boundary conditions
