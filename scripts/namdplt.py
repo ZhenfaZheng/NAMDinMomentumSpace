@@ -9,37 +9,47 @@ from glob import glob
 
 def main():
 
+    #                       Basic parameters setting                      #
+    #######################################################################
+
     Eref = 0.0
     inp = pn.read_inp('inp')
 
-    coup = pn.read_couple(filcoup='EPECTXT', inp=inp)
-    coup_av = np.average(np.abs(coup), axis=0)
-    plot_couple(coup_av, figname='COUPLE.png')
-
-    filshps = glob('SHPROP.*')
-    shp = pn.readshp(filshps)
-    en, kpts = pn.ek_selected(inp=inp)
-    plot_tdprop(shp, Eref, lplot=2, ksen=en, figname='TDEN.png')
-
-    prefix = inp['EPMPREF']; epmdir = inp['EPMDIR']
-    filepm = os.path.join(epmdir, prefix + '_ephmat_p1.h5')
-    A = pn.read_ephmath5(filepm, dset='/el_ph_band_info/lattice_vec_angstrom')
-    a1, a2, a3 = (A[0], A[1], A[2])
-    b1, b2, b3 = pn.calc_rec_vec(a1, a2, a3)
-    kpts_cart = pn.frac2cart(kpts, b1, b2, b3)
-
-    plot_kprop(kpts_cart, shp, B=[b1, b2, b3], axis='xy', figname='TDKPROPxy.png')
-    plot_kprop(kpts_cart, shp, B=[b1, b2, b3], axis='yz', figname='TDKPROPyz.png')
-    plot_kprop(kpts_cart, shp, B=[b1, b2, b3], axis='xz', figname='TDKPROPxz.png')
-
-
     kplabels = 'gkmg'
-    kpath = np.array([
+    kpath = np.array([ # for TDBAND.png
         [0.00000, 0.00000, 0.00000],
         [0.33333, 0.33333, 0.00000],
         [0.50000, 0.00000, 0.00000],
         [0.00000, 0.00000, 0.00000]
         ])
+    qpath = kpath # for TDPH.png
+    qplabels = kplabels
+
+    #                              Read data                              #
+    #######################################################################
+
+    en, kpts = pn.ek_selected(inp=inp)
+    prefix = inp['EPMPREF']; epmdir = inp['EPMDIR']
+    filepm = os.path.join(epmdir, prefix + '_ephmat_p1.h5')
+    A = pn.read_ephmath5(filepm, dset='/el_ph_band_info/lattice_vec_angstrom')
+    a1, a2, a3 = (A[0], A[1], A[2])
+    b1, b2, b3 = pn.calc_rec_vec(a1, a2, a3)
+    filshps = glob('SHPROP.*')
+    shp = pn.readshp(filshps)
+
+
+    #                             Plot figures                            #
+    #######################################################################
+
+    coup = pn.read_couple(filcoup='EPECTXT', inp=inp)
+    coup_av = np.average(np.abs(coup), axis=0)
+    plot_couple(coup_av, figname='COUPLE.png')
+
+    plot_tdprop(shp, Eref, lplot=2, ksen=en, figname='TDEN.png')
+
+    kpts_cart = pn.frac2cart(kpts, b1, b2, b3)
+    plot_kprop(kpts_cart, shp, B=[b1, b2, b3], axis='xy', figname='TDKPROP.png')
+
     kpath_cart = pn.frac2cart(kpath, b1, b2, b3)
     k_index, kp_index = pn.select_kpts_on_path(kpts, kpath, norm=0.01)
     k_loc, kp_loc = pn.loc_on_kpath(kpts_cart, k_index, kp_index, kpath_cart)
@@ -47,58 +57,25 @@ def main():
     plot_tdband(k_loc, en, kp_loc, kplabels, shp, k_index,
                 Eref=Eref, figname='TDBAND.png')
 
+    filphps = glob('PHPROP.*')
+    php = pn.readshp(filphps)
+    ntsteps = int( float(inp['NAMDTIME']) * float(inp['POTIM']) )
+    nmodes = int( php.shape[0] / ntsteps ) ; nqs = php.shape[1] - 2
+    php = php.reshape(nmodes, ntsteps, nqs+2)
 
-def plot_tdband(k_loc, en, kp_loc, kplabels, shp, index,
-        X_bg=None, E_bg=None, Eref=0.0, figname='TDBAND.png'):
+    qpath_cart = pn.frac2cart(qpath, b1, b2, b3)
+    qpts = pn.read_ephmath5(filepm, dset='/el_ph_band_info/q_list')
+    qen = pn.read_ephmath5(filepm, dset='/el_ph_band_info/ph_disp_meV')
+    qpts_cart = pn.frac2cart(qpts, b1, b2, b3)
+    q_index, qp_index = pn.select_kpts_on_path(qpts, qpath, norm=0.001)
+    q_loc, qp_loc = pn.loc_on_kpath(qpts_cart, q_index, qp_index, qpath_cart)
 
-    nbasis = index.shape[0]
-    ntsteps = shp.shape[0]
-    namdtime = shp[-1, 0]
-    potim = namdtime / ntsteps
-    pop = shp[:, index+2]
+    # times = [0, 100, 200, 400, 800, 999]
+    times = list( range(0, ntsteps, int(ntsteps/5)) ) ; times.append(ntsteps-1)
+    plot_tdph_sns(q_loc, qen, qp_loc, qplabels, php, q_index, times, figname='TDPH.png')
 
-    X = np.tile(k_loc, ntsteps).reshape(ntsteps, nbasis)
-    E = np.tile(en[index], ntsteps).reshape(ntsteps, nbasis) - Eref
 
-    xmin = kp_loc[0] ; xmax = kp_loc[-1]
-    ymin = E.min() ; ymax = E.max() ; dy = ymax - ymin
-    ymin -= dy*0.05 ; ymax += dy*0.05
-
-    figsize_x = 4.8
-    figsize_y = 3.6 # in inches
-    fig, ax = plt.subplots()
-    fig.set_size_inches(figsize_x, figsize_y)
-    mpl.rcParams['axes.unicode_minus'] = False
-
-    cmap = 'rainbow'
-    norm = mpl.colors.Normalize(0,namdtime)
-    color_t = np.tile(np.arange(ntsteps), nbasis).reshape(nbasis,ntsteps).T * potim
-    s_avg = np.average(pop[pop>0])
-    dotsize = pop / s_avg * 5
-
-    nkpath = kp_loc.shape[0]
-    for ipath in range(1, nkpath):
-        x = kp_loc[ipath]
-        ax.plot([x,x], [ymin,ymax], 'k', lw=0.7, ls='--')
-
-    sc = ax.scatter(X, E, s=dotsize, lw=0, c=color_t, cmap=cmap, norm=norm)
-    cbar = plt.colorbar(sc, fraction=0.05)
-    cbar.set_label('Time (fs)')
-
-    ticks = []
-    for s in kplabels:
-        s = u'\u0393' if (s=='g' or s=='G') else s.upper()
-        ticks.append(s)
-
-    ax.set_xticks(kp_loc)
-    ax.set_xticklabels(ticks)
-
-    ax.set_xlim(xmin, xmax)
-    ax.set_ylim(ymin, ymax)
-    ax.set_ylabel('Energy (eV)')
-
-    plt.tight_layout()
-    plt.savefig(figname, dpi=400)
+###############################################################################
 
 
 def plot_couple(coup, figname='COUPLE.png'):
@@ -240,6 +217,133 @@ def plot_kprop(kpts, shp, B, axis='xy', figname='TDKPROP.png'):
     plt.axis('off')
     plt.tight_layout()
     plt.savefig(figname, dpi=600)
+
+
+def plot_tdband(k_loc, en, kp_loc, kplabels, shp, index,
+        X_bg=None, E_bg=None, Eref=0.0, figname='TDBAND.png'):
+
+    nbasis = index.shape[0]
+    ntsteps = shp.shape[0]
+    namdtime = shp[-1, 0]
+    potim = namdtime / ntsteps
+    pop = shp[:, index+2]
+
+    X = np.tile(k_loc, ntsteps).reshape(ntsteps, nbasis)
+    E = np.tile(en[index], ntsteps).reshape(ntsteps, nbasis) - Eref
+
+    xmin = kp_loc[0] ; xmax = kp_loc[-1]
+    ymin = E.min() ; ymax = E.max() ; dy = ymax - ymin
+    ymin -= dy*0.05 ; ymax += dy*0.05
+
+    figsize_x = 4.8
+    figsize_y = 3.6 # in inches
+    fig, ax = plt.subplots()
+    fig.set_size_inches(figsize_x, figsize_y)
+    mpl.rcParams['axes.unicode_minus'] = False
+
+    cmap = 'rainbow'
+    norm = mpl.colors.Normalize(0,namdtime)
+    color_t = np.tile(np.arange(ntsteps), nbasis).reshape(nbasis,ntsteps).T * potim
+    s_avg = np.average(pop[pop>0])
+    dotsize = pop / s_avg * 5
+
+    nkpath = kp_loc.shape[0]
+    for ipath in range(1, nkpath):
+        x = kp_loc[ipath]
+        ax.plot([x,x], [ymin,ymax], 'k', lw=0.7, ls='--')
+
+    sc = ax.scatter(X, E, s=dotsize, lw=0, c=color_t, cmap=cmap, norm=norm)
+    cbar = plt.colorbar(sc, fraction=0.05)
+    cbar.set_label('Time (fs)')
+
+    ticks = []
+    for s in kplabels:
+        s = u'\u0393' if (s=='g' or s=='G') else s.upper()
+        ticks.append(s)
+
+    ax.set_xticks(kp_loc)
+    ax.set_xticklabels(ticks)
+
+    ax.set_xlim(xmin, xmax)
+    ax.set_ylim(ymin, ymax)
+    ax.set_ylabel('Energy (eV)')
+
+    plt.tight_layout()
+    plt.savefig(figname, dpi=400)
+
+
+def plot_tdph_sns(q_loc, qen, qp_loc, qplabels, php, index, times,
+                  X_bg=None, E_bg=None, figname='TDPH.png'):
+
+    nts = len(times)
+    nmodes = php.shape[0]
+    ntsteps = php.shape[1]
+    nbasis = index.shape[0]
+    namdtime = php[0, -1, 0]
+    potim = namdtime / ntsteps
+    php = np.cumsum(php, axis=1)
+    pop = php[:,:,index+2][:,times,:]
+    # np.savetxt('phde.dat', php[:,:,1].T, fmt='%12.7f')
+
+    X = q_loc
+    E = qen[index, :]
+
+    xmin = qp_loc[0] ; xmax = qp_loc[-1]
+    ymin = E.min() ; ymax = E.max() ; dy = ymax - ymin
+    ymin -= dy*0.05 ; ymax += dy*0.05
+
+    figsize_x = 2.4 * nts + 1.0
+    figsize_y = 3.2 # in inches
+    fig, axes = plt.subplots(1, nts)
+    fig.set_size_inches(figsize_x, figsize_y)
+    mpl.rcParams['axes.unicode_minus'] = False
+
+    cmap = 'rainbow'
+    cmin = pop.min() ; cmax = pop.max()
+    norm = mpl.colors.Normalize(cmin, cmax)
+    size = np.abs(pop)
+    s_avg = np.average(size[size>0])
+    size = size / s_avg * 3
+
+    for it in range(nts):
+
+        ax = axes[it]
+        time = times[it] * potim
+        if(time==namdtime-potim): time = namdtime
+        ax.set_title('%.0f fs'%time)
+
+        sort_index = np.argsort(q_loc)
+        for im in range(nmodes):
+            ax.plot(q_loc[sort_index], E[sort_index, im], 'r', lw=0.5)
+        nqpath = qp_loc.shape[0]
+        for ipath in range(1, nqpath):
+            x = qp_loc[ipath]
+            ax.plot([x,x], [ymin,ymax], 'k', lw=0.5, ls='--')
+
+        for im in range(nmodes):
+            sc = ax.scatter(X, E[:,im], s=size[im,it,:], lw=0,
+                    c=pop[im,it,:], cmap=cmap, norm=norm)
+
+        ticks = []
+        for s in qplabels:
+            s = u'\u0393' if (s=='g' or s=='G') else s.upper()
+            ticks.append(s)
+
+        ax.set_xticks(qp_loc)
+        ax.set_xticklabels(ticks)
+
+        ax.set_xlim(xmin, xmax)
+        ax.set_ylim(ymin, ymax)
+        if(it==0): ax.set_ylabel('Phonon energy (meV)')
+
+    ll = 0.8/figsize_x ; rr = 1.0 - 1.0 / figsize_x
+    ll_cb = 1.0 - 0.9 / figsize_x ; ww_cb = 0.12 / figsize_x
+    fig.subplots_adjust(bottom=0.1, top=0.9, left=ll, right=rr, wspace=0.35)
+    cb_ax = fig.add_axes([ll_cb, 0.1, ww_cb, 0.8])
+    cbar = plt.colorbar(sc, cax=cb_ax)
+
+    plt.savefig(figname, dpi=400)
+
 
 if __name__=='__main__':
     main()
