@@ -21,7 +21,7 @@ Program main
   integer :: ns
 
   write(*,*)
-  write(*,*) "Hefei-NAMD (epc version 1.8.1, Apr 18, 2022)"
+  write(*,*) "Hefei-NAMD (epc version 1.8.2, Apr 19, 2022)"
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   ! First, get user inputs
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -59,14 +59,14 @@ Program main
     ! Run surface hopping
     if (inp%LSHP) then
       call runSH(ks, inp, olap_sec)
-      if (inp%LEPC) then
-        call printSH_EPC(ks, inp, olap_sec)
-      else
-        call printSH(ks, inp)
-      end if
+      call printSH(ks, inp)
     end if
     call system_clock(t2)
     write(*,'(A, F10.2)') "CPU Time [s]:", (t2-t1)/real(rate)
   end do
+  if (inp%LEPC) then
+    ks%ph_pops = ks%ph_pops / inp%NTRAJ / inp%NSAMPLE
+    call printPHPROP(ks, inp, olap_sec)
+  end if
 
 end Program

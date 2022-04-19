@@ -57,22 +57,23 @@ def main():
     plot_tdband(k_loc, en, kp_loc, kplabels, shp, k_index,
                 Eref=Eref, figname='TDBAND.png')
 
-    filphps = glob('PHPROP.*')
-    php = pn.readshp(filphps)
+    php = np.loadtxt('PHPROP')
     ntsteps = int( float(inp['NAMDTIME']) * float(inp['POTIM']) )
     nmodes = int( php.shape[0] / ntsteps ) ; nqs = php.shape[1] - 2
     php = php.reshape(nmodes, ntsteps, nqs+2)
 
     qpath_cart = pn.frac2cart(qpath, b1, b2, b3)
     qpts = pn.read_ephmath5(filepm, dset='/el_ph_band_info/q_list')
-    qen = pn.read_ephmath5(filepm, dset='/el_ph_band_info/ph_disp_meV')
+    phen = pn.read_ephmath5(filepm, dset='/el_ph_band_info/ph_disp_meV')
     qpts_cart = pn.frac2cart(qpts, b1, b2, b3)
     q_index, qp_index = pn.select_kpts_on_path(qpts, qpath, norm=0.001)
     q_loc, qp_loc = pn.loc_on_kpath(qpts_cart, q_index, qp_index, qpath_cart)
 
     # times = [0, 100, 200, 400, 800, 999]
     times = list( range(0, ntsteps, int(ntsteps/5)) ) ; times.append(ntsteps-1)
-    plot_tdph_sns(q_loc, qen, qp_loc, qplabels, php, q_index, times, figname='TDPH.png')
+    plot_tdph_sns(q_loc, phen, qp_loc, qplabels, php, q_index, times, figname='TDPH.png')
+
+    print("\nAll Done!\n")
 
 
 ###############################################################################
@@ -106,6 +107,7 @@ def plot_couple(coup, figname='COUPLE.png'):
     cbar.set_label('Coupling (meV)')
     plt.tight_layout()
     plt.savefig(figname, dpi=400)
+    print("\n%s has been saved."%figname)
 
 
 def plot_tdprop(shp, Eref=0.0, lplot=1, ksen=None, figname='tdshp.png'):
@@ -169,6 +171,7 @@ def plot_tdprop(shp, Eref=0.0, lplot=1, ksen=None, figname='tdshp.png'):
 
     plt.tight_layout()
     plt.savefig(figname, dpi=400)
+    print("\n%s has been saved."%figname)
 
 
 def plot_kprop(kpts, shp, B, axis='xy', figname='TDKPROP.png'):
@@ -217,6 +220,7 @@ def plot_kprop(kpts, shp, B, axis='xy', figname='TDKPROP.png'):
     plt.axis('off')
     plt.tight_layout()
     plt.savefig(figname, dpi=600)
+    print("\n%s has been saved."%figname)
 
 
 def plot_tdband(k_loc, en, kp_loc, kplabels, shp, index,
@@ -270,9 +274,10 @@ def plot_tdband(k_loc, en, kp_loc, kplabels, shp, index,
 
     plt.tight_layout()
     plt.savefig(figname, dpi=400)
+    print("\n%s has been saved."%figname)
 
 
-def plot_tdph_sns(q_loc, qen, qp_loc, qplabels, php, index, times,
+def plot_tdph_sns(q_loc, phen, qp_loc, qplabels, php, index, times,
                   X_bg=None, E_bg=None, figname='TDPH.png'):
 
     nts = len(times)
@@ -283,10 +288,10 @@ def plot_tdph_sns(q_loc, qen, qp_loc, qplabels, php, index, times,
     potim = namdtime / ntsteps
     php = np.cumsum(php, axis=1)
     pop = php[:,:,index+2][:,times,:]
-    # np.savetxt('phde.dat', php[:,:,1].T, fmt='%12.7f')
+    np.savetxt('phde.dat', php[:,:,1].T, fmt='%12.7f')
 
     X = q_loc
-    E = qen[index, :]
+    E = phen[index, :]
 
     xmin = qp_loc[0] ; xmax = qp_loc[-1]
     ymin = E.min() ; ymax = E.max() ; dy = ymax - ymin
@@ -343,6 +348,7 @@ def plot_tdph_sns(q_loc, qen, qp_loc, qplabels, php, index, times,
     cbar = plt.colorbar(sc, cax=cb_ax)
 
     plt.savefig(figname, dpi=400)
+    print("\n%s has been saved."%figname)
 
 
 if __name__=='__main__':

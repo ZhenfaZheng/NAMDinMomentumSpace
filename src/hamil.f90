@@ -84,6 +84,7 @@ module hamil
         allocate(ks%PhQ(olap%NQ, olap%NMODES, 2, Nt))
         allocate(ks%ph_pops(olap%NQ, olap%NMODES, Nt))
         allocate(ks%ph_prop(N,N, olap%NMODES, 2))
+        ks%ph_pops = 0
       else
         allocate(ks%NAcoup(N,N, Nt))
       end if

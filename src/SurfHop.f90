@@ -136,7 +136,7 @@ module shop
 
     if (inp%LEPC) then
 
-      ks%ph_pops = 0
+      ! ks%ph_pops = 0
       ks%ph_prop = 0
       call calcBftot(ks, inp)
 
@@ -162,7 +162,7 @@ module shop
         end do
       end do
       ks%sh_pops = ks%sh_pops / inp%NTRAJ
-      ks%ph_pops = ks%ph_pops / inp%NTRAJ
+      ! ks%ph_pops = ks%ph_pops / inp%NTRAJ
 
     else
 
@@ -356,7 +356,7 @@ module shop
 
   end subroutine
 
-  subroutine printSH_EPC(ks, inp, olap)
+  subroutine printPHPROP(ks, inp, olap)
     implicit none
     type(TDKS), intent(in) :: ks
     type(namdInfo), intent(in) :: inp
@@ -365,66 +365,50 @@ module shop
     integer :: i, j, tion, Nt, ierr, io, im, NM
     character(len=48) :: buf
 
-    write(buf, *) inp%NAMDTINI
-    open(unit=24, file='SHPROP.' // trim(adjustl(buf)), &
-         status='unknown', action='write', iostat=ierr)
-    open(unit=25, file='PSICT.' // trim(adjustl(buf)), &
-         status='unknown', action='write', iostat=ierr)
-    open(unit=26, file='PHPROP.' // trim(adjustl(buf)), &
+    open(unit=26, file='PHPROP', &
          status='unknown', action='write', iostat=ierr)
     if (ierr /= 0) then
-      write(*,*) "SHPROP file I/O error!"
+      write(*,*) "PHPROP file I/O error!"
       stop
     end if
 
-    do io = 24, 26
-      write(io,'(A,A12,A3,I6)')     '#', 'BMIN',     ' = ', inp%BMIN
-      write(io,'(A,A12,A3,I6)')     '#', 'BMAX',     ' = ', inp%BMAX
-      write(io,'(A,A12,A3,I6)')     '#', 'KMIN',     ' = ', inp%KMIN
-      write(io,'(A,A12,A3,I6)')     '#', 'KMAX',     ' = ', inp%KMAX
-      if (inp%EMIN > -1.0E5_q) &
-        write(io,'(A,A12,A3,F6.2)') '#', 'EMIN',     ' = ', inp%EMIN
-      if (inp%EMAX <  1.0E5_q) &
-        write(io,'(A,A12,A3,F6.2)') '#', 'EMAX',     ' = ', inp%EMAX
+    io = 26
+    write(io,'(A,A12,A3,I6)')     '#', 'BMIN',     ' = ', inp%BMIN
+    write(io,'(A,A12,A3,I6)')     '#', 'BMAX',     ' = ', inp%BMAX
+    write(io,'(A,A12,A3,I6)')     '#', 'KMIN',     ' = ', inp%KMIN
+    write(io,'(A,A12,A3,I6)')     '#', 'KMAX',     ' = ', inp%KMAX
+    if (inp%EMIN > -1.0E5_q) &
+      write(io,'(A,A12,A3,F6.2)') '#', 'EMIN',     ' = ', inp%EMIN
+    if (inp%EMAX <  1.0E5_q) &
+      write(io,'(A,A12,A3,F6.2)') '#', 'EMAX',     ' = ', inp%EMAX
 
-      write(io,'(A,A12,A3,I6)')     '#', 'NBASIS',   ' = ', inp%NBASIS
-      write(io,'(A,A12,A3,I6)')     '#', 'NBANDS',   ' = ', inp%NBANDS
-      write(io,'(A,A12,A3,I6)')     '#', 'NKPOINTS', ' = ', inp%NKPOINTS
-      write(io,'(A,A12,A3,I6)')     '#', 'INIBAND',  ' = ', inp%INIBAND
-      write(io,'(A,A12,A3,I6)')     '#', 'INIKPT',   ' = ', inp%INIKPT
+    write(io,'(A,A12,A3,I6)')     '#', 'NBASIS',   ' = ', inp%NBASIS
+    write(io,'(A,A12,A3,I6)')     '#', 'NBANDS',   ' = ', inp%NBANDS
+    write(io,'(A,A12,A3,I6)')     '#', 'NKPOINTS', ' = ', inp%NKPOINTS
+    write(io,'(A,A12,A3,I6)')     '#', 'INIBAND',  ' = ', inp%INIBAND
+    write(io,'(A,A12,A3,I6)')     '#', 'INIKPT',   ' = ', inp%INIKPT
 
-      write(io,'(A,A12,A3,I6)')     '#', 'NSW',      ' = ', inp%NSW
-      write(io,'(A,A12,A3,F6.1)')   '#', 'POTIM',    ' = ', inp%POTIM
-      write(io,'(A,A12,A3,F6.1)')   '#', 'TEMP',     ' = ', inp%TEMP
-      write(io,'(A,A12,A3,I6)')     '#', 'NAMDTINI', ' = ', inp%NAMDTINI
-      write(io,'(A,A12,A3,I6)')     '#', 'NAMDTIME', ' = ', inp%NAMDTIME
-      write(io,'(A,A12,A3,I6)')     '#', 'NTRAJ',    ' = ', inp%NTRAJ
-      write(io,'(A,A12,A3,I6)')     '#', 'NELM',     ' = ', inp%NELM
+    write(io,'(A,A12,A3,I6)')     '#', 'NSW',      ' = ', inp%NSW
+    write(io,'(A,A12,A3,F6.1)')   '#', 'POTIM',    ' = ', inp%POTIM
+    write(io,'(A,A12,A3,F6.1)')   '#', 'TEMP',     ' = ', inp%TEMP
+    write(io,'(A,A12,A3,I6)')     '#', 'NAMDTINI', ' = ', inp%NAMDTINI
+    write(io,'(A,A12,A3,I6)')     '#', 'NAMDTIME', ' = ', inp%NAMDTIME
+    write(io,'(A,A12,A3,I6)')     '#', 'NTRAJ',    ' = ', inp%NTRAJ
+    write(io,'(A,A12,A3,I6)')     '#', 'NELM',     ' = ', inp%NELM
 
-      write(io,'(A,A12,A3,L6)')     '#', 'LEPC',     ' = ', inp%LEPC
-      write(io,'(A,A12,A3,L6)')     '#', 'LARGEBS',  ' = ', inp%LARGEBS
-      write(io,'(A,A12,A3,I6)')     '#', 'EPCTYPE',  ' = ', inp%EPCTYPE
-      write(io,'(A,A12,A3,L6)')     '#', 'LBASSEL',  ' = ', inp%LBASSEL
-      write(io,'(A,A12,A3,L6)')     '#', 'LSORT',    ' = ', inp%LSORT
-      write(io,'(A,A12,A3,L6)')     '#', 'LCPTXT',   ' = ', inp%LCPTXT
-      write(io,'(A,A12,A3,L6)')     '#', 'LHOLE',    ' = ', inp%LHOLE
+    write(io,'(A,A12,A3,L6)')     '#', 'LEPC',     ' = ', inp%LEPC
+    write(io,'(A,A12,A3,L6)')     '#', 'LARGEBS',  ' = ', inp%LARGEBS
+    write(io,'(A,A12,A3,I6)')     '#', 'EPCTYPE',  ' = ', inp%EPCTYPE
+    write(io,'(A,A12,A3,L6)')     '#', 'LBASSEL',  ' = ', inp%LBASSEL
+    write(io,'(A,A12,A3,L6)')     '#', 'LSORT',    ' = ', inp%LSORT
+    write(io,'(A,A12,A3,L6)')     '#', 'LCPTXT',   ' = ', inp%LCPTXT
+    write(io,'(A,A12,A3,L6)')     '#', 'LHOLE',    ' = ', inp%LHOLE
 
-      if (inp%EPCTYPE==2) &
-        write(io,'(A,A12,A3,A)') '#', 'MDFIL', ' = ', TRIM(ADJUSTL(inp%FILMD))
-      write(io,'(A,A12,A3,A)') '#', 'EPMFIL', ' = ', TRIM(ADJUSTL(inp%FILEPM))
-    end do
+    if (inp%EPCTYPE==2) &
+      write(io,'(A,A12,A3,A)') '#', 'MDFIL', ' = ', TRIM(ADJUSTL(inp%FILMD))
+    write(io,'(A,A12,A3,A)') '#', 'EPMFIL', ' = ', TRIM(ADJUSTL(inp%FILEPM))
 
     Nt = inp%NAMDTIME / inp%POTIM
-    do tion=1, Nt
-      write(unit=24, fmt='(*(G20.10))') &
-            tion * inp%POTIM, SUM(ks%eigKs(:,tion) * ks%sh_pops(:,tion)), &
-            (ks%sh_pops(i,tion), i=1, ks%ndim)
-      ! write(unit=25, fmt="(2G20.10, *( ' ( ',G20.10,' , ',G20.10,' ) ' ) )") &
-      write(unit=25, fmt='(*(G20.10))') &
-            tion * inp%POTIM, SUM(ks%eigKs(:,tion) * ks%pop_a(:,tion)), &
-          ! (ks%psi_a(i,tion), i=1, ks%ndim)
-            (ks%pop_a(i,tion), i=1, ks%ndim)
-    end do
 
     do im=1, inp%NMODES
       do tion=1, Nt
@@ -435,8 +419,6 @@ module shop
       write(unit=26, fmt=*)
     end do
 
-    close(24)
-    close(25)
     close(26)
 
 
