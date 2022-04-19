@@ -38,7 +38,7 @@ module hamil
     real(kind=q), allocatable, dimension(:,:) :: sh_pops
     real(kind=q), allocatable, dimension(:,:) :: sh_prop
     real(kind=q), allocatable, dimension(:,:,:) :: ph_pops
-    real(kind=q), allocatable, dimension(:,:,:,:) :: ph_prop
+    real(kind=q), allocatable, dimension(:,:,:) :: ph_prop
     ! Blotzmann factor for SH probability scaling.
     real(kind=q), allocatable, dimension(:,:) :: sh_Bfactor
 
@@ -56,7 +56,9 @@ module hamil
     type(overlap), intent(in)  :: olap
     type(namdInfo), intent(in) :: inp
 
-    integer :: i, j, im, t, nsteps, N, NM, Nt
+    real(kind=q) :: norm
+    real(kind=q), allocatable, dimension(:,:) :: eptemp
+    integer :: i, j, iq, im, t, nsteps, N, Nt
     integer :: initstep
 
     ! memory allocation
@@ -83,8 +85,7 @@ module hamil
       if (inp%LEPC) then
         allocate(ks%PhQ(olap%NQ, olap%NMODES, 2, Nt))
         allocate(ks%ph_pops(olap%NQ, olap%NMODES, Nt))
-        allocate(ks%ph_prop(N,N, olap%NMODES, 2))
-        ks%ph_pops = 0
+        allocate(ks%ph_prop(N,N, olap%NMODES))
       else
         allocate(ks%NAcoup(N,N, Nt))
       end if
@@ -117,29 +118,24 @@ module hamil
     nsteps = inp%NSW - 1
 
     if (inp%LEPC) then
+
       do t=1, Nt
         i = MOD(initstep+t, nsteps) + 1
         ks%eigKs(:,t) = olap%Eig(:,i)
         ks%PhQ(:,:,:,t) = olap%PhQ(:,:,:,i)
       end do
-      ! if (inp%LARGEBS) then
-      !   do t=1, Nt
-      !     i = MOD(initstep+t, nsteps) + 1
-      !     ks%eigKs(:,t) = olap%Eig(:,i)
-      !     ks%PhQ(:,:,:,t) = olap%PhQ(:,:,:,i)
-      !   end do
-      ! else
-      !   do t=1, Nt
-      !     ! If time step > NSW-1, use Eig & couplings
-      !     ! from initial time repeatedly.
-      !     i = MOD(initstep+t, nsteps) + 1
-      !     ks%eigKs(:,t) = olap%Eig(:, i)
-      !     ks%NAcoup(:,:,t) = olap%Dij(:,:, i)
-      !     ks%EPcoup(:,:,t) = &
-      !       SUM( SUM(olap%EPcoup(:,:,:,:,i), dim=4), dim=3)
-      !   end do
-      ! end if
+      allocate(eptemp(inp%NMODES, 2))
+      do i=1,N
+        do j=1,N
+          iq = olap%kkqmap(i,j)
+          eptemp = ABS(olap%EPcoup(i,j,:,:,1) * ks%PhQ(iq,:,:,1)) ** 2
+          norm = SUM(eptemp)
+          if (norm>0) ks%ph_prop(i,j,:) = (eptemp(:,2) - eptemp(:,1)) / norm
+        end do
+      end do
+
     else
+
       do t=1, Nt
         ! If time step > NSW-1, use Eig & couplings
         ! from initial time repeatedly.
@@ -150,6 +146,7 @@ module hamil
         ! because we didn't do this in the calculation of couplings
         ks%NAcoup(:,:,t) = olap%Dij(:,:, i) / (2*inp%POTIM)
       end do
+
     end if
 
   end subroutine

@@ -62,17 +62,18 @@ module shop
     type(overlap), intent(in) :: olap
 
     real(kind=q) :: Akk, norm
-    complex(kind=q), allocatable :: epcoup(:), eptemp(:,:)
+    complex(kind=q), allocatable :: epcoup(:) ! , eptemp(:,:)
     integer :: i, iq
 
-    allocate(epcoup(ks%ndim), eptemp(inp%NMODES, 2))
+    allocate(epcoup(ks%ndim))
+    ! allocate(epcoup(ks%ndim), eptemp(inp%NMODES, 2))
     do i=1,ks%ndim
       iq = olap%kkqmap(cstat, i)
-      eptemp = olap%EPcoup(cstat,i,:,:,1) * ks%PhQ(iq,:,:,tion)
-      ks%ph_prop(cstat, i, :, :) = ABS(eptemp) ** 2
-      norm = SUM(ks%ph_prop(cstat, i, :, :))
-      if (norm>0) ks%ph_prop(cstat, i, :, :) = ks%ph_prop(cstat, i, :, :) / norm
-      epcoup(i) = SUM(eptemp)
+      epcoup(i) = SUM(olap%EPcoup(cstat,i,:,:,1) * ks%PhQ(iq,:,:,tion))
+      ! eptemp = olap%EPcoup(cstat,i,:,:,1) * ks%PhQ(iq,:,:,tion)
+      ! ks%ph_prop(cstat, i, :, :) = ABS(eptemp) ** 2
+      ! norm = SUM(ks%ph_prop(cstat, i, :, :))
+      ! if (norm>0) ks%ph_prop(cstat, i, :, :) = ks%ph_prop(cstat, i, :, :) / norm
     end do
 
     Akk = CONJG(ks%psi_a(cstat, tion)) * ks%psi_a(cstat, tion)
@@ -137,7 +138,7 @@ module shop
     if (inp%LEPC) then
 
       ! ks%ph_pops = 0
-      ks%ph_prop = 0
+      ! ks%ph_prop = 0
       call calcBftot(ks, inp)
 
       do tion=1, Nt
@@ -153,9 +154,7 @@ module shop
             iq = olap%kkqmap(cstat_all(i), cstat)
             if (iq>0) then
               ks%ph_pops(iq, :, tion) &
-                = ks%ph_pops(iq, :, tion) &
-                - ks%ph_prop(cstat_all(i), cstat, :, 1) &
-                + ks%ph_prop(cstat_all(i), cstat, :, 2)
+                = ks%ph_pops(iq, :, tion) + ks%ph_prop(cstat_all(i), cstat, :)
             end if
           end if
           cstat_all(i) = cstat

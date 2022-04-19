@@ -15,6 +15,14 @@ def main():
     Eref = 0.0
     inp = pn.read_inp('inp')
 
+    which_plt = [1, 2, 31, 4, 5]
+    '''
+    Select which figures to plot.
+    1: COUPLE.png; 2: TDEN.png;
+    31: TDKPROPxy.png; 32: TDKPROPyz.png; 33: TDKPROPxz.png;
+    4: TDBAND.png; 5: TDPH.png
+    '''
+
     kplabels = 'gkmg'
     kpath = np.array([ # for TDBAND.png
         [0.00000, 0.00000, 0.00000],
@@ -41,37 +49,46 @@ def main():
     #                             Plot figures                            #
     #######################################################################
 
-    coup = pn.read_couple(filcoup='EPECTXT', inp=inp)
-    coup_av = np.average(np.abs(coup), axis=0)
-    plot_couple(coup_av, figname='COUPLE.png')
+    if (1 in which_plt):
+        coup = pn.read_couple(filcoup='EPECTXT', inp=inp)
+        coup_av = np.average(np.abs(coup), axis=0)
+        plot_couple(coup_av, figname='COUPLE.png')
 
-    plot_tdprop(shp, Eref, lplot=2, ksen=en, figname='TDEN.png')
+    if (2 in which_plt):
+        plot_tdprop(shp, Eref, lplot=2, ksen=en, figname='TDEN.png')
 
     kpts_cart = pn.frac2cart(kpts, b1, b2, b3)
-    plot_kprop(kpts_cart, shp, B=[b1, b2, b3], axis='xy', figname='TDKPROP.png')
+    if (31 in which_plt):
+        plot_kprop(kpts_cart, shp, B=[b1, b2, b3], axis='xy', figname='TDKPROPxy.png')
+    if (32 in which_plt):
+        plot_kprop(kpts_cart, shp, B=[b1, b2, b3], axis='yz', figname='TDKPROPyz.png')
+    if (33 in which_plt):
+        plot_kprop(kpts_cart, shp, B=[b1, b2, b3], axis='xz', figname='TDKPROPxz.png')
 
-    kpath_cart = pn.frac2cart(kpath, b1, b2, b3)
-    k_index, kp_index = pn.select_kpts_on_path(kpts, kpath, norm=0.01)
-    k_loc, kp_loc = pn.loc_on_kpath(kpts_cart, k_index, kp_index, kpath_cart)
+    if (4 in which_plt):
+        kpath_cart = pn.frac2cart(kpath, b1, b2, b3)
+        k_index, kp_index = pn.select_kpts_on_path(kpts, kpath, norm=0.01)
+        k_loc, kp_loc = pn.loc_on_kpath(kpts_cart, k_index, kp_index, kpath_cart)
 
-    plot_tdband(k_loc, en, kp_loc, kplabels, shp, k_index,
-                Eref=Eref, figname='TDBAND.png')
+        plot_tdband(k_loc, en, kp_loc, kplabels, shp, k_index,
+                    Eref=Eref, figname='TDBAND.png')
 
-    php = np.loadtxt('PHPROP')
-    ntsteps = int( float(inp['NAMDTIME']) * float(inp['POTIM']) )
-    nmodes = int( php.shape[0] / ntsteps ) ; nqs = php.shape[1] - 2
-    php = php.reshape(nmodes, ntsteps, nqs+2)
+    if (5 in which_plt):
+        php = np.loadtxt('PHPROP')
+        ntsteps = int( float(inp['NAMDTIME']) * float(inp['POTIM']) )
+        nmodes = int( php.shape[0] / ntsteps ) ; nqs = php.shape[1] - 2
+        php = php.reshape(nmodes, ntsteps, nqs+2)
 
-    qpath_cart = pn.frac2cart(qpath, b1, b2, b3)
-    qpts = pn.read_ephmath5(filepm, dset='/el_ph_band_info/q_list')
-    phen = pn.read_ephmath5(filepm, dset='/el_ph_band_info/ph_disp_meV')
-    qpts_cart = pn.frac2cart(qpts, b1, b2, b3)
-    q_index, qp_index = pn.select_kpts_on_path(qpts, qpath, norm=0.001)
-    q_loc, qp_loc = pn.loc_on_kpath(qpts_cart, q_index, qp_index, qpath_cart)
+        qpath_cart = pn.frac2cart(qpath, b1, b2, b3)
+        qpts = pn.read_ephmath5(filepm, dset='/el_ph_band_info/q_list')
+        phen = pn.read_ephmath5(filepm, dset='/el_ph_band_info/ph_disp_meV')
+        qpts_cart = pn.frac2cart(qpts, b1, b2, b3)
+        q_index, qp_index = pn.select_kpts_on_path(qpts, qpath, norm=0.001)
+        q_loc, qp_loc = pn.loc_on_kpath(qpts_cart, q_index, qp_index, qpath_cart)
 
-    # times = [0, 100, 200, 400, 800, 999]
-    times = list( range(0, ntsteps, int(ntsteps/5)) ) ; times.append(ntsteps-1)
-    plot_tdph_sns(q_loc, phen, qp_loc, qplabels, php, q_index, times, figname='TDPH.png')
+        # times = [0, 100, 200, 400, 800, 999]
+        times = list( range(0, ntsteps, int(ntsteps/5)) ) ; times.append(ntsteps-1)
+        plot_tdph_sns(q_loc, phen, qp_loc, qplabels, php, q_index, times, figname='TDPH.png')
 
     print("\nAll Done!\n")
 
@@ -303,7 +320,7 @@ def plot_tdph_sns(q_loc, phen, qp_loc, qplabels, php, index, times,
     fig.set_size_inches(figsize_x, figsize_y)
     mpl.rcParams['axes.unicode_minus'] = False
 
-    cmap = 'rainbow'
+    cmap = 'plasma'
     cmin = pop.min() ; cmax = pop.max()
     norm = mpl.colors.Normalize(cmin, cmax)
     size = np.abs(pop)
