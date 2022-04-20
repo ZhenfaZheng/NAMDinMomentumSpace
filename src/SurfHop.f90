@@ -355,12 +355,14 @@ module shop
 
   end subroutine
 
-  subroutine printPHPROP(ks, inp, olap)
+  subroutine printPHPROP(ks, inp, olap, isample)
     implicit none
     type(TDKS), intent(in) :: ks
     type(namdInfo), intent(in) :: inp
     type(overlap), intent(in) :: olap
+    integer, intent(in) :: isample
 
+    real(kind=q), allocatable, dimension(:,:,:) :: pops
     integer :: i, j, tion, Nt, ierr, io, im, NM
     character(len=48) :: buf
 
@@ -408,12 +410,14 @@ module shop
     write(io,'(A,A12,A3,A)') '#', 'EPMFIL', ' = ', TRIM(ADJUSTL(inp%FILEPM))
 
     Nt = inp%NAMDTIME / inp%POTIM
+    allocate(pops(inp%NQPOINTS, inp%NMODES, Nt))
+    pops = ks%ph_pops / inp%NTRAJ / isample
 
     do im=1, inp%NMODES
       do tion=1, Nt
         write(unit=26, fmt='(*(G20.10))') &
-            tion * inp%POTIM, SUM(olap%Phfreq(:,im) * ks%ph_pops(:,im,tion)), &
-            (ks%ph_pops(i, im,tion), i=1, inp%NQPOINTS)
+            tion * inp%POTIM, SUM( olap%Phfreq(:,im) * pops(:,im,tion) ), &
+            (pops(i, im,tion), i=1, inp%NQPOINTS)
       end do
       write(unit=26, fmt=*)
     end do

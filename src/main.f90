@@ -21,7 +21,7 @@ Program main
   integer :: ns
 
   write(*,*)
-  write(*,*) "Hefei-NAMD (epc version 1.8.3, Apr 19, 2022)"
+  write(*,*) "Hefei-NAMD (epc version 1.8.4, Apr 19, 2022)"
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   ! First, get user inputs
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -60,13 +60,10 @@ Program main
     if (inp%LSHP) then
       call runSH(ks, inp, olap_sec)
       call printSH(ks, inp)
+      if (inp%LEPC) call printPHPROP(ks, inp, olap_sec, ns)
     end if
     call system_clock(t2)
     write(*,'(A, F10.2)') "CPU Time [s]:", (t2-t1)/real(rate)
   end do
-  if (inp%LEPC) then
-    ks%ph_pops = ks%ph_pops / inp%NTRAJ / inp%NSAMPLE
-    call printPHPROP(ks, inp, olap_sec)
-  end if
 
 end Program

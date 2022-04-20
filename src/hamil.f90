@@ -102,6 +102,21 @@ module hamil
       allocate(ks%Bkm(N))
 
       ks%LALLO = .TRUE.
+
+      if (inp%LEPC) then
+        ks%ph_pops = 0.0
+        ks%ph_prop = 0.0
+        allocate(eptemp(inp%NMODES, 2))
+        do i=1,N
+          do j=1,N
+            iq = olap%kkqmap(i,j)
+            eptemp = ABS(olap%EPcoup(i,j,:,:,1) * olap%PhQ(iq,:,:,1)) ** 2
+            norm = SUM(eptemp)
+            if (norm>0) ks%ph_prop(i,j,:) = (eptemp(:,2) - eptemp(:,1)) / norm
+          end do
+        end do
+      end if
+
     end if
 
     ! cero = (0, 0)
@@ -123,15 +138,6 @@ module hamil
         i = MOD(initstep+t, nsteps) + 1
         ks%eigKs(:,t) = olap%Eig(:,i)
         ks%PhQ(:,:,:,t) = olap%PhQ(:,:,:,i)
-      end do
-      allocate(eptemp(inp%NMODES, 2))
-      do i=1,N
-        do j=1,N
-          iq = olap%kkqmap(i,j)
-          eptemp = ABS(olap%EPcoup(i,j,:,:,1) * ks%PhQ(iq,:,:,1)) ** 2
-          norm = SUM(eptemp)
-          if (norm>0) ks%ph_prop(i,j,:) = (eptemp(:,2) - eptemp(:,1)) / norm
-        end do
       end do
 
     else
