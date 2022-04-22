@@ -52,7 +52,7 @@ module shop
 
   end subroutine
 
-  subroutine calcprop_LBS(tion, cstat, ks, inp, olap)
+  subroutine calcprop_EPC(tion, cstat, ks, inp, olap)
     implicit none
 
     type(TDKS), intent(inout) :: ks
@@ -98,14 +98,9 @@ module shop
 
     Akk = CONJG(ks%psi_a(cstat, tion)) * ks%psi_a(cstat, tion)
 
-    if (inp%LEPC) then
-      ks%Bkm = -2. / hbar * AIMAG( CONJG(ks%psi_a(cstat, tion)) * &
-               ks%psi_a(:, tion) * ks%EPcoup(cstat, :, tion) )
-    else
-      ks%Bkm = 2. * REAL(CONJG(ks%psi_a(cstat, tion)) * ks%psi_a(:, tion) * &
-                    ks%NAcoup(cstat, :, tion))
-      call calcBfactor(ks, inp, cstat, tion)
-    end if
+    ks%Bkm = 2. * REAL(CONJG(ks%psi_a(cstat, tion)) * ks%psi_a(:, tion) * &
+                  ks%NAcoup(cstat, :, tion))
+    call calcBfactor(ks, inp, cstat, tion)
 
     ks%sh_prop(cstat,:) = ks%Bkm / Akk * inp%POTIM * ks%sh_Bfactor(cstat,:)
     forall (i=1:ks%ndim, ks%sh_prop(cstat,i) < 0) ks%sh_prop(cstat,i) = 0
@@ -144,7 +139,7 @@ module shop
       do tion=1, Nt
         do ibas=1,nbas
         ! do ibas=int(minval(cstat_all)), int(maxval(cstat_all))
-          call calcprop_LBS(tion, ibas, ks, inp, olap)
+          call calcprop_EPC(tion, ibas, ks, inp, olap)
         end do
         do i=1, inp%NTRAJ
           cstat = cstat_all(i)
@@ -179,30 +174,6 @@ module shop
       ks%sh_pops = ks%sh_pops / inp%NTRAJ
 
     end if
-
-    ! do tion=1, Nt
-
-    !   ! if (inp%LARGEBS) then
-    !   if (inp%LEPC) then
-    !     do ibas=1,nbas
-    !       call calcprop_LBS(tion, ibas, ks, inp, olap)
-    !     end do
-    !   else
-    !     do ibas=1,nbas
-    !       call calcprop(tion, ibas, ks, inp)
-    !     end do
-    !   end if
-
-    !   do i=1, inp%NTRAJ
-    !     cstat = cstat_all(i)
-    !     call whichToHop(cstat, ks)
-    !     cstat_all(i) = cstat
-    !     ks%sh_pops(cstat, tion) = ks%sh_pops(cstat, tion) + 1
-    !   end do
-
-    ! end do
-
-    ! ks%sh_pops = ks%sh_pops / inp%NTRAJ
 
   end subroutine
 

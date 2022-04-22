@@ -35,9 +35,8 @@ module TimeProp
       ! do tele = 1, inp%NELM-1
       do tele = 1, inp%NELM-1
         ! construct hamiltonian matrix
-        ! if (inp%LARGEBS) then
         if (inp%LEPC) then
-          call make_hamil_LBS(tion, tele, ks, inp, olap)
+          call make_hamil_EPC(tion, tele, ks, inp, olap)
         else
           call make_hamil(tion, tele, ks, inp)
         end if

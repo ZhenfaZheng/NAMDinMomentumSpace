@@ -807,7 +807,7 @@ module epcoup
   end subroutine
 
 
-  subroutine calcEPC_LBS(olap, inp)
+  subroutine calcEPC(olap, inp)
   ! EPC calculations for large basis set.
     implicit none
 
@@ -855,7 +855,7 @@ module epcoup
   end subroutine
 
 
-  subroutine calcEPC(olap, inp)
+  subroutine calcNAC(olap, inp)
     implicit none
 
     type(overlap), intent(inout) :: olap
@@ -977,13 +977,13 @@ module epcoup
 
     write(*,*) "Calculating e-ph couplings."
     if (inp%LARGEBS) then
-      call calcEPC_LBS(olap_sec, inp)
-      call writeTXT_LBS(olap_sec)
-    else
       call calcEPC(olap_sec, inp)
+      call writeTXT_EPC(olap_sec)
+    else
+      call calcNAC(olap_sec, inp)
       call writeEPTXTs(olap_sec)
       deallocate(olap_sec%Dij, olap_sec%EPcoup)
-      call calcEPC_LBS(olap_sec, inp)
+      call calcEPC(olap_sec, inp)
     end if
 
     call releaseEPC(epc)
@@ -1350,7 +1350,7 @@ module epcoup
 
   end subroutine
 
-  subroutine writeTXT_LBS(olap)
+  subroutine writeTXT_EPC(olap)
     implicit none
 
     type(overlap), intent(inout) :: olap

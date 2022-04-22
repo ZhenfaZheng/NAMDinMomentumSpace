@@ -58,7 +58,7 @@ module hamil
 
     real(kind=q) :: norm
     real(kind=q), allocatable, dimension(:,:) :: eptemp
-    integer :: i, j, iq, im, t, nsteps, N, Nt
+    integer :: i, j, iq, im, t, nsteps, N, Nt, nmodes, nqs
     integer :: initstep
 
     ! memory allocation
@@ -82,40 +82,39 @@ module hamil
 
       allocate(ks%eigKs(N, Nt))
 
-      if (inp%LEPC) then
-        allocate(ks%PhQ(olap%NQ, olap%NMODES, 2, Nt))
-        allocate(ks%ph_pops(olap%NQ, olap%NMODES, Nt))
-        allocate(ks%ph_prop(N,N, olap%NMODES))
-      else
-        allocate(ks%NAcoup(N,N, Nt))
-      end if
-      ! if (.NOT. inp%LARGEBS) then
-      !   allocate(ks%NAcoup(N,N, Nt))
-      !   if (inp%LEPC) allocate(ks%EPcoup(N,N, Nt))
-      ! else
-      !   allocate(ks%PhQ(olap%NQ, olap%NMODES, 2, Nt))
-      ! end if
 
       allocate(ks%sh_pops(N, Nt))
       allocate(ks%sh_prop(N,N))
       allocate(ks%sh_Bfactor(N,N))
       allocate(ks%Bkm(N))
 
-      ks%LALLO = .TRUE.
+      if (.NOT. inp%LEPC) then
 
-      if (inp%LEPC) then
-        ks%ph_pops = 0.0
-        ks%ph_prop = 0.0
-        allocate(eptemp(inp%NMODES, 2))
+        allocate(ks%NAcoup(N,N, Nt))
+
+      else
+
+        nqs = olap%NQ; nmodes = olap%NMODES
+        allocate(ks%PhQ(nqs, nmodes, 2, Nt))
+        allocate(ks%ph_pops(nqs, nmodes, Nt))
+        allocate(ks%ph_prop(N,N, nmodes))
+
+        ks%ph_pops = 0.0; ks%ph_prop = 0.0
+        allocate(eptemp(nmodes, 2))
         do i=1,N
           do j=1,N
             iq = olap%kkqmap(i,j)
             eptemp = ABS(olap%EPcoup(i,j,:,:,1) * olap%PhQ(iq,:,:,1)) ** 2
             norm = SUM(eptemp)
-            if (norm>0) ks%ph_prop(i,j,:) = (eptemp(:,2) - eptemp(:,1)) / norm
+            if (norm>0) then
+              ks%ph_prop(i,j,:) = (eptemp(:,2) - eptemp(:,1)) / norm
+            end if
           end do
         end do
+
       end if
+
+      ks%LALLO = .TRUE.
 
     end if
 
@@ -186,7 +185,7 @@ module hamil
   end subroutine
 
 
-  subroutine make_hamil_LBS(tion, tele, ks, inp, olap)
+  subroutine make_hamil_EPC(tion, tele, ks, inp, olap)
     implicit none
 
     type(TDKS), intent(inout) :: ks
@@ -197,15 +196,15 @@ module hamil
     integer :: ib, jb, iq
     complex(kind=q), allocatable :: tempQ(:,:,:)
 
-    if (tion==1 .AND. tele==1) call calc_hamil_LBS(tion, ks, inp, olap)
-    if (tele==1) call calc_hamil_LBS(tion+1, ks, inp, olap)
+    if (tion==1 .AND. tele==1) call calc_hamil_EPC(tion, ks, inp, olap)
+    if (tele==1) call calc_hamil_EPC(tion+1, ks, inp, olap)
 
     ks%ham_c = ks%ham_p + (ks%ham_n - ks%ham_p) * TELE / inp%NELM
 
   end subroutine
 
 
-  subroutine calc_hamil_LBS(tion, ks, inp, olap)
+  subroutine calc_hamil_EPC(tion, ks, inp, olap)
     implicit none
 
     type(TDKS), intent(inout) :: ks
