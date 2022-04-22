@@ -7,106 +7,6 @@ module shop
 
   contains
 
-  ! initialize the random seed from the system clock
-  ! code from: http://fortranwiki.org/fortran/show/random_seed
-  subroutine init_random_seed()
-    implicit none
-    integer :: i, n, clock
-    integer, dimension(:), allocatable :: seed
-
-    call random_seed(size = n)
-    allocate(seed(n))
-
-    call system_clock(count=clock)
-
-    seed = clock + 37 * (/ (i - 1, i = 1, n) /)
-    call random_seed(put = seed)
-
-    deallocate(seed)
-  end subroutine
-
-  subroutine whichToHop(cstat, ks)
-    implicit none
-
-    integer, intent(inout) :: cstat
-    type(TDKS), intent(in) :: ks
-
-    integer :: i
-    real(kind=q) :: lower, upper, r
-
-    call random_number(r)
-
-    do i=1, ks%ndim
-      if (i == 1) then
-        lower = 0
-        upper = ks%sh_prop(cstat,i)
-      else
-        lower = upper
-        upper = upper + ks%sh_prop(cstat,i)
-      end if
-      if (lower <= r .AND. r < upper) then
-        cstat = i
-        exit
-      end if
-    end do
-
-  end subroutine
-
-  subroutine calcprop_EPC(tion, cstat, ks, inp, olap)
-    implicit none
-
-    type(TDKS), intent(inout) :: ks
-    type(namdInfo), intent(in) :: inp
-    integer, intent(in) :: tion
-    integer, intent(in) :: cstat
-    type(overlap), intent(in) :: olap
-
-    real(kind=q) :: Akk, norm
-    complex(kind=q), allocatable :: epcoup(:) ! , eptemp(:,:)
-    integer :: i, iq
-
-    allocate(epcoup(ks%ndim))
-    ! allocate(epcoup(ks%ndim), eptemp(inp%NMODES, 2))
-    do i=1,ks%ndim
-      iq = olap%kkqmap(cstat, i)
-      epcoup(i) = SUM(olap%EPcoup(cstat,i,:,:,1) * ks%PhQ(iq,:,:,tion))
-      ! eptemp = olap%EPcoup(cstat,i,:,:,1) * ks%PhQ(iq,:,:,tion)
-      ! ks%ph_prop(cstat, i, :, :) = ABS(eptemp) ** 2
-      ! norm = SUM(ks%ph_prop(cstat, i, :, :))
-      ! if (norm>0) ks%ph_prop(cstat, i, :, :) = ks%ph_prop(cstat, i, :, :) / norm
-    end do
-
-    Akk = CONJG(ks%psi_a(cstat, tion)) * ks%psi_a(cstat, tion)
-    ks%Bkm = -2. / hbar * AIMAG( CONJG(ks%psi_a(cstat, tion)) * &
-             ks%psi_a(:, tion) * epcoup(:) )
-
-    ks%sh_prop(cstat,:) = ks%Bkm / Akk * inp%POTIM * ks%sh_Bfactor(cstat,:)
-    forall (i=1:ks%ndim, ks%sh_prop(cstat,i) < 0) ks%sh_prop(cstat,i) = 0
-
-  end subroutine
-
-  subroutine calcprop(tion, cstat, ks, inp)
-    implicit none
-
-    type(TDKS), intent(inout) :: ks
-    type(namdInfo), intent(in) :: inp
-    integer, intent(in) :: tion
-    integer, intent(in) :: cstat
-
-    integer :: i, j
-    real(kind=q) :: Akk
-
-    Akk = CONJG(ks%psi_a(cstat, tion)) * ks%psi_a(cstat, tion)
-
-    ks%Bkm = 2. * REAL(CONJG(ks%psi_a(cstat, tion)) * ks%psi_a(:, tion) * &
-                  ks%NAcoup(cstat, :, tion))
-    call calcBfactor(ks, inp, cstat, tion)
-
-    ks%sh_prop(cstat,:) = ks%Bkm / Akk * inp%POTIM * ks%sh_Bfactor(cstat,:)
-    forall (i=1:ks%ndim, ks%sh_prop(cstat,i) < 0) ks%sh_prop(cstat,i) = 0
-
-  end subroutine
-
   ! calculate surface hopping probabilities
   subroutine runSH(ks, inp, olap)
     implicit none
@@ -174,6 +74,107 @@ module shop
       ks%sh_pops = ks%sh_pops / inp%NTRAJ
 
     end if
+
+  end subroutine
+
+
+  ! initialize the random seed from the system clock
+  ! code from: http://fortranwiki.org/fortran/show/random_seed
+  subroutine init_random_seed()
+    implicit none
+    integer :: i, n, clock
+    integer, dimension(:), allocatable :: seed
+
+    call random_seed(size = n)
+    allocate(seed(n))
+
+    call system_clock(count=clock)
+
+    seed = clock + 37 * (/ (i - 1, i = 1, n) /)
+    call random_seed(put = seed)
+
+    deallocate(seed)
+  end subroutine
+
+  subroutine whichToHop(cstat, ks)
+    implicit none
+
+    integer, intent(inout) :: cstat
+    type(TDKS), intent(in) :: ks
+
+    integer :: i
+    real(kind=q) :: lower, upper, r
+
+    call random_number(r)
+
+    do i=1, ks%ndim
+      if (i == 1) then
+        lower = 0
+        upper = ks%sh_prop(cstat,i)
+      else
+        lower = upper
+        upper = upper + ks%sh_prop(cstat,i)
+      end if
+      if (lower <= r .AND. r < upper) then
+        cstat = i
+        exit
+      end if
+    end do
+
+  end subroutine
+
+  subroutine calcprop(tion, cstat, ks, inp)
+    implicit none
+
+    type(TDKS), intent(inout) :: ks
+    type(namdInfo), intent(in) :: inp
+    integer, intent(in) :: tion
+    integer, intent(in) :: cstat
+
+    integer :: i, j
+    real(kind=q) :: Akk
+
+    Akk = CONJG(ks%psi_a(cstat, tion)) * ks%psi_a(cstat, tion)
+
+    ks%Bkm = 2. * REAL(CONJG(ks%psi_a(cstat, tion)) * ks%psi_a(:, tion) * &
+                  ks%NAcoup(cstat, :, tion))
+    call calcBfactor(ks, inp, cstat, tion)
+
+    ks%sh_prop(cstat,:) = ks%Bkm / Akk * inp%POTIM * ks%sh_Bfactor(cstat,:)
+    forall (i=1:ks%ndim, ks%sh_prop(cstat,i) < 0) ks%sh_prop(cstat,i) = 0
+
+  end subroutine
+
+  subroutine calcprop_EPC(tion, cstat, ks, inp, olap)
+    implicit none
+
+    type(TDKS), intent(inout) :: ks
+    type(namdInfo), intent(in) :: inp
+    integer, intent(in) :: tion
+    integer, intent(in) :: cstat
+    type(overlap), intent(in) :: olap
+
+    real(kind=q) :: Akk, norm
+    complex(kind=q), allocatable :: epcoup(:) ! , eptemp(:,:)
+    integer :: i, iq
+
+    allocate(epcoup(ks%ndim))
+    ! allocate(epcoup(ks%ndim), eptemp(inp%NMODES, 2))
+    do i=1,ks%ndim
+      iq = olap%kkqmap(cstat, i)
+      epcoup(i) = SUM(olap%EPcoup(cstat,i,:,:,1) * ks%PhQ(iq,:,:,tion))
+      ! eptemp = olap%EPcoup(cstat,i,:,:,1) * ks%PhQ(iq,:,:,tion)
+      ! ks%ph_prop(cstat, i, :, :) = ABS(eptemp) ** 2
+      ! norm = SUM(ks%ph_prop(cstat, i, :, :))
+      ! if (norm>0) ks%ph_prop(cstat, i, :, :) = ks%ph_prop(cstat, i, :, :) / norm
+    end do
+
+    Akk = CONJG(ks%psi_a(cstat, tion)) * ks%psi_a(cstat, tion)
+    ks%Bkm = -2. / hbar * AIMAG( CONJG(ks%psi_a(cstat, tion)) * &
+             ks%psi_a(:, tion) * epcoup(:) )
+
+    ks%sh_prop(cstat,:) = ks%Bkm / Akk * inp%POTIM * ks%sh_Bfactor(cstat,:)
+    forall (i=1:ks%ndim, ks%sh_prop(cstat,i) < 0) ks%sh_prop(cstat,i) = 0
 
   end subroutine
 

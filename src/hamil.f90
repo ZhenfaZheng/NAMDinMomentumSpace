@@ -118,8 +118,6 @@ module hamil
 
     end if
 
-    ! cero = (0, 0)
-    ! uno = (1, 0)
     ks%psi_c = cero
     ks%psi_p = cero
     ks%psi_n = cero

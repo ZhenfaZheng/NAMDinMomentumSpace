@@ -27,6 +27,71 @@ module epcoup
   contains
 
 
+  subroutine TDepCoupIJ(olap, olap_sec, inp, epc)
+    implicit none
+
+    type(namdInfo), intent(inout) :: inp
+    type(epCoupling), intent(inout) :: epc
+    type(overlap), intent(inout) :: olap
+    type(overlap), intent(inout) :: olap_sec
+
+    integer :: nmodes, nb, nsw
+    logical :: lcoup
+
+    write(*,*)
+    write(*,'(A)') &
+      "------------------------------------------------------------"
+
+    if (inp%EPCTYPE==1) then
+      write(*,*) "TypeI e-ph coupling calculation."
+    else
+      write(*,*) "TypeII e-ph coupling calculation."
+    end if
+
+    write(*,*) "Reading el & ph information."
+    call readBasicInfo(inp, epc)
+    call initEPC(inp, epc)
+    call readEPHinfo(inp, epc)
+
+    call selBasis(inp, epc)
+    if (inp%LSORT) call sortBasis(inp, epc)
+    call initOlap(olap_sec, inp, epc%nqpts, inp%NBASIS)
+    call epcToOlapSec(inp, epc, olap_sec)
+
+    write(*,*) "Mapping k & k' points with q point."
+    call kqMatchSec(inp, epc, olap_sec)
+    write(*,*) "Reading e-ph matrix elements."
+    call readEPHmatSec(inp, epc, olap_sec)
+
+    if (inp%EPCTYPE==1) then
+      write(*,*) "Calculating TD phonon normal modes."
+      call calcPhQ(olap_sec, inp)
+    else
+      write(*,*) "Decomposing phonon modes from MD traj."
+      call phDecomp(inp, olap_sec, epc)
+    end if
+
+    write(*,*) "Calculating e-ph couplings."
+    if (inp%LARGEBS) then
+      call calcEPC(olap_sec, inp)
+      call writeTXT_EPC(olap_sec)
+    else
+      call calcNAC(olap_sec, inp)
+      call writeEPTXTs(olap_sec)
+      deallocate(olap_sec%Dij, olap_sec%EPcoup)
+      call calcEPC(olap_sec, inp)
+    end if
+
+    call releaseEPC(epc)
+
+    write(*,*) "Done!"
+    write(*,'(A)') &
+      "------------------------------------------------------------"
+    write(*,*)
+
+  end subroutine
+
+
   subroutine initEPC(inp, epc)
     implicit none
 
@@ -57,6 +122,39 @@ module epcoup
   end subroutine
 
 
+  subroutine initOlap(olap, inp, nq, nb)
+    implicit none
+    type(overlap), intent(inout) :: olap
+    type(namdInfo), intent(in) :: inp
+    integer, intent(in) :: nq, nb
+    integer :: nmodes, nsw
+
+    nmodes = inp%NMODES
+    nsw = inp%NSW
+
+    olap%NBANDS = nb
+    olap%TSTEPS = inp%NSW
+    olap%dt = inp%POTIM
+    olap%NMODES = nmodes
+    olap%COUPTYPE = inp%EPCTYPE
+    olap%Np = inp%Np
+    olap%NQ = nq
+
+    allocate(olap%Eig(nb, nsw-1))
+    allocate(olap%gij(nb, nb, nmodes))
+    allocate(olap%Phfreq(nq, nmodes))
+    allocate(olap%PhQ(nq, nmodes, 2, nsw-1))
+    allocate(olap%kkqmap(nb,nb))
+
+    olap%gij = cero
+    olap%PhQ = cero
+    olap%Phfreq = 0.0_q
+    olap%Eig = 0.0_q
+    olap%kkqmap = -1
+
+  end subroutine
+
+
   subroutine releaseEPC(epc)
     implicit none
 
@@ -73,6 +171,133 @@ module epcoup
     if ( allocated(epc%cellmd) ) deallocate(epc%cellmd)
     if ( allocated(epc%displ) ) deallocate(epc%displ)
     if ( allocated(epc%phmodes) ) deallocate(epc%phmodes)
+
+  end subroutine
+
+
+  subroutine readBasis(inp)
+    implicit none
+
+    type(namdInfo), intent(inout) :: inp
+    integer :: ierr, ibas, ik, ib
+
+    open(unit=38, file='BASSEL', status='unknown', action='read', iostat=ierr)
+
+    if (ierr /= 0) then
+      write(*,*) "BASSEL file does NOT exist!"
+      stop
+    end if
+
+    inp%BASSEL = -1
+    read(unit=38, fmt=*) inp%NBASIS
+    allocate(inp%BASLIST(inp%NBASIS, 3))
+    do ibas=1,inp%NBASIS
+      read(unit=38, fmt=*) ik, ib
+      inp%BASSEL(ik, ib) = ibas
+      inp%BASLIST(ibas, 1) = ik
+      inp%BASLIST(ibas, 2) = ib
+    end do
+
+    close(unit=38)
+
+  end subroutine
+
+
+  subroutine selBasis(inp, epc)
+    implicit none
+
+    type(namdInfo), intent(inout) :: inp
+    type(epCoupling), intent(in) :: epc
+
+    integer :: ik, ib, nb, ibas
+    real :: emin, emax
+
+    if (inp%LBASSEL) then
+      call readBasis(inp)
+      return
+    end if
+
+    nb = inp%NBANDS
+    emin = inp%EMIN
+    emax = inp%EMAX
+
+    inp%NBASIS = 0
+    inp%BASSEL = -1
+
+    do ik=inp%KMIN, inp%KMAX
+      do ib=inp%BMIN, inp%BMAX
+        if ( epc%elen(ik,ib)>emin .and. epc%elen(ik,ib)<emax ) then
+          inp%NBASIS = inp%NBASIS + 1
+          inp%BASSEL(ik,ib) = inp%NBASIS
+        end if
+      end do
+    end do
+
+    allocate(inp%BASLIST(inp%NBASIS, 3))
+
+    open(unit=39, file='BASSEL', status='unknown', action='write')
+
+    write(unit=39, fmt='(I18)') inp%NBASIS
+
+    ibas = 0
+    do ik=inp%KMIN, inp%KMAX
+      do ib=inp%BMIN, inp%BMAX
+        if (inp%BASSEL(ik,ib)>0) then
+          ibas = ibas + 1
+          inp%BASLIST(ibas, 1) = ik
+          inp%BASLIST(ibas, 2) = ib
+          write(unit=39, fmt='(2I12)') ik, ib
+        end if
+      end do
+    end do
+
+    close(unit=39)
+
+    !! For array element inp%BASSEL(ik,ib),
+    !! 0 represent ik,ib state isn't selected as basis;
+    !! number >0 represent ik,ib state is selected as basis,
+    !! and the number is the state's serial number among the basises.
+
+  end subroutine
+
+
+  subroutine sortBasis(inp, epc)
+    implicit none
+
+    type(namdInfo), intent(inout) :: inp
+    type(epCoupling), intent(in) :: epc
+
+    integer :: ibas, i, j, ik, ib, nb, nbas
+    integer :: temp(3)
+
+    nb = inp%NBANDS
+    nbas = inp%NBASIS
+    do ibas=1,nbas
+      ik = inp%BASLIST(ibas,1)
+      ib = inp%BASLIST(ibas,2)
+      inp%BASLIST(ibas,3) = epc%elen(ik, ib) * 1000
+    end do
+
+    do i=1,nbas-1
+      do j=1,nbas-i
+        if ( inp%BASLIST(j+1,3) < inp%BASLIST(j,3) ) then
+          temp = inp%BASLIST(j,:)
+          inp%BASLIST(j,:) = inp%BASLIST(j+1,:)
+          inp%BASLIST(j+1,:) = temp
+        end if
+      end do
+    end do
+
+    open(unit=39, file='BASSEL', status='unknown', action='write')
+    write(unit=39, fmt='(I18)') inp%NBASIS
+
+    do ibas=1,nbas
+      ik = inp%BASLIST(ibas,1)
+      ib = inp%BASLIST(ibas,2)
+      inp%BASSEL(ik, ib) = ibas
+      write(unit=39, fmt='(2I12)') ik, ib
+    end do
+    close(unit=39)
 
   end subroutine
 
@@ -417,6 +642,7 @@ module epcoup
     call h5fclose_f(file_id, hdferror)
 
   end subroutine
+
 
   subroutine readEPHmatSec_p(inp, epc, olap_sec)
     implicit none
@@ -925,244 +1151,6 @@ module epcoup
     else
       olap%EPcoup = olap%EPcoup / SQRT(olap%Np * 0.5)
     end if
-
-    ! call releaseOlap(olap)
-
-  end subroutine
-
-
-  subroutine TDepCoupIJ(olap, olap_sec, inp, epc)
-    implicit none
-
-    type(namdInfo), intent(inout) :: inp
-    type(epCoupling), intent(inout) :: epc
-    type(overlap), intent(inout) :: olap
-    type(overlap), intent(inout) :: olap_sec
-
-    integer :: nmodes, nb, nsw
-    logical :: lcoup
-
-    write(*,*)
-    write(*,'(A)') &
-      "------------------------------------------------------------"
-
-    if (inp%EPCTYPE==1) then
-      write(*,*) "TypeI e-ph coupling calculation."
-    else
-      write(*,*) "TypeII e-ph coupling calculation."
-    end if
-
-    write(*,*) "Reading el & ph information."
-    call readBasicInfo(inp, epc)
-    call initEPC(inp, epc)
-    call readEPHinfo(inp, epc)
-
-    call selBasis(inp, epc)
-    if (inp%LSORT) call sortBasis(inp, epc)
-    call initOlap(olap_sec, inp, epc%nqpts, inp%NBASIS)
-    call epcToOlapSec(inp, epc, olap_sec)
-
-    write(*,*) "Mapping k & k' points with q point."
-    call kqMatchSec(inp, epc, olap_sec)
-    write(*,*) "Reading e-ph matrix elements."
-    call readEPHmatSec(inp, epc, olap_sec)
-
-    if (inp%EPCTYPE==1) then
-      write(*,*) "Calculating TD phonon normal modes."
-      call calcPhQ(olap_sec, inp)
-    else
-      write(*,*) "Decomposing phonon modes from MD traj."
-      call phDecomp(inp, olap_sec, epc)
-    end if
-
-    write(*,*) "Calculating e-ph couplings."
-    if (inp%LARGEBS) then
-      call calcEPC(olap_sec, inp)
-      call writeTXT_EPC(olap_sec)
-    else
-      call calcNAC(olap_sec, inp)
-      call writeEPTXTs(olap_sec)
-      deallocate(olap_sec%Dij, olap_sec%EPcoup)
-      call calcEPC(olap_sec, inp)
-    end if
-
-    call releaseEPC(epc)
-
-    write(*,*) "Done!"
-    write(*,'(A)') &
-      "------------------------------------------------------------"
-    write(*,*)
-
-  end subroutine
-
-
-  subroutine readBasis(inp)
-    implicit none
-
-    type(namdInfo), intent(inout) :: inp
-    integer :: ierr, ibas, ik, ib
-
-    open(unit=38, file='BASSEL', status='unknown', action='read', iostat=ierr)
-
-    if (ierr /= 0) then
-      write(*,*) "BASSEL file does NOT exist!"
-      stop
-    end if
-
-    inp%BASSEL = -1
-    read(unit=38, fmt=*) inp%NBASIS
-    allocate(inp%BASLIST(inp%NBASIS, 3))
-    do ibas=1,inp%NBASIS
-      read(unit=38, fmt=*) ik, ib
-      inp%BASSEL(ik, ib) = ibas
-      inp%BASLIST(ibas, 1) = ik
-      inp%BASLIST(ibas, 2) = ib
-    end do
-
-    close(unit=38)
-
-  end subroutine
-
-
-  subroutine selBasis(inp, epc)
-    implicit none
-
-    type(namdInfo), intent(inout) :: inp
-    type(epCoupling), intent(in) :: epc
-
-    integer :: ik, ib, nb, ibas
-    real :: emin, emax
-
-    if (inp%LBASSEL) then
-      call readBasis(inp)
-      return
-    end if
-
-    nb = inp%NBANDS
-    emin = inp%EMIN
-    emax = inp%EMAX
-
-    inp%NBASIS = 0
-    inp%BASSEL = -1
-
-    do ik=inp%KMIN, inp%KMAX
-      do ib=inp%BMIN, inp%BMAX
-        if ( epc%elen(ik,ib)>emin .and. epc%elen(ik,ib)<emax ) then
-          inp%NBASIS = inp%NBASIS + 1
-          inp%BASSEL(ik,ib) = inp%NBASIS
-        end if
-      end do
-    end do
-
-    allocate(inp%BASLIST(inp%NBASIS, 3))
-
-    open(unit=39, file='BASSEL', status='unknown', action='write')
-
-    write(unit=39, fmt='(I18)') inp%NBASIS
-
-    ibas = 0
-    do ik=inp%KMIN, inp%KMAX
-      do ib=inp%BMIN, inp%BMAX
-        if (inp%BASSEL(ik,ib)>0) then
-          ibas = ibas + 1
-          inp%BASLIST(ibas, 1) = ik
-          inp%BASLIST(ibas, 2) = ib
-          write(unit=39, fmt='(2I12)') ik, ib
-        end if
-      end do
-    end do
-
-    close(unit=39)
-
-    !! For array element inp%BASSEL(ik,ib),
-    !! 0 represent ik,ib state isn't selected as basis;
-    !! number >0 represent ik,ib state is selected as basis,
-    !! and the number is the state's serial number among the basises.
-
-  end subroutine
-
-
-  subroutine sortBasis(inp, epc)
-    implicit none
-
-    type(namdInfo), intent(inout) :: inp
-    type(epCoupling), intent(in) :: epc
-
-    integer :: ibas, i, j, ik, ib, nb, nbas
-    integer :: temp(3)
-
-    nb = inp%NBANDS
-    nbas = inp%NBASIS
-    do ibas=1,nbas
-      ik = inp%BASLIST(ibas,1)
-      ib = inp%BASLIST(ibas,2)
-      inp%BASLIST(ibas,3) = epc%elen(ik, ib) * 1000
-    end do
-
-    do i=1,nbas-1
-      do j=1,nbas-i
-        if ( inp%BASLIST(j+1,3) < inp%BASLIST(j,3) ) then
-          temp = inp%BASLIST(j,:)
-          inp%BASLIST(j,:) = inp%BASLIST(j+1,:)
-          inp%BASLIST(j+1,:) = temp
-        end if
-      end do
-    end do
-
-    open(unit=39, file='BASSEL', status='unknown', action='write')
-    write(unit=39, fmt='(I18)') inp%NBASIS
-
-    do ibas=1,nbas
-      ik = inp%BASLIST(ibas,1)
-      ib = inp%BASLIST(ibas,2)
-      inp%BASSEL(ik, ib) = ibas
-      write(unit=39, fmt='(2I12)') ik, ib
-    end do
-    close(unit=39)
-
-  end subroutine
-
-
-  subroutine initOlap(olap, inp, nq, nb)
-    implicit none
-    type(overlap), intent(inout) :: olap
-    type(namdInfo), intent(in) :: inp
-    integer, intent(in) :: nq, nb
-    integer :: nmodes, nsw
-
-    nmodes = inp%NMODES
-    nsw = inp%NSW
-
-    olap%NBANDS = nb
-    olap%TSTEPS = inp%NSW
-    olap%dt = inp%POTIM
-    olap%NMODES = nmodes
-    olap%COUPTYPE = inp%EPCTYPE
-    olap%Np = inp%Np
-    olap%NQ = nq
-
-    allocate(olap%Eig(nb, nsw-1))
-    allocate(olap%gij(nb, nb, nmodes))
-    allocate(olap%Phfreq(nq, nmodes))
-    allocate(olap%PhQ(nq, nmodes, 2, nsw-1))
-    allocate(olap%kkqmap(nb,nb))
-
-    olap%gij = cero
-    olap%PhQ = cero
-    olap%Phfreq = 0.0_q
-    olap%Eig = 0.0_q
-    olap%kkqmap = -1
-
-  end subroutine
-
-
-  subroutine releaseOlap(olap)
-    implicit none
-    type(overlap), intent(inout) :: olap
-
-    if ( allocated(olap%gij) ) deallocate(olap%gij)
-    ! if ( allocated(olap%Phfreq) ) deallocate(olap%Phfreq)
-    if ( allocated(olap%PhQ) ) deallocate(olap%PhQ)
 
   end subroutine
 
