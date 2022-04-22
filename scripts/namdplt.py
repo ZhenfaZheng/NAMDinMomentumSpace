@@ -15,12 +15,12 @@ def main():
     Eref = 0.0
     inp = pn.read_inp('inp')
 
-    which_plt = [1, 2, 31, 4, 5]
+    which_plt = [1, 2, 31, 4, 5, 6]
     '''
     Select which figures to plot.
     1: COUPLE.png; 2: TDEN.png;
     31: TDKPROPxy.png; 32: TDKPROPyz.png; 33: TDKPROPxz.png;
-    4: TDBAND.png; 5: TDPH.png
+    4: TDBAND.png; 5: TDPH.png; 6:TDPHEN.png
     '''
 
     kplabels = 'gkmg'
@@ -42,6 +42,7 @@ def main():
     A = pn.read_ephmath5(filepm, dset='/el_ph_band_info/lattice_vec_angstrom')
     a1, a2, a3 = (A[0], A[1], A[2])
     b1, b2, b3 = pn.calc_rec_vec(a1, a2, a3)
+    kpts_cart = pn.frac2cart(kpts, b1, b2, b3)
     filshps = glob('SHPROP.*')
     shp = pn.readshp(filshps)
 
@@ -57,7 +58,6 @@ def main():
     if (2 in which_plt):
         plot_tdprop(shp, Eref, lplot=2, ksen=en, figname='TDEN.png')
 
-    kpts_cart = pn.frac2cart(kpts, b1, b2, b3)
     if (31 in which_plt):
         plot_kprop(kpts_cart, shp, B=[b1, b2, b3], axis='xy', figname='TDKPROPxy.png')
     if (32 in which_plt):
@@ -73,12 +73,14 @@ def main():
         plot_tdband(k_loc, en, kp_loc, kplabels, shp, k_index,
                     Eref=Eref, figname='TDBAND.png')
 
-    if (5 in which_plt):
+
+    if ((5 in which_plt) or (6 in which_plt)):
         php = np.loadtxt('PHPROP')
         ntsteps = int( float(inp['NAMDTIME']) * float(inp['POTIM']) )
         nmodes = int( php.shape[0] / ntsteps ) ; nqs = php.shape[1] - 2
         php = php.reshape(nmodes, ntsteps, nqs+2)
 
+    if (5 in which_plt):
         qpath_cart = pn.frac2cart(qpath, b1, b2, b3)
         qpts = pn.read_ephmath5(filepm, dset='/el_ph_band_info/q_list')
         phen = pn.read_ephmath5(filepm, dset='/el_ph_band_info/ph_disp_meV')
@@ -86,9 +88,12 @@ def main():
         q_index, qp_index = pn.select_kpts_on_path(qpts, qpath, norm=0.001)
         q_loc, qp_loc = pn.loc_on_kpath(qpts_cart, q_index, qp_index, qpath_cart)
 
-        # times = [0, 100, 200, 400, 800, 999]
+        # times = [0, 50, 100, 200, 500, 999]
         times = list( range(0, ntsteps, int(ntsteps/5)) ) ; times.append(ntsteps-1)
         plot_tdph_sns(q_loc, phen, qp_loc, qplabels, php, q_index, times, figname='TDPH.png')
+
+    if (6 in which_plt):
+        plot_tdphen(php, figname='TDPHEN.png')
 
     print("\nAll Done!\n")
 
@@ -321,11 +326,12 @@ def plot_tdph_sns(q_loc, phen, qp_loc, qplabels, php, index, times,
     mpl.rcParams['axes.unicode_minus'] = False
 
     cmap = 'plasma'
+    cmap = 'autumn'
     cmin = pop.min() ; cmax = pop.max()
     norm = mpl.colors.Normalize(cmin, cmax)
-    size = np.abs(pop)
+    size = np.sqrt(np.abs(pop))
     s_avg = np.average(size[size>0])
-    size = size / s_avg * 3
+    size = size / s_avg * 5
 
     for it in range(nts):
 
@@ -336,11 +342,11 @@ def plot_tdph_sns(q_loc, phen, qp_loc, qplabels, php, index, times,
 
         sort_index = np.argsort(q_loc)
         for im in range(nmodes):
-            ax.plot(q_loc[sort_index], E[sort_index, im], 'r', lw=0.5)
+            ax.plot(q_loc[sort_index], E[sort_index, im], '#1A5599', lw=0.7)
         nqpath = qp_loc.shape[0]
         for ipath in range(1, nqpath):
             x = qp_loc[ipath]
-            ax.plot([x,x], [ymin,ymax], 'k', lw=0.5, ls='--')
+            ax.plot([x,x], [ymin,ymax], 'gray', lw=0.7, ls='--')
 
         for im in range(nmodes):
             sc = ax.scatter(X, E[:,im], s=size[im,it,:], lw=0,
@@ -366,6 +372,35 @@ def plot_tdph_sns(q_loc, phen, qp_loc, qplabels, php, index, times,
 
     plt.savefig(figname, dpi=400)
     print("\n%s has been saved."%figname)
+
+
+def plot_tdphen(php, figname='TDPHEN.png'):
+
+    phen = php[:, :, 1].T
+    phen = np.cumsum(np.cumsum(phen, axis=0), axis=1)
+    nmodes = phen.shape[1]
+    X = php[0, :, 0]
+    namdtime = X[-1]
+
+    figsize_x = 4.8
+    figsize_y = 3.2 # in inches
+
+    fig, ax = plt.subplots()
+    fig.set_size_inches(figsize_x, figsize_y)
+    mpl.rcParams['axes.unicode_minus'] = False
+
+    ax.fill_between(X, phen[:, 0])
+    for im in range(1, nmodes):
+        ax.fill_between(X, phen[:, im], phen[:, im-1])
+
+    ax.set_xlim(0,namdtime)
+    ax.set_xlabel('Time (fs)')
+    ax.set_ylabel('Energy (eV)')
+
+    plt.tight_layout()
+    plt.savefig(figname, dpi=400)
+    print("\n%s has been saved."%figname)
+
 
 
 if __name__=='__main__':
