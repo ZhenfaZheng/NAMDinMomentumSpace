@@ -926,7 +926,7 @@ module epcoup
       olap%EPcoup = olap%EPcoup / SQRT(olap%Np * 0.5)
     end if
 
-    call releaseOlap(olap)
+    ! call releaseOlap(olap)
 
   end subroutine
 
@@ -946,76 +946,47 @@ module epcoup
     write(*,'(A)') &
       "------------------------------------------------------------"
 
-    if (inp%LCPTXT .and. inp%LBASSEL) then
-
-      call readBasicInfo(inp, epc)
-
-      if (inp%LARGEBS) then
-        write(*,*) "For large basis set, LCPEXT is not available!"
-        write(*,*)
-        stop
-      end if
-
-      write(*,*) "Reading couplings from TXT files..."
-
-      call readBasis(inp)
-
-      nsw = inp%NSW
-      nb = inp%NBASIS
-      nmodes = inp%NMODES
-      allocate(olap_sec%Dij(nb, nb, nsw-1))
-      allocate(olap_sec%EPcoup(nb, nb, nmodes, 1, nsw-1))
-      olap_sec%Dij = cero ; olap_sec%EPcoup = cero
-      call initOlap(olap_sec, inp, epc%nqpts, nb)
-
-      call readEPTXTs(olap_sec)
-      call releaseOlap(olap_sec)
-
+    if (inp%EPCTYPE==1) then
+      write(*,*) "TypeI e-ph coupling calculation."
     else
+      write(*,*) "TypeII e-ph coupling calculation."
+    end if
 
-      if (inp%EPCTYPE==1) then
-        write(*,*) "TypeI e-ph coupling calculation."
-      else
-        write(*,*) "TypeII e-ph coupling calculation."
-      end if
+    write(*,*) "Reading el & ph information."
+    call readBasicInfo(inp, epc)
+    call initEPC(inp, epc)
+    call readEPHinfo(inp, epc)
 
-      write(*,*) "Reading el & ph information."
-      call readBasicInfo(inp, epc)
-      call initEPC(inp, epc)
-      call readEPHinfo(inp, epc)
+    call selBasis(inp, epc)
+    if (inp%LSORT) call sortBasis(inp, epc)
+    call initOlap(olap_sec, inp, epc%nqpts, inp%NBASIS)
+    call epcToOlapSec(inp, epc, olap_sec)
 
-      call selBasis(inp, epc)
-      if (inp%LSORT) call sortBasis(inp, epc)
-      call initOlap(olap_sec, inp, epc%nqpts, inp%NBASIS)
-      call epcToOlapSec(inp, epc, olap_sec)
+    write(*,*) "Mapping k & k' points with q point."
+    call kqMatchSec(inp, epc, olap_sec)
+    write(*,*) "Reading e-ph matrix elements."
+    call readEPHmatSec(inp, epc, olap_sec)
 
-      write(*,*) "Mapping k & k' points with q point."
-      call kqMatchSec(inp, epc, olap_sec)
-      write(*,*) "Reading e-ph matrix elements."
-      call readEPHmatSec(inp, epc, olap_sec)
+    if (inp%EPCTYPE==1) then
+      write(*,*) "Calculating TD phonon normal modes."
+      call calcPhQ(olap_sec, inp)
+    else
+      write(*,*) "Decomposing phonon modes from MD traj."
+      call phDecomp(inp, olap_sec, epc)
+    end if
 
-      if (inp%EPCTYPE==1) then
-        write(*,*) "Calculating TD phonon normal modes."
-        call calcPhQ(olap_sec, inp)
-      else
-        write(*,*) "Decomposing phonon modes from MD traj."
-        call phDecomp(inp, olap_sec, epc)
-      end if
-
-      write(*,*) "Calculating e-ph couplings."
-      ! if (inp%LARGEBS) then
-      !   call calcEPC_LBS(olap_sec, inp)
-      !   call writeTXT_LBS(olap_sec)
-      ! else
-      !   call calcEPC(olap_sec, inp)
-      !   call writeEPTXTs(olap_sec)
-      ! end if
+    write(*,*) "Calculating e-ph couplings."
+    if (inp%LARGEBS) then
       call calcEPC_LBS(olap_sec, inp)
       call writeTXT_LBS(olap_sec)
-
-      call releaseEPC(epc)
-
+    else
+      call calcEPC(olap_sec, inp)
+      call writeEPTXTs(olap_sec)
+      deallocate(olap_sec%Dij, olap_sec%EPcoup)
+      call calcEPC_LBS(olap_sec, inp)
     end if
+
+    call releaseEPC(epc)
 
     write(*,*) "Done!"
     write(*,'(A)') &

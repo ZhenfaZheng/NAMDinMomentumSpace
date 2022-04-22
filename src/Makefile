@@ -8,8 +8,8 @@ FFLAGS= -g -O2
 MAKE = make
 
 #path to HDF5 library
-IFLAGS = -I/public/home/zzf/src/lib/hdf5-1.12.0/include
-LFLAGS = -L/public/home/zzf/src/lib/hdf5-1.12.0/lib -lhdf5 -lhdf5_fortran
+IFLAGS = -I/public/apps/qe/hdf5/1.12.1_intel/include
+LFLAGS = -L/public/apps/qe/hdf5/1.12.1_intel/lib -lhdf5 -lhdf5_fortran
 FFLAGS += $(IFLAGS)
 SPGLIB += $(LFLAGS)
 #-------------------------------------------------------------------------------

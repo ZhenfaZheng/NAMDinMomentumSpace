@@ -293,13 +293,23 @@ module fileio
 
       integer :: nl1, nl2
 
+      if (inp%LEPC .AND. inp%LCPTXT) then
+        write(*,*)
+        write(*,*) "ERROR: For LEPC=.True., LCPTXT is not available! &
+          Please set LCPTXT=.False.."
+        write(*,*)
+        stop
+      end if
+
       nl1 = len( trim(inp%FILEPM) )
       nl2 = len( trim(inp%EPMPREF) )
 
       if (nl1==0) then
         if (nl2==0) then
+          write(*,*)
           write(*,*) "ERROR: lack of EPMPREF, &
             need to specify prefix of 'prefix_ephmat_pX.h5' file!"
+          write(*,*)
           stop
         end if
         inp%FILEPM = trim(inp%EPMDIR) // trim(inp%EPMPREF) &
@@ -309,14 +319,18 @@ module fileio
         if ( (nl1<14) .OR. &
              (inp%FILEPM(nl1-12:nl1-4) .NE. '_ephmat_p') .OR. &
              (inp%FILEPM(nl1-2:nl1) .NE. '.h5') ) then
+          write(*,*)
           write(*,*) "ERROR: EPM file name must be in form of &
             'prefix_ephmat_pX.h5'!"
+          write(*,*)
           stop
         end if
 
         if (nl2>0) then
           if (inp%EPMPREF .NE. inp%FILEPM(1:nl1-13)) then
+            write(*,*)
             write(*,*) "ERROR: FILEPM and EPMPREF do not match!"
+            write(*,*)
             stop
           end if
         end if
@@ -395,7 +409,8 @@ module fileio
 
         if (inp%EPCTYPE==2) &
           write(*,'(A30,A3,A)')    'MDFIL', ' = ', TRIM(ADJUSTL(inp%FILMD))
-        write(*,'(A30,A3,A)' )    'EPMFIL', ' = ', TRIM(ADJUSTL(inp%FILEPM))
+        write(*,'(A30,A3,A)' )    'EPMFIL', ' = ', &
+          trim(inp%EPMDIR) // trim(inp%EPMPREF) // '_ephmat_pX.h5'
 
         write(*,'(A)') &
           "------------------------------------------------------------"
