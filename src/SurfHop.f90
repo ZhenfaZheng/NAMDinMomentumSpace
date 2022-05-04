@@ -15,17 +15,25 @@ module shop
     type(namdInfo), intent(in) :: inp
     type(overlap), intent(in) :: olap
     integer :: i, j, ibas, nbas, tion, Nt, iq
-    integer :: cstat
-    integer, allocatable :: cstat_all(:)
+    integer, allocatable :: cstat_all(:,:), occb(:,:), occbtot(:)
+    integer :: cstat, nstat
 
     ks%sh_pops = 0
     ks%sh_prop = 0
     nbas = ks%ndim
     Nt = inp%NAMDTIME / inp%POTIM
-    allocate(cstat_all(inp%NTRAJ))
-    ! allocate(cstat_all(inp%NTRAJ, inp%NINIBS))
-    do i=1, 1!inp%NINIBS
-      cstat_all(:) = inp%BASSEL(inp%INIKPT(i), inp%INIBAND(i))
+
+    allocate(cstat_all(inp%NTRAJ, inp%NINIBS))
+    allocate(occb(inp%NTRAJ, inp%NBASIS))
+    allocate(occbtot(inp%NBASIS))
+    ! tag of basis occupied
+
+    occb = 0; occbtot = 0
+    do i=1, inp%NINIBS
+      ibas = inp%BASSEL(inp%INIKPT(i), inp%INIBAND(i))
+      cstat_all(:,i) = ibas
+      occb(:,ibas) = 1
+      occbtot(ibas) = 1
     end do
 
     ! initialize the random seed for ramdom number production
@@ -38,23 +46,34 @@ module shop
       call calcBftot(ks, inp)
 
       do tion=1, Nt
+
         do ibas=1,nbas
-        ! do ibas=int(minval(cstat_all)), int(maxval(cstat_all))
+          if (occbtot(ibas)==0) cycle
           call calcprop_EPC(tion, ibas, ks, inp, olap)
         end do
+
         do i=1, inp%NTRAJ
-          cstat = cstat_all(i)
-          call whichToHop(cstat, ks)
-          ks%sh_pops(cstat, tion) = ks%sh_pops(cstat, tion) + 1
-          if (cstat_all(i) .NE. cstat) then
-            iq = olap%kkqmap(cstat_all(i), cstat)
+          do j=1, inp%NINIBS
+
+            cstat = cstat_all(i,j)
+            call whichToHop(cstat, nstat, ks)
+
+            if (nstat /= cstat .AND. occb(i,nstat)>0) cycle
+            occb(i,cstat) = 0; occb(i,nstat) = 1
+            occbtot(cstat) = 0; occbtot(nstat) = 1
+            ks%sh_pops(nstat, tion) = ks%sh_pops(nstat, tion) + 1
+            cstat_all(i,j) = nstat
+
+            if (nstat == cstat) cycle
+            iq = olap%kkqmap(cstat, nstat)
             if (iq>0) then
               ks%ph_pops(iq, :, tion) &
-                = ks%ph_pops(iq, :, tion) + ks%ph_prop(cstat_all(i), cstat, :)
+                = ks%ph_pops(iq, :, tion) + ks%ph_prop(cstat, nstat, :)
             end if
-          end if
-          cstat_all(i) = cstat
+
+          end do
         end do
+
       end do
       ks%sh_pops = ks%sh_pops / inp%NTRAJ
       ! ks%ph_pops = ks%ph_pops / inp%NTRAJ
@@ -62,15 +81,24 @@ module shop
     else
 
       do tion=1, Nt
+
         do ibas=1,nbas
+          if (occbtot(ibas)==0) cycle
           call calcprop(tion, ibas, ks, inp)
         end do
+
         do i=1, inp%NTRAJ
-          cstat = cstat_all(i)
-          call whichToHop(cstat, ks)
-          cstat_all(i) = cstat
-          ks%sh_pops(cstat, tion) = ks%sh_pops(cstat, tion) + 1
+          do j=1, inp%NINIBS
+            cstat = cstat_all(i,j)
+            call whichToHop(cstat, nstat, ks)
+            if (nstat /= cstat .AND. occb(i,nstat)>0) cycle
+            occb(i,cstat) = 0; occbtot(cstat) = 0
+            occb(i,nstat) = 1; occbtot(nstat) = 1
+            ks%sh_pops(nstat, tion) = ks%sh_pops(nstat, tion) + 1
+            cstat_all(i,j) = nstat
+          end do
         end do
+
       end do
       ks%sh_pops = ks%sh_pops / inp%NTRAJ
 
@@ -97,10 +125,11 @@ module shop
     deallocate(seed)
   end subroutine
 
-  subroutine whichToHop(cstat, ks)
+  subroutine whichToHop(cstat, nstat, ks)
     implicit none
 
-    integer, intent(inout) :: cstat
+    integer, intent(in) :: cstat
+    integer, intent(inout) :: nstat
     type(TDKS), intent(in) :: ks
 
     integer :: i
@@ -108,6 +137,7 @@ module shop
 
     call random_number(r)
 
+    nstat = cstat
     do i=1, ks%ndim
       if (i == 1) then
         lower = 0
@@ -117,7 +147,7 @@ module shop
         upper = upper + ks%sh_prop(cstat,i)
       end if
       if (lower <= r .AND. r < upper) then
-        cstat = i
+        nstat = i
         exit
       end if
     end do
@@ -313,14 +343,14 @@ module shop
 
     Nt = inp%NAMDTIME / inp%POTIM
     do tion=1, Nt
-      write(unit=24, fmt='(*(G20.10))') &
-            tion * inp%POTIM, SUM(ks%eigKs(:,tion) * ks%sh_pops(:,tion)), &
-            (ks%sh_pops(i,tion), i=1, ks%ndim)
+      write(unit=24, fmt='(*(G20.10))') tion * inp%POTIM, &
+        SUM(ks%eigKs(:,tion) * ks%sh_pops(:,tion)) / inp%NINIBS, &
+        (ks%sh_pops(i,tion), i=1, ks%ndim)
       ! write(unit=25, fmt="(2G20.10, *( ' ( ',G20.10,' , ',G20.10,' ) ' ) )") &
-      write(unit=25, fmt='(*(G20.10))') &
-            tion * inp%POTIM, SUM(ks%eigKs(:,tion) * ks%pop_a(:,tion)), &
-          ! (ks%psi_a(i,tion), i=1, ks%ndim)
-            (ks%pop_a(i,tion), i=1, ks%ndim)
+      write(unit=25, fmt='(*(G20.10))') tion * inp%POTIM, &
+        SUM(ks%eigKs(:,tion) * ks%pop_a(:,tion)) / inp%NINIBS, &
+      ! (ks%psi_a(i,tion), i=1, ks%ndim)
+        (ks%pop_a(i,tion), i=1, ks%ndim)
     end do
 
     close(24)
@@ -384,7 +414,7 @@ module shop
 
     Nt = inp%NAMDTIME / inp%POTIM
     allocate(pops(inp%NQPOINTS, inp%NMODES, Nt))
-    pops = ks%ph_pops / inp%NTRAJ / isample
+    pops = ks%ph_pops / inp%NTRAJ / isample / inp%NINIBS
 
     do im=1, inp%NMODES
       do tion=1, Nt

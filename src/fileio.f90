@@ -123,7 +123,7 @@ module fileio
         epmdir, epmpref, filepm, filmd
 
       integer :: ik, ib, num
-      integer :: ierr, i
+      integer :: ierr, i, j
       logical :: lext
 
       ! set default values for thos parameters
@@ -210,8 +210,8 @@ module fileio
         open(unit=9, file=tbinit, action='read')
         if (lepc) then
           do i=1, nsample
-            read(unit=9,fmt=*) &
-            inp%NAMDTINI_A(i), inp%INIKPT_A(i,:), inp%INIBAND_A(i,:)
+            read(unit=9,fmt=*) inp%NAMDTINI_A(i), &
+                ((inp%INIKPT_A(i,j), inp%INIBAND_A(i,j)), j=1,ninibs)
           end do
         else
           largebs = .FALSE. ! largebs only available for lepc=.TRUE.
