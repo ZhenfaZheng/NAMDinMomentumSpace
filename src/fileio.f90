@@ -35,6 +35,10 @@ module fileio
     ! NA coupling = <psi_i(t)| d/dt |(psi_j(t))>
     logical :: LGAMMA
 
+    ! whether to propagate psi_c(t) only at first sample.
+    ! the initial c(t=0) will sum up initial settings of all samples.
+    logical :: LCPROP
+
     logical :: LEPC    ! whether to use e-p matrix as NA couplings
     logical :: LARGEBS ! whether the basis set is large or not
     logical :: LBASSEL ! whether to read BASSEL file. If not, will generate it.
@@ -98,6 +102,8 @@ module fileio
       character(len=256) :: tbinit
 
       logical :: lgamma
+      logical :: lcprop
+
       logical :: lepc
       logical :: largebs
       integer :: epctype
@@ -117,7 +123,7 @@ module fileio
       namelist /NAMDPARA/ &
         bmin, bmax, nsw, nbands, ninibs, potim, namdtime, &
         nsample, ntraj, nelm, temp, &
-        rundir, lhole, lshp, lcpext, tbinit, lgamma, &
+        rundir, lhole, lshp, lcpext, tbinit, lgamma, lcprop, &
         lepc, largebs, epctype, lbassel, lsort, &
         Np, nkpoints, nmodes, nparts, kmin, kmax, emin, emax, &
         epmdir, epmpref, filepm, filmd
@@ -146,6 +152,8 @@ module fileio
       lgamma = .TRUE.
 
       lepc = .FALSE.
+      lcprop = .FALSE.
+
       largebs = .FALSE.
       epctype = 1
       lbassel = .FALSE.
@@ -265,6 +273,7 @@ module fileio
       inp%POTIM    = potim
       inp%LCPTXT   = lcpext
       inp%LGAMMA   = lgamma
+      inp%LCPROP   = lcprop
 
       inp%LEPC     = lepc
       inp%LARGEBS  = largebs
