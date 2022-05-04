@@ -8,12 +8,13 @@ module fileio
     integer :: BMAX
     integer :: NBASIS      ! No. of adiabatic states as basis
     integer :: NBANDS      ! No. of band of the system
-    integer :: INIBAND     ! inititial adiabatic state of excited electron/hole
+    integer :: NINIBS      ! No. of inititial basises
     integer :: NSW         ! No. of MD steps
     integer :: NAMDTINI    ! Initial time step of NAMD
     integer :: NAMDTIME    ! No. of steps of NAMD
     integer, allocatable, dimension(:) :: NAMDTINI_A    ! No. of steps of NAMD
-    integer, allocatable, dimension(:) :: INIBAND_A     ! No. of steps of NAMD
+    integer, allocatable, dimension(:,:) :: INIBAND_A     ! No. of steps of NAMD
+    integer, allocatable, dimension(:) :: INIBAND ! inititial bands.
     integer :: NTRAJ       ! No. of surface hopping trajectories
     integer :: NELM        ! No. of steps of electron wave propagation
     integer :: NSAMPLE     ! No. of steps of electron wave propagation
@@ -44,13 +45,13 @@ module fileio
     integer :: EPCTYPE ! 1: calculate EPC from average phonon populations.
                        ! 2: calculate EPC by norm mode decompositon form MD traj
     integer :: KMIN, KMAX
-    integer :: INIKPT      ! inititial k-point of excited state
     integer :: NKPOINTS    ! No. of k-points of the system
     integer :: NQPOINTS    ! No. of q-points of the system
     integer :: NMODES      ! No. of phonon modes for each q
     integer :: NPARTS      ! No. of parts of ephmat information.
     integer :: Np    ! No. of unit cells in Born-von Kamann boundary conditions
-    integer, allocatable, dimension(:) :: INIKPT_A   ! all initial k-points
+    integer, allocatable, dimension(:,:) :: INIKPT_A   ! all initial k-points
+    integer, allocatable, dimension(:) :: INIKPT ! inititial k-points.
     ! selected basises among the nk*nb eigen states
     ! BASLIST(ibas, 1) = ik
     ! BASLIST(ibas, 2) = ib
@@ -79,6 +80,7 @@ module fileio
       integer :: nsw
       integer :: iniband
       integer :: nbands
+      integer :: ninibs
       integer :: namdtime
       ! integer :: namdtini
       integer :: ntraj
@@ -113,7 +115,7 @@ module fileio
       character(len=256) :: filepm, filmd
 
       namelist /NAMDPARA/ &
-        bmin, bmax, nsw, nbands, potim, namdtime, &
+        bmin, bmax, nsw, nbands, ninibs, potim, namdtime, &
         nsample, ntraj, nelm, temp, &
         rundir, lhole, lshp, lcpext, tbinit, lgamma, &
         lepc, largebs, epctype, lbassel, lsort, &
@@ -131,6 +133,7 @@ module fileio
       bmax = 0
       nbands = 0
       ! iniband = 0
+      ninibs = 1
       ntraj = 1000
       nelm = 1000
       lhole = .FALSE.
@@ -175,8 +178,10 @@ module fileio
       if ( kmax == 0 ) kmax = nkpoints
 
       allocate(inp%BASSEL(nkpoints,nbands))
-      allocate(inp%INIBAND_A(nsample), inp%NAMDTINI_A(nsample))
-      allocate(inp%INIKPT_A(nsample))
+      allocate(inp%NAMDTINI_A(nsample))
+      allocate(inp%INIKPT_A(nsample, ninibs))
+      allocate(inp%INIBAND_A(nsample, ninibs))
+      allocate(inp%INIKPT(ninibs), inp%INIBAND(ninibs))
 
       num = 0
       inp%BASSEL = -1
@@ -206,13 +211,13 @@ module fileio
         if (lepc) then
           do i=1, nsample
             read(unit=9,fmt=*) &
-            inp%NAMDTINI_A(i), inp%INIKPT_A(i), inp%INIBAND_A(i)
+            inp%NAMDTINI_A(i), inp%INIKPT_A(i,:), inp%INIBAND_A(i,:)
           end do
         else
           largebs = .FALSE. ! largebs only available for lepc=.TRUE.
           inp%INIKPT_A = 1
           do i=1, nsample
-            read(unit=9,fmt=*) inp%NAMDTINI_A(i), inp%INIBAND_A(i)
+            read(unit=9,fmt=*) inp%NAMDTINI_A(i), inp%INIBAND_A(i,:)
           end do
         end if
         close(9)
@@ -247,6 +252,7 @@ module fileio
       inp%NBASIS   = bmax - bmin + 1
       inp%NSW      = nsw
       inp%NBANDS   = nbands
+      inp%NINIBS   = ninibs
       inp%NAMDTIME = namdtime
       inp%NTRAJ    = ntraj
       inp%NELM     = nelm
@@ -352,7 +358,7 @@ module fileio
           "------------------------------------------------------------"
         write(*,'(A30,A3,I5)') 'BMIN',     ' = ', inp%BMIN
         write(*,'(A30,A3,I5)') 'BMAX',     ' = ', inp%BMAX
-        write(*,'(A30,A3,I5)') 'INIBAND',  ' = ', inp%INIBAND
+        ! write(*,'(A30,A3,I5)') 'INIBAND',  ' = ', inp%INIBAND
         write(*,'(A30,A3,I5)') 'NBANDS',   ' = ', inp%NBANDS
 
         write(*,'(A30,A3,I5)')   'NSW',    ' = ', inp%NSW
@@ -389,8 +395,9 @@ module fileio
 
         write(*,'(A30,A3,I6)')    'NBANDS', ' = ', inp%NBANDS
         write(*,'(A30,A3,I6)')  'NKPOINTS', ' = ', inp%NKPOINTS
-        write(*,'(A30,A3,I6)')   'INIBAND', ' = ', inp%INIBAND
-        write(*,'(A30,A3,I6)')    'INIKPT', ' = ', inp%INIKPT
+        write(*,'(A30,A3,I6)')    'NINIBS', ' = ', inp%NINIBS
+        ! write(*,'(A30,A3,I6)')   'INIBAND', ' = ', inp%INIBAND
+        ! write(*,'(A30,A3,I6)')    'INIKPT', ' = ', inp%INIKPT
 
         write(*,'(A30,A3,I6)')       'NSW', ' = ', inp%NSW
         write(*,'(A30,A3,F6.1)')   'POTIM', ' = ', inp%POTIM

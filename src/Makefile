@@ -2,7 +2,6 @@
 # defaults
 #-------------------------------------------------------------------------------
 #FC= gfortran
-#FC= ifort -assume byterecl -qopt-matmul
 FC= ifort -assume byterecl
 FFLAGS= -g -O2
 MAKE = make

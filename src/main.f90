@@ -21,7 +21,7 @@ Program main
   integer :: ns
 
   write(*,*)
-  write(*,*) "Hefei-NAMD (epc version 1.8.6, Apr 22, 2022)"
+  write(*,*) "Hefei-NAMD (epc version 1.9.0, May 04, 2022)"
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   ! First, get user inputs
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -48,8 +48,8 @@ Program main
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   do ns=1, inp%NSAMPLE
     inp%NAMDTINI = inp%NAMDTINI_A(ns)
-    inp%INIBAND  = inp%INIBAND_A(ns)
-    inp%INIKPT  = inp%INIKPT_A(ns)
+    inp%INIBAND  = inp%INIBAND_A(ns,:)
+    inp%INIKPT  = inp%INIKPT_A(ns,:)
     call printUserInp(inp)
     ! initiate KS matrix
     call system_clock(t1)

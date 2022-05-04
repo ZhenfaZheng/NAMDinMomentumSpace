@@ -15,20 +15,21 @@ module shop
     type(namdInfo), intent(in) :: inp
     type(overlap), intent(in) :: olap
     integer :: i, j, ibas, nbas, tion, Nt, iq
-    integer :: istat, cstat
+    integer :: cstat
     integer, allocatable :: cstat_all(:)
 
     ks%sh_pops = 0
     ks%sh_prop = 0
     nbas = ks%ndim
-    allocate(cstat_all(inp%NTRAJ))
-    istat = inp%BASSEL(inp%INIKPT, inp%INIBAND)
     Nt = inp%NAMDTIME / inp%POTIM
+    allocate(cstat_all(inp%NTRAJ))
+    ! allocate(cstat_all(inp%NTRAJ, inp%NINIBS))
+    do i=1, 1!inp%NINIBS
+      cstat_all(:) = inp%BASSEL(inp%INIKPT(i), inp%INIBAND(i))
+    end do
 
     ! initialize the random seed for ramdom number production
     call init_random_seed()
-
-    cstat_all = istat
 
     if (inp%LEPC) then
 
@@ -250,7 +251,7 @@ module shop
       do io = 24, 25
         write(io,'(A,A12,A3,I5)') '#', 'BMIN',     ' = ', inp%BMIN
         write(io,'(A,A12,A3,I5)') '#', 'BMAX',     ' = ', inp%BMAX
-        write(io,'(A,A12,A3,I5)') '#', 'INIBAND',  ' = ', inp%INIBAND
+        ! write(io,'(A,A12,A3,I5)') '#', 'INIBAND',  ' = ', inp%INIBAND
         write(io,'(A,A12,A3,I5)') '#', 'NBANDS',   ' = ', inp%NBANDS
 
         write(io,'(A,A12,A3,I5)')   '#', 'NSW',    ' = ', inp%NSW
@@ -284,8 +285,8 @@ module shop
         write(io,'(A,A12,A3,I6)')     '#', 'NBASIS',   ' = ', inp%NBASIS
         write(io,'(A,A12,A3,I6)')     '#', 'NBANDS',   ' = ', inp%NBANDS
         write(io,'(A,A12,A3,I6)')     '#', 'NKPOINTS', ' = ', inp%NKPOINTS
-        write(io,'(A,A12,A3,I6)')     '#', 'INIBAND',  ' = ', inp%INIBAND
-        write(io,'(A,A12,A3,I6)')     '#', 'INIKPT',   ' = ', inp%INIKPT
+        ! write(io,'(A,A12,A3,I6)')     '#', 'INIBAND',  ' = ', inp%INIBAND
+        ! write(io,'(A,A12,A3,I6)')     '#', 'INIKPT',   ' = ', inp%INIKPT
 
         write(io,'(A,A12,A3,I6)')     '#', 'NSW',      ' = ', inp%NSW
         write(io,'(A,A12,A3,F6.1)')   '#', 'POTIM',    ' = ', inp%POTIM
@@ -358,8 +359,8 @@ module shop
     write(io,'(A,A12,A3,I6)')     '#', 'NBASIS',   ' = ', inp%NBASIS
     write(io,'(A,A12,A3,I6)')     '#', 'NBANDS',   ' = ', inp%NBANDS
     write(io,'(A,A12,A3,I6)')     '#', 'NKPOINTS', ' = ', inp%NKPOINTS
-    write(io,'(A,A12,A3,I6)')     '#', 'INIBAND',  ' = ', inp%INIBAND
-    write(io,'(A,A12,A3,I6)')     '#', 'INIKPT',   ' = ', inp%INIKPT
+    ! write(io,'(A,A12,A3,I6)')     '#', 'INIBAND',  ' = ', inp%INIBAND
+    ! write(io,'(A,A12,A3,I6)')     '#', 'INIKPT',   ' = ', inp%INIKPT
 
     write(io,'(A,A12,A3,I6)')     '#', 'NSW',      ' = ', inp%NSW
     write(io,'(A,A12,A3,F6.1)')   '#', 'POTIM',    ' = ', inp%POTIM

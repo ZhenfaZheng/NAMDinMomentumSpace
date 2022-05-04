@@ -7,6 +7,7 @@
   EMAX       = -1.5
   NBANDS     = 2
   NKPOINTS   = 81
+  NINIBS     = 1
   Np         = 81
 
   NSW        = 1200

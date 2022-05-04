@@ -107,7 +107,7 @@ def ek_selected(filephmat='', filbassel='BASSEL', inp=None):
 
     if inp is not None:
 
-        inp = read_inp()
+        # inp = read_inp()
         nparts = int(inp['NPARTS'])
         prefix = inp['EPMPREF']
         epmdir = inp['EPMDIR']

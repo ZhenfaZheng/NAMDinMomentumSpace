@@ -124,7 +124,10 @@ module hamil
     ! ks%ham_c = cero
     ! ks%ham_p = cero
     ! ks%ham_n = cero
-    ks%psi_c( inp%BASSEL(inp%INIKPT, inp%INIBAND) ) = uno
+    do i=1, inp%NINIBS
+      ks%psi_c( inp%BASSEL(inp%INIKPT(i), inp%INIBAND(i)) ) = uno
+    end do
+    ks%psi_c = ks%psi_c / SQRT(REAL(inp%NINIBS))
     initstep = inp%NAMDTINI / inp%POTIM - 2
     ! initstep = MOD(initstep-1, nsw-1) + 1
     nsteps = inp%NSW - 1
