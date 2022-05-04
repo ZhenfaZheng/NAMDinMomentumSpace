@@ -348,7 +348,7 @@ module shop
         (ks%sh_pops(i,tion), i=1, ks%ndim)
       ! write(unit=25, fmt="(2G20.10, *( ' ( ',G20.10,' , ',G20.10,' ) ' ) )") &
       write(unit=25, fmt='(*(G20.10))') tion * inp%POTIM, &
-        SUM(ks%eigKs(:,tion) * ks%pop_a(:,tion)) / inp%NINIBS, &
+        SUM(ks%eigKs(:,tion) * ks%pop_a(:,tion)), &
       ! (ks%psi_a(i,tion), i=1, ks%ndim)
         (ks%pop_a(i,tion), i=1, ks%ndim)
     end do

@@ -21,7 +21,7 @@ Program main
   integer :: ns
 
   write(*,*)
-  write(*,*) "Hefei-NAMD (epc version 1.9.1, May 04, 2022)"
+  write(*,*) "Hefei-NAMD (epc version 1.9.2, May 04, 2022)"
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   ! First, get user inputs
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -51,11 +51,13 @@ Program main
     inp%INIBAND  = inp%INIBAND_A(ns,:)
     inp%INIKPT  = inp%INIKPT_A(ns,:)
     call printUserInp(inp)
-    ! initiate KS matrix
     call system_clock(t1)
-    call initTDKS(ks, inp, olap_sec)
+    if (inp%LCPROP .OR. ns==1) then
+      ! initiate KS matrix
+      call initTDKS(ks, inp, olap_sec)
     ! Time propagation
-    call Propagation(ks, inp, olap_sec)
+      call Propagation(ks, inp, olap_sec)
+    end if
     ! Run surface hopping
     if (inp%LSHP) then
       call runSH(ks, inp, olap_sec)

@@ -35,8 +35,9 @@ module fileio
     ! NA coupling = <psi_i(t)| d/dt |(psi_j(t))>
     logical :: LGAMMA
 
-    ! whether to propagate psi_c(t) only at first sample.
-    ! the initial c(t=0) will sum up initial settings of all samples.
+    ! whether to propagate psi_c(t) only at each sample.
+    ! if False, only propagate at first sample, and the initial c(t=0)
+    ! will sum up initial settings of all samples.
     logical :: LCPROP
 
     logical :: LEPC    ! whether to use e-p matrix as NA couplings
@@ -152,7 +153,7 @@ module fileio
       lgamma = .TRUE.
 
       lepc = .FALSE.
-      lcprop = .FALSE.
+      lcprop = .True.
 
       largebs = .FALSE.
       epctype = 1

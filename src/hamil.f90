@@ -58,7 +58,7 @@ module hamil
 
     real(kind=q) :: norm
     real(kind=q), allocatable, dimension(:,:) :: eptemp
-    integer :: i, j, iq, im, t, nsteps, N, Nt, nmodes, nqs
+    integer :: i, j, ib, iq, im, t, nsteps, N, Nt, nmodes, nqs
     integer :: initstep
 
     ! memory allocation
@@ -121,16 +121,25 @@ module hamil
     ks%psi_c = cero
     ks%psi_p = cero
     ks%psi_n = cero
-    ! ks%ham_c = cero
-    ! ks%ham_p = cero
-    ! ks%ham_n = cero
-    do i=1, inp%NINIBS
-      ks%psi_c( inp%BASSEL(inp%INIKPT(i), inp%INIBAND(i)) ) = uno
-    end do
-    ks%psi_c = ks%psi_c / SQRT(REAL(inp%NINIBS))
-    initstep = inp%NAMDTINI / inp%POTIM - 2
-    ! initstep = MOD(initstep-1, nsw-1) + 1
+
+    if (inp%LCPROP) then
+      do i=1, inp%NINIBS
+        ib = inp%BASSEL(inp%INIKPT(i), inp%INIBAND(i))
+        ks%psi_c(ib) = uno
+      end do
+      ks%psi_c = SQRT(ks%psi_c / REAL(inp%NINIBS))
+    else
+      do i=1, inp%NSAMPLE
+        do j=1, inp%NINIBS
+          ib = inp%BASSEL(inp%INIKPT_A(i,j), inp%INIBAND_A(i,j))
+          ks%psi_c(ib) = ks%psi_c(ib) + uno
+        end do
+      end do
+      ks%psi_c = SQRT(ks%psi_c / REAL(inp%NSAMPLE * inp%NINIBS))
+    end if
+
     nsteps = inp%NSW - 1
+    initstep = inp%NAMDTINI / inp%POTIM - 2
 
     if (inp%LEPC) then
 
