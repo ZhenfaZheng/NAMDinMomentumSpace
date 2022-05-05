@@ -415,6 +415,8 @@ module shop
     Nt = inp%NAMDTIME / inp%POTIM
     allocate(pops(inp%NQPOINTS, inp%NMODES, Nt))
     pops = ks%ph_pops / inp%NTRAJ / isample / inp%NINIBS
+    if (inp%NQPOINTS * inp%NMODES * Nt > 3e7) &
+      write(*,'(A)') "Writing PHPROP file, please wait!"
 
     do im=1, inp%NMODES
       do tion=1, Nt

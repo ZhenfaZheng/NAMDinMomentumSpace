@@ -4,10 +4,18 @@ import os
 import numpy as np
 import postnamd as pn
 
-iniemin = -3.7 ; iniemax = -3.5
-# select states between iniemin ~ iniemax
+
+# select initial states
+# between iniemin ~ iniemax
+iniemin = -4.0
+iniemax = -3.95
+
+# select initial time between
+# init_time_min ~ init_time_max randomly.
 init_time_min = 1
 init_time_max = 200
+
+#=====================================================================#
 
 inp = pn.read_inp('./inp')
 nparts = int(inp['NPARTS'])
@@ -24,19 +32,30 @@ for ip in range(nparts):
 
 index = np.argwhere((en_tot>iniemin) & (en_tot<iniemax)) + 1
 
+nbas = index.shape[0]
+if ('NINIBS' in inp):
+    ninibs = int( inp['NINIBS'] )
+else:
+    ninibs = 1
+if (nbas<ninibs):
+    print("\nNot enough states between%.2f ~ %.2f eV!\n"%(iniemin, iniemax))
+    os._exit()
+nsample = int( nbas // ninibs )
+
 T = np.arange(init_time_min, init_time_max + 1)
 np.random.shuffle(T)
-
 niniT = T.shape[0]
-nsample = index.shape[0]
+
 if (nsample>niniT):
     nsample = niniT
     print("\nToo many states between %.2f ~ %.2f eV!"%(iniemin, iniemax))
-    print("Select first %d states. Please set NSAMPLE = %d in inp.\n"%(niniT, niniT))
+    print("Select first %d states. "%(nsample*ninibs) + \
+          "Please set NSAMPLE = %d or less in inp.\n"%niniT)
 else:
-    print("\nPlease set NSAMPLE = %d in inp.\n"%nsample)
-ini = np.empty([nsample,3])
+    print("\nPlease set NSAMPLE = %d or less in inp.\n"%nsample)
+
+ini = np.empty([nsample,1+ninibs*2])
 ini[:,0] = T[:nsample]
-ini[:,1:] = index[:nsample, :]
+ini[:,1:] = index[:nsample*ninibs, :].reshape((nsample,ninibs*2))
 
 np.savetxt('INICON', ini, fmt='%8d')
