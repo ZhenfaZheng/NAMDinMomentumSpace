@@ -22,6 +22,7 @@ nparts = int(inp['NPARTS'])
 prefix = inp['EPMPREF']
 epmdir = inp['EPMDIR']
 
+# read band energies from h5 files.
 for ip in range(nparts):
     filepm = os.path.join(epmdir, prefix + '_ephmat_p%d.h5'%(ip+1))
     en_p = pn.read_ephmath5(filepm, igroup=0, idset=3)
@@ -30,8 +31,10 @@ for ip in range(nparts):
     else:
         en_tot = np.vstack((en_tot, en_p))
 
+# select initial states within energy range.
 index = np.argwhere((en_tot>iniemin) & (en_tot<iniemax)) + 1
 
+# read number of initial states and determine nsample.
 nbas = index.shape[0]
 if ('NINIBS' in inp):
     ninibs = int( inp['NINIBS'] )
@@ -42,6 +45,7 @@ if (nbas<ninibs):
     os._exit()
 nsample = int( nbas // ninibs )
 
+# generate initial times randomly.
 T = np.arange(init_time_min, init_time_max + 1)
 np.random.shuffle(T)
 niniT = T.shape[0]
@@ -54,6 +58,7 @@ if (nsample>niniT):
 else:
     print("\nPlease set NSAMPLE = %d or less in inp.\n"%nsample)
 
+# generate data of INICON and save them.
 ini = np.empty([nsample,1+ninibs*2])
 ini[:,0] = T[:nsample]
 ini[:,1:] = index[:nsample*ninibs, :].reshape((nsample,ninibs*2))

@@ -433,6 +433,18 @@ def func_gauss(x, a, b, c):
     '''
     return a * np.exp( -0.5 * ((x-b)/c)**2 )
 
+def func_fd(en, T):
+    '''
+    Fermi-dirac distribution
+
+    en: ndarray, function variable, should be subtracted by fermi energy.
+    T : float, temperature in unit of K.
+    '''
+    kbT = 8.61733 * 1.0e-5 * T
+    f = 1.0 / ( np.exp(en/kbT) + 1.0 )
+
+    return f
+
 
 if __name__=='__main__':
     intro = "\nThis is a namd postprocessing module, you can add this file to" \

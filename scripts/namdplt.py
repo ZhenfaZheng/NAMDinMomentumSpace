@@ -21,6 +21,7 @@ def main():
     1: COUPLE.png; 2: TDEN.png;
     31: TDKPROPxy.png; 32: TDKPROPyz.png; 33: TDKPROPxz.png;
     4: TDBAND.png; 5: TDPH.png; 6:TDPHEN.png
+    7: DISTRIBUTION.png; 8: TPROP.png
     '''
 
     kplabels = 'gkmg'
@@ -95,6 +96,14 @@ def main():
     if (6 in which_plt):
         plot_tdphen(php, figname='TDPHEN.png')
 
+    if (7 in which_plt):
+        ntsteps = shp.shape[0]
+        times = list( range(0, ntsteps, int(ntsteps/5)) ) ; times.append(ntsteps-1)
+        plot_distrib(en, shp, times, Ef=Eref, figname='DISTRIBUTION.png')
+
+    if (8 in which_plt):
+        plot_Tprop(en, shp, Ef=Eref, figname='TPROP.png')
+
     print("\nAll Done!\n")
 
 
@@ -168,17 +177,22 @@ def plot_tdprop(shp, Eref=0.0, lplot=1, ksen=None, figname='tdshp.png'):
         ylabel = 'Energy (eV)'
         ntsteps = shp.shape[0]
         nbands = shp.shape[1] -2
-        cmin = 0.0; cmax = np.max(shp[:,2:])
-        cmax = math.ceil(cmax*10)/10
-        norm = mpl.colors.Normalize(cmin,cmax)
+
+        # cmin = 0.0; cmax = np.max(shp[:,2:])
+        # cmax = math.ceil(cmax*10)/10
+        # norm = mpl.colors.Normalize(cmin,cmax)
+        pop = shp[:,2:]
+        cmin = np.min(pop[pop>0.0]); cmax = np.max(pop)
+        norm = mpl.colors.LogNorm(cmin,cmax)
 
         if (ksen.shape[0]!=nbands):
             print('\nNumber of ksen states doesn\'t match with SHPROP data!\n')
+        sort = np.argsort(np.sum(pop, axis=0))
         E = np.tile(ksen-Eref, ntsteps).reshape(ntsteps, nbands)
         T = np.tile(shp[:,0], nbands).reshape(nbands,ntsteps).T
-        sc = ax.scatter(T, E, s=dotsize, c=shp[:,2:], lw=0,
+        sc = ax.scatter(T, E[:,sort], s=dotsize, c=pop[:, sort], lw=0,
                         norm=norm, cmap=cmap)
-        ax.plot(shp[:,1]-Eref, 'r', lw=1, label='Average Energy')
+        ax.plot(shp[:,1]-Eref, 'b', lw=1, label='Average Energy')
         plt.colorbar(sc)
 
         x1 = 0.05 * namdtime; x2 = 0.1 * namdtime
@@ -396,6 +410,81 @@ def plot_tdphen(php, figname='TDPHEN.png'):
     ax.set_xlim(0,namdtime)
     ax.set_xlabel('Time (fs)')
     ax.set_ylabel('Energy (eV)')
+
+    plt.tight_layout()
+    plt.savefig(figname, dpi=400)
+    print("\n%s has been saved."%figname)
+
+
+def plot_distrib(en, shp, times, Ef=0.0, figname='DISTRIBUTION.png'):
+
+    sort = np.argsort(en)
+    pop = shp[times, 2:][:,sort]
+    en = en[sort] - Ef
+
+    ntsteps = shp.shape[0]
+    namdtime = shp[-1, 0]
+    potim = namdtime / ntsteps
+
+    figsize_x = 4.8
+    figsize_y = 3.2 # in inches
+
+    fig, ax = plt.subplots()
+    fig.set_size_inches(figsize_x, figsize_y)
+    mpl.rcParams['axes.unicode_minus'] = False
+
+    for  ii, tt in enumerate(times):
+
+        time = tt * potim
+        if(time==namdtime-potim): time = namdtime
+
+        from scipy.optimize import curve_fit
+        popt, pcov = curve_fit(pn.func_fd, en, pop[ii], p0=[1000])
+        fdfit = pn.func_fd(en, *popt)
+        print("Temperature at time of %.0f fs is %.0f K."%(time, popt[0]))
+
+        line = ax.plot(en, fdfit, lw=1.0, label='%.0f fs'%time)
+        ax.scatter(en, pop[ii], s=3.0, lw=0.0, color=line[0].get_color())
+
+
+    ax.legend(loc=1)
+    ax.set_xlabel('Energy (eV)')
+    ax.set_ylabel('Distribution')
+
+    plt.tight_layout()
+    plt.savefig(figname, dpi=400)
+    print("\n%s has been saved."%figname)
+
+
+def plot_Tprop(en, shp, Ef=0.0, figname='TPROP.png'):
+
+    en -= Ef
+    ntsteps = shp.shape[0]
+    namdtime = shp[-1, 0]
+    potim = namdtime / ntsteps
+
+    from scipy.optimize import curve_fit
+    itime = np.arange(0, ntsteps, 20)
+    time = shp[itime, 0]
+    pop = shp[:, 2:]
+
+    temp = []
+    for it in itime:
+        popt, pcov = curve_fit(pn.func_fd, en, pop[it], p0=[1000])
+        temp.append(popt[0])
+    temp = np.array(temp)
+
+    figsize_x = 4.8
+    figsize_y = 3.2 # in inches
+
+    fig, ax = plt.subplots()
+    fig.set_size_inches(figsize_x, figsize_y)
+    mpl.rcParams['axes.unicode_minus'] = False
+
+    ax.plot(time, temp, lw=1.0)
+
+    ax.set_xlabel('Time (fs)')
+    ax.set_ylabel('Temperature (K)')
 
     plt.tight_layout()
     plt.savefig(figname, dpi=400)
