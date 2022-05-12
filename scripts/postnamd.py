@@ -158,6 +158,21 @@ def readshp(filshps):
     return shp
 
 
+def readphp(filphps):
+    '''
+    This function loads data from SHPROP.xxx files.
+
+    Parameters:
+    filphps: a list of strings, file names if PHPROP.xxx files. such as
+             ['PHPROP.1', 'PHPROP.2']
+
+    Returns: ndarray, total data of PHPROP.xxx files, in forms of
+             php[nmodes, ntsteps, nb+2].
+    '''
+    php = np.array( [ np.loadtxt(filphp) for filphp in filphps ] )
+    return php
+
+
 def read_ephmath5(filname, igroup=-1, idset=-1, dset=""):
     '''
     Read informations about e-ph coupling from PERTURBO output h5 file.

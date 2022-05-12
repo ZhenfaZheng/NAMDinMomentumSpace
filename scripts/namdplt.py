@@ -46,6 +46,7 @@ def main():
     kpts_cart = pn.frac2cart(kpts, b1, b2, b3)
     filshps = glob('SHPROP.*')
     shp = pn.readshp(filshps)
+    ntsteps = shp.shape[0]
 
 
     #                             Plot figures                            #
@@ -76,10 +77,13 @@ def main():
 
 
     if ((5 in which_plt) or (6 in which_plt)):
-        php = np.loadtxt('PHPROP')
-        ntsteps = int( float(inp['NAMDTIME']) * float(inp['POTIM']) )
-        nmodes = int( php.shape[0] / ntsteps ) ; nqs = php.shape[1] - 2
-        php = php.reshape(nmodes, ntsteps, nqs+2)
+        if not os.path.isfile('PHPROP'):
+            filphps = glob('PHPROP.*')
+            php = pn.readphp(filphps)
+        else:
+            php = np.loadtxt('PHPROP')
+            nmodes = int( php.shape[0] / ntsteps ) ; nqs = php.shape[1] - 2
+            php = php.reshape(nmodes, ntsteps, nqs+2)
 
     if (5 in which_plt):
         qpath_cart = pn.frac2cart(qpath, b1, b2, b3)
@@ -97,7 +101,6 @@ def main():
         plot_tdphen(php, figname='TDPHEN.png')
 
     if (7 in which_plt):
-        ntsteps = shp.shape[0]
         times = list( range(0, ntsteps, int(ntsteps/5)) ) ; times.append(ntsteps-1)
         plot_distrib(en, shp, times, Ef=Eref, figname='DISTRIBUTION.png')
 
@@ -195,10 +198,10 @@ def plot_tdprop(shp, Eref=0.0, lplot=1, ksen=None, figname='tdshp.png'):
         ax.plot(shp[:,1]-Eref, 'b', lw=1, label='Average Energy')
         plt.colorbar(sc)
 
-        x1 = 0.05 * namdtime; x2 = 0.1 * namdtime
-        for ib in range(nbands):
-            y = ksen[ib] - Eref
-            ax.plot([x1, x2], [y, y], color='r', lw=0.7)
+        # x1 = 0.05 * namdtime; x2 = 0.1 * namdtime
+        # for ib in range(nbands):
+        #     y = ksen[ib] - Eref
+        #     ax.plot([x1, x2], [y, y], color='r', lw=0.7)
 
         ax.set_ylabel(ylabel)
 
