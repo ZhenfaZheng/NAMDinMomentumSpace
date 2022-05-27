@@ -37,6 +37,7 @@ def main():
     #                              Read data                              #
     #######################################################################
 
+    print("\nReading data ...")
     en, kpts = pn.ek_selected(inp=inp)
     prefix = inp['EPMPREF']; epmdir = inp['EPMDIR']
     filepm = os.path.join(epmdir, prefix + '_ephmat_p1.h5')
@@ -72,7 +73,10 @@ def main():
         k_index, kp_index = pn.select_kpts_on_path(kpts, kpath, norm=0.01)
         k_loc, kp_loc = pn.loc_on_kpath(kpts_cart, k_index, kp_index, kpath_cart)
 
-        plot_tdband(k_loc, en, kp_loc, kplabels, shp, k_index,
+        # plot_tdband(k_loc, en, kp_loc, kplabels, shp, k_index,
+        #             Eref=Eref, figname='TDBAND.png')
+        times = list( range(0, ntsteps, int(ntsteps/4)) ) ; times.append(ntsteps-1)
+        plot_tdband_sns(k_loc, en, kp_loc, kplabels, shp, k_index, times,
                     Eref=Eref, figname='TDBAND.png')
 
 
@@ -94,20 +98,20 @@ def main():
         q_loc, qp_loc = pn.loc_on_kpath(qpts_cart, q_index, qp_index, qpath_cart)
 
         # times = [0, 50, 100, 200, 500, 999]
-        times = list( range(0, ntsteps, int(ntsteps/5)) ) ; times.append(ntsteps-1)
+        times = list( range(0, ntsteps, int(ntsteps/4)) ) ; times.append(ntsteps-1)
         plot_tdph_sns(q_loc, phen, qp_loc, qplabels, php, q_index, times, figname='TDPH.png')
 
     if (6 in which_plt):
         plot_tdphen(php, figname='TDPHEN.png')
 
     if (7 in which_plt):
-        times = list( range(0, ntsteps, int(ntsteps/5)) ) ; times.append(ntsteps-1)
+        times = list( range(0, ntsteps, int(ntsteps/4)) ) ; times.append(ntsteps-1)
         plot_distrib(en, shp, times, Ef=Eref, figname='DISTRIBUTION.png')
 
     if (8 in which_plt):
         plot_Tprop(en, shp, Ef=Eref, figname='TPROP.png')
 
-    print("\nAll Done!\n")
+    print("\nDone!\n")
 
 
 ###############################################################################
@@ -316,6 +320,71 @@ def plot_tdband(k_loc, en, kp_loc, kplabels, shp, index,
     print("\n%s has been saved."%figname)
 
 
+def plot_tdband_sns(k_loc, en, kp_loc, kplabels, shp, index, times,
+        X_bg=None, E_bg=None, Eref=0.0, figname='TDBAND.png'):
+
+    nts = len(times)
+    nbasis = index.shape[0]
+    ntsteps = shp.shape[0]
+    namdtime = shp[-1, 0]
+    potim = namdtime / ntsteps
+    pop = shp[:, index+2]
+
+    X = k_loc
+    E = en[index] - Eref
+
+    xmin = kp_loc[0] ; xmax = kp_loc[-1]
+    ymin = E.min() ; ymax = E.max() ; dy = ymax - ymin
+    ymin -= dy*0.05 ; ymax += dy*0.05
+
+    figsize_x = 2.4 * nts + 1.0
+    figsize_y = 3.2 # in inches
+    fig, axes = plt.subplots(1, nts)
+    fig.set_size_inches(figsize_x, figsize_y)
+    mpl.rcParams['axes.unicode_minus'] = False
+
+    cmap = 'hot_r'
+    cmin = np.min(pop[pop>0.0]); cmax = np.max(pop)
+    norm = mpl.colors.LogNorm(cmin,cmax)
+
+    for it in range(nts):
+
+        ax = axes[it]
+        time = times[it] * potim
+        if(time==namdtime-potim): time = namdtime
+        ax.set_title('%.0f fs'%time)
+
+        sc = ax.scatter(X, E, s=10, lw=0,
+                c=pop[times[it],:], cmap=cmap, norm=norm)
+
+        nkpath = kp_loc.shape[0]
+        for ipath in range(1, nkpath):
+            x = kp_loc[ipath]
+            ax.plot([x,x], [ymin,ymax], 'k', lw=0.7, ls='--')
+
+        ticks = []
+        for s in kplabels:
+            s = u'\u0393' if (s=='g' or s=='G') else s.upper()
+            ticks.append(s)
+
+        ax.set_xticks(kp_loc)
+        ax.set_xticklabels(ticks)
+
+        ax.set_xlim(xmin, xmax)
+        ax.set_ylim(ymin, ymax)
+        if (it==0):
+            ax.set_ylabel('Energy (eV)')
+
+    ll = 0.8/figsize_x ; rr = 1.0 - 1.0 / figsize_x
+    ll_cb = 1.0 - 0.9 / figsize_x ; ww_cb = 0.12 / figsize_x
+    fig.subplots_adjust(bottom=0.1, top=0.9, left=ll, right=rr, wspace=0.35)
+    cb_ax = fig.add_axes([ll_cb, 0.1, ww_cb, 0.8])
+    cbar = plt.colorbar(sc, cax=cb_ax)
+
+    plt.savefig(figname, dpi=400)
+    print("\n%s has been saved."%figname)
+
+
 def plot_tdph_sns(q_loc, phen, qp_loc, qplabels, php, index, times,
                   X_bg=None, E_bg=None, figname='TDPH.png'):
 
@@ -327,7 +396,6 @@ def plot_tdph_sns(q_loc, phen, qp_loc, qplabels, php, index, times,
     potim = namdtime / ntsteps
     php = np.cumsum(php, axis=1)
     pop = php[:,:,index+2][:,times,:]
-    np.savetxt('phde.dat', php[:,:,1].T, fmt='%12.7f')
 
     X = q_loc
     E = phen[index, :]
@@ -424,16 +492,19 @@ def plot_distrib(en, shp, times, Ef=0.0, figname='DISTRIBUTION.png'):
     sort = np.argsort(en)
     pop = shp[times, 2:][:,sort]
     en = en[sort] - Ef
+    enfit = np.arange(en.min(), en.max(), 0.01)
 
+    nsns = len(times)
     ntsteps = shp.shape[0]
     namdtime = shp[-1, 0]
     potim = namdtime / ntsteps
 
     figsize_x = 4.8
-    figsize_y = 3.2 # in inches
+    figsize_y = 1.2 * nsns # in inches
 
-    fig, ax = plt.subplots()
+    fig, axes = plt.subplots(nsns, 1)
     fig.set_size_inches(figsize_x, figsize_y)
+    fig.subplots_adjust(hspace=0.1)
     mpl.rcParams['axes.unicode_minus'] = False
 
     for  ii, tt in enumerate(times):
@@ -443,16 +514,27 @@ def plot_distrib(en, shp, times, Ef=0.0, figname='DISTRIBUTION.png'):
 
         from scipy.optimize import curve_fit
         popt, pcov = curve_fit(pn.func_fd, en, pop[ii], p0=[1000])
-        fdfit = pn.func_fd(en, *popt)
-        print("Temperature at time of %.0f fs is %.0f K."%(time, popt[0]))
+        fdfit = pn.func_fd(enfit, *popt)
 
-        line = ax.plot(en, fdfit, lw=1.0, label='%.0f fs'%time)
-        ax.scatter(en, pop[ii], s=3.0, lw=0.0, color=line[0].get_color())
+        ax = axes if (nsns==1) else axes[ii]
 
+        ax.plot([0,0], [-0.1,1.1], 'k', ls='--', lw=0.5)
+        ax.plot(enfit, fdfit, lw=1.0, color='b', alpha=0.8)
+        ax.scatter(en, pop[ii], s=8.0, lw=0.0, color='r', alpha=0.5)
 
-    ax.legend(loc=1)
-    ax.set_xlabel('Energy (eV)')
-    ax.set_ylabel('Distribution')
+        s = "%d fs, %d K"%(time, popt[0])
+        ax.text(0.97, 0.90, s, ha='right', va='top',
+                bbox=dict(boxstyle='round', ec='k', alpha=0.1),
+                transform=ax.transAxes
+                )
+
+        ax.set_ylim(-0.1, 1.1)
+        ax.set_ylabel('Distribution')
+
+        if ii<nsns-1:
+            ax.set_xticks([])
+        else:
+            ax.set_xlabel('$E-E_f$ (eV)')
 
     plt.tight_layout()
     plt.savefig(figname, dpi=400)
