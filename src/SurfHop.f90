@@ -367,13 +367,29 @@ module shop
 
     real(kind=q), allocatable, dimension(:,:) :: pops
     integer :: i, j, tion, Nt, ierr, io, im, NM, Navg
+    integer :: order, ntemp, steps
     character(len=48) :: mtag
 
     Nt = inp%NAMDTIME / inp%POTIM
+
+    if (Nt<1000) then
+      steps = 1
+    else
+      order = int( LOG10(REAL(Nt)) )
+      ntemp = int( Nt / (10**order) )
+      if (ntemp < 2) then
+        steps = 1 * 10**(order-3)
+      else if (ntemp < 5) then
+        steps = 2 * 10**(order-3)
+      else
+        steps = 5 * 10**(order-3)
+      end if
+    end if
+
     Navg = inp%NTRAJ * isample * inp%NINIBS
     allocate(pops(inp%NQPOINTS, Nt))
-    if (inp%NQPOINTS * inp%NMODES * Nt > 3e7) &
-      write(*,'(A)') "Writing PHPROP file, please wait!"
+    if (inp%NQPOINTS * inp%NMODES * Nt / steps > 3e7) &
+      write(*,'(A)') "Writing PHPROP files, please wait!"
 
     do im=1, inp%NMODES
 
@@ -425,6 +441,11 @@ module shop
       pops = ks%ph_pops(:,im,:) / Navg
 
       do tion=1, Nt
+        ! if ( (MOD(tion, steps) .NE. 0) .AND. (tion .NE. Nt) ) then
+        if (MOD(tion, steps) .NE. 0) then
+          pops(:,tion+1) = pops(:,tion) + pops(:, tion+1)
+          cycle
+        end if
         write(unit=26, fmt='(*(G20.10))') &
             tion * inp%POTIM, SUM( olap%Phfreq(:,im) * pops(:,tion) ), &
             (pops(i,tion), i=1, inp%NQPOINTS)

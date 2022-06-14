@@ -24,11 +24,11 @@ def main():
     7: DISTRIBUTION.png; 8: TPROP.png
     '''
 
-    kplabels = 'gkmg'
+    kplabels = 'gmkg'
     kpath = np.array([ # for TDBAND.png
         [0.00000, 0.00000, 0.00000],
-        [0.33333, 0.33333, 0.00000],
         [0.50000, 0.00000, 0.00000],
+        [0.33333, 0.33333, 0.00000],
         [0.00000, 0.00000, 0.00000]
         ])
     qpath = kpath # for TDPH.png
@@ -75,7 +75,8 @@ def main():
 
         # plot_tdband(k_loc, en, kp_loc, kplabels, shp, k_index,
         #             Eref=Eref, figname='TDBAND.png')
-        times = list( range(0, ntsteps, int(ntsteps/4)) ) ; times.append(ntsteps-1)
+        # times = [0, 50, 100, 200, 500, 1000]
+        times = list( range(0, ntsteps+1, int(ntsteps/4)) )
         plot_tdband_sns(k_loc, en, kp_loc, kplabels, shp, k_index, times,
                     Eref=Eref, figname='TDBAND.png')
 
@@ -97,8 +98,8 @@ def main():
         q_index, qp_index = pn.select_kpts_on_path(qpts, qpath, norm=0.001)
         q_loc, qp_loc = pn.loc_on_kpath(qpts_cart, q_index, qp_index, qpath_cart)
 
-        # times = [0, 50, 100, 200, 500, 999]
-        times = list( range(0, ntsteps, int(ntsteps/4)) ) ; times.append(ntsteps-1)
+        # times = [0, 50, 100, 200, 500, 1000]
+        times = list( range(0, ntsteps+1, int(ntsteps/4)) )
         plot_tdph_sns(q_loc, phen, qp_loc, qplabels, php, q_index, times, figname='TDPH.png')
 
     if (6 in which_plt):
@@ -323,12 +324,17 @@ def plot_tdband(k_loc, en, kp_loc, kplabels, shp, index,
 def plot_tdband_sns(k_loc, en, kp_loc, kplabels, shp, index, times,
         X_bg=None, E_bg=None, Eref=0.0, figname='TDBAND.png'):
 
-    nts = len(times)
     nbasis = index.shape[0]
     ntsteps = shp.shape[0]
     namdtime = shp[-1, 0]
     potim = namdtime / ntsteps
-    pop = shp[:, index+2]
+
+    tindex = []
+    for time in times:
+        if time==0: time = potim
+        tindex.append(int(time/potim)-1)
+    pop = shp[:,index+2][tindex,:]
+    nts = len(times)
 
     X = k_loc
     E = en[index] - Eref
@@ -350,12 +356,10 @@ def plot_tdband_sns(k_loc, en, kp_loc, kplabels, shp, index, times,
     for it in range(nts):
 
         ax = axes[it]
-        time = times[it] * potim
-        if(time==namdtime-potim): time = namdtime
-        ax.set_title('%.0f fs'%time)
+        ax.set_title('%.0f fs'%times[it])
 
         sc = ax.scatter(X, E, s=10, lw=0,
-                c=pop[times[it],:], cmap=cmap, norm=norm)
+                c=pop[it,:], cmap=cmap, norm=norm)
 
         nkpath = kp_loc.shape[0]
         for ipath in range(1, nkpath):
@@ -388,14 +392,19 @@ def plot_tdband_sns(k_loc, en, kp_loc, kplabels, shp, index, times,
 def plot_tdph_sns(q_loc, phen, qp_loc, qplabels, php, index, times,
                   X_bg=None, E_bg=None, figname='TDPH.png'):
 
-    nts = len(times)
     nmodes = php.shape[0]
     ntsteps = php.shape[1]
     nbasis = index.shape[0]
     namdtime = php[0, -1, 0]
     potim = namdtime / ntsteps
     php = np.cumsum(php, axis=1)
-    pop = php[:,:,index+2][:,times,:]
+
+    tindex = []
+    for time in times:
+        if time==0: time = potim
+        tindex.append(int(time/potim)-1)
+    pop = php[:,:,index+2][:,tindex,:]
+    nts = len(times)
 
     X = q_loc
     E = phen[index, :]
@@ -421,9 +430,7 @@ def plot_tdph_sns(q_loc, phen, qp_loc, qplabels, php, index, times,
     for it in range(nts):
 
         ax = axes[it]
-        time = times[it] * potim
-        if(time==namdtime-potim): time = namdtime
-        ax.set_title('%.0f fs'%time)
+        ax.set_title('%.0f fs'%times[it])
 
         sort_index = np.argsort(q_loc)
         for im in range(nmodes):
