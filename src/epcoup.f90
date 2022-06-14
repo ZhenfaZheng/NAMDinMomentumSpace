@@ -75,6 +75,8 @@ module epcoup
     if (inp%LARGEBS) then
       call calcEPC(olap_sec, inp)
       call writeTXT_EPC(olap_sec)
+      ! call writeTXT_EPC_Mode(olap_sec)
+      ! call writeKKQMap(olap_sec)
     else
       call calcNAC(olap_sec, inp)
       call writeEPTXTs(olap_sec)
@@ -1380,6 +1382,78 @@ module epcoup
     close(unit=32)
     close(unit=33)
     close(unit=34)
+
+  end subroutine
+
+
+  subroutine writeTXT_EPC_Mode(olap)
+    implicit none
+
+    type(overlap), intent(inout) :: olap
+    integer :: im, nmodes, ib, jb, nb, iq, ierr, it, nsw
+    real(kind=q), allocatable :: natxt(:,:), eptxt(:,:)
+    character(len=48) :: mtag, fileptxt
+
+    nb = olap%NBANDS
+    nmodes = olap%NMODES
+    nsw = olap%TSTEPS
+
+    allocate(natxt(nb,nb), eptxt(nb,nb))
+    natxt = 0.0_q; eptxt = 0.0_q
+
+    open(unit=32, file='EIGTXT', status='unknown', action='write')
+    write(unit=32, fmt='(*(f12.6))') (olap%Eig(ib,1), ib=1,nb)
+    close(unit=32)
+
+    do im=1,nmodes
+      do ib=1,nb
+        do jb=ib,nb
+          iq = olap%kkqmap(ib,jb)
+          do it=1,nsw-1
+            natxt(ib,jb) = natxt(ib,jb) + ABS( olap%gij(ib,jb,im) * &
+              SUM(olap%PhQ(iq,im,:,it)) )
+            eptxt(ib,jb) = eptxt(ib,jb) + &
+              ABS( SUM(olap%EPcoup(ib,jb,im,:,1) * olap%PhQ(iq,im,:,it)) )
+          end do
+          natxt(jb,ib) = natxt(ib,jb)
+          eptxt(jb,ib) = eptxt(ib,jb)
+        end do
+      end do
+      natxt = natxt / (nsw-1)
+      eptxt = eptxt / (nsw-1)
+
+      write(mtag, *) im
+
+      fileptxt = 'EPTXT.' // trim(adjustl(mtag))
+      open(unit=33, file=fileptxt, status='unknown', action='write')
+      fileptxt = 'EPECTXT.' // trim(adjustl(mtag))
+      open(unit=34, file=fileptxt, status='unknown', action='write')
+
+      write(unit=33, fmt='(*(f15.9))') (( natxt(ib,jb), jb=1,nb ), ib=1,nb)
+      write(unit=34, fmt='(*(f15.9))') (( eptxt(ib,jb), jb=1,nb ), ib=1,nb)
+
+      close(unit=33)
+      close(unit=34)
+
+    end do
+
+  end subroutine
+
+  subroutine writeKKQMap(olap)
+    implicit none
+
+    type(overlap), intent(in) :: olap
+    integer :: ib, jb, nbas
+
+    nbas = olap%NBANDS
+
+    open(unit=35, file='KKQMAP', status='unknown', action='write')
+
+    do ib=1,nbas
+      write(unit=35, fmt='(*(I8))') (olap%kkqmap(ib, jb), jb=1,nbas)
+    end do
+
+    close(unit=35)
 
   end subroutine
 
