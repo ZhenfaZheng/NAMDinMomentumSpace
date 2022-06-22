@@ -13,8 +13,6 @@ def main():
     #######################################################################
 
     Eref = 0.0
-    inp = pn.read_inp('inp')
-
     which_plt = [1, 2, 31, 4, 5, 6]
     '''
     Select which figures to plot.
@@ -38,13 +36,20 @@ def main():
     #######################################################################
 
     print("\nReading data ...")
-    en, kpts = pn.ek_selected(inp=inp)
+    inp = pn.read_inp('inp')
     prefix = inp['EPMPREF']; epmdir = inp['EPMDIR']
     filepm = os.path.join(epmdir, prefix + '_ephmat_p1.h5')
     A = pn.read_ephmath5(filepm, dset='/el_ph_band_info/lattice_vec_angstrom')
     a1, a2, a3 = (A[0], A[1], A[2])
     b1, b2, b3 = pn.calc_rec_vec(a1, a2, a3)
+
+    en, kpts = pn.ek_selected(inp=inp) # en & kpts selected
+    Enk = pn.get_Enk(kpath, B=[b1, b2, b3], inp=inp) # total Enk
     kpts_cart = pn.frac2cart(kpts, b1, b2, b3)
+    kpath_cart = pn.frac2cart(kpath, b1, b2, b3)
+    k_index, kp_index = pn.select_kpts_on_path(kpts, kpath, norm=0.001)
+    k_loc, kp_loc = pn.loc_on_kpath(kpts_cart, k_index, kp_index, kpath_cart)
+
     filshps = glob('SHPROP.*')
     shp = pn.readshp(filshps)
     ntsteps = shp.shape[0]
@@ -56,7 +61,9 @@ def main():
     if (1 in which_plt):
         coup = pn.read_couple(filcoup='EPECTXT', inp=inp)
         coup_av = np.average(np.abs(coup), axis=0)
-        plot_couple(coup_av, figname='COUPLE.png')
+        # plot_couple(coup_av, figname='COUPLE.png')
+        plot_couple_el(coup_av, k_loc, en, kp_loc, kplabels, k_index, Enk,
+                       Eref, figname='COUPLE.png')
 
     if (2 in which_plt):
         plot_tdprop(shp, Eref, lplot=2, ksen=en, figname='TDEN.png')
@@ -69,12 +76,6 @@ def main():
         plot_kprop(kpts_cart, shp, B=[b1, b2, b3], axis='xz', figname='TDKPROPxz.png')
 
     if (4 in which_plt):
-        kpath_cart = pn.frac2cart(kpath, b1, b2, b3)
-        k_index, kp_index = pn.select_kpts_on_path(kpts, kpath, norm=0.01)
-        k_loc, kp_loc = pn.loc_on_kpath(kpts_cart, k_index, kp_index, kpath_cart)
-
-        # plot_tdband(k_loc, en, kp_loc, kplabels, shp, k_index,
-        #             Eref=Eref, figname='TDBAND.png')
         # times = [0, 50, 100, 200, 500, 1000]
         times = list( range(0, ntsteps+1, int(ntsteps/4)) )
         plot_tdband_sns(k_loc, en, kp_loc, kplabels, shp, k_index, times,
@@ -117,13 +118,68 @@ def main():
 
 ###############################################################################
 
+def plot_couple_el(coup_in, k_loc, en, kp_loc, kplabels, index, Enk,
+                   Eref=0.0, figname='COUPLE.png'):
 
-def plot_couple(coup, figname='COUPLE.png'):
+    X = k_loc
+    E = en[index] - Eref
+    coup = np.sum(coup_in, axis=1)[index]
+    coup *= 1000.0 # change unit to meV
+    nbands = Enk.shape[1] - 1
+
+    xmin = kp_loc[0] ; xmax = kp_loc[-1]
+    ymin = E.min() ; ymax = E.max() ; dy = ymax - ymin
+    ymin -= dy*0.05 ; ymax += dy*0.05
+
+    cmap = 'hot_r'
+    cmin = np.min(coup[coup>0.0]); cmax = np.max(coup)
+    norm = mpl.colors.LogNorm(cmin,cmax)
+    cmap = 'rainbow'
+    cmin = 0.0; cmax = np.max(coup)
+    norm = mpl.colors.Normalize(cmin,cmax)
+
+    figsize_x = 4.2
+    figsize_y = 4.8 # in inches
+    fig, ax = plt.subplots()
+    fig.set_size_inches(figsize_x, figsize_y)
+    mpl.rcParams['axes.unicode_minus'] = False
+
+    sc = ax.scatter(X, E, s=50, lw=0,
+            c=coup, cmap=cmap, norm=norm)
+
+    for ib in range(nbands):
+        ax.plot(Enk[:,0], Enk[:,ib+1]-Eref, '#1A5599', lw=0.7)
+
+    nkpath = kp_loc.shape[0]
+    for ipath in range(1, nkpath):
+        x = kp_loc[ipath]
+        ax.plot([x,x], [ymin,ymax], 'k', lw=0.7, ls='--')
+
+    ticks = []
+    for s in kplabels:
+        s = u'\u0393' if (s=='g' or s=='G') else s.upper()
+        ticks.append(s)
+
+    ax.set_xticks(kp_loc)
+    ax.set_xticklabels(ticks)
+
+    ax.set_xlim(xmin, xmax)
+    ax.set_ylim(ymin, ymax)
+    ax.set_ylabel('Energy (eV)')
+
+    cbar = plt.colorbar(sc)
+    cbar.set_label('Coupling (meV)')
+    plt.tight_layout()
+    plt.savefig(figname, dpi=400)
+    print("\n%s has been saved."%figname)
+
+
+def plot_couple(coup_in, figname='COUPLE.png'):
     '''
     This function plots average couplings.
 
     Parameters:
-    coup: ndarray, average coupling data in forms of coup[nb, nb]
+    coup_in: ndarray, average coupling data in forms of coup[nb, nb]
     figname: string, output figure file name.
     '''
 
@@ -133,8 +189,8 @@ def plot_couple(coup, figname='COUPLE.png'):
     fig.set_size_inches(figsize_x, figsize_y)
 
     cmap = 'bwr'
-    n = coup.shape[0]
-    coup *= 1000.0 # change unit to meV
+    n = coup_in.shape[0]
+    coup = coup_in * 1000.0 # change unit to meV
     Bmin = 0.5; Bmax = n + 0.5
     cmin = 0.0; cmax = np.max(coup)
     norm = mpl.colors.Normalize(cmin,cmax)

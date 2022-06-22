@@ -90,6 +90,35 @@ def read_couple(filcoup='NATXT', inp=None, ctype=0):
 
     return coup
 
+def read_ektot(inp):
+    '''
+    Extract total energies and k-list.
+
+    Parameters:
+    inp      : dictionary, input parameters.
+
+    Returns: two ndarrays, energies and k-list arrays, in forms of
+             en_tot[nks, nb] and kpts_tot[nks,3], respectively.
+    '''
+
+    nparts = int(inp['NPARTS'])
+    prefix = inp['EPMPREF']
+    epmdir = inp['EPMDIR']
+
+    for ip in range(nparts):
+        filepm = prefix + '_ephmat_p%d.h5'%(ip+1)
+        path = os.path.join(epmdir, filepm)
+        en_p   = read_ephmath5(path, igroup=0, idset=3)
+        kpts_p = read_ephmath5(path, igroup=0, idset=1)
+        if ip==0:
+            en_tot = en_p
+            kpts_tot = kpts_p
+        else:
+            en_tot = np.vstack((en_tot, en_p))
+            kpts_tot = np.vstack((kpts_tot, kpts_p))
+
+    return en_tot, kpts_tot
+
 
 def ek_selected(filephmat='', filbassel='BASSEL', inp=None):
     '''
@@ -105,30 +134,13 @@ def ek_selected(filephmat='', filbassel='BASSEL', inp=None):
              and kpts[nbas,3], respectively.
     '''
 
-    if inp is not None:
-
-        # inp = read_inp()
-        nparts = int(inp['NPARTS'])
-        prefix = inp['EPMPREF']
-        epmdir = inp['EPMDIR']
-
-        bassel  = np.loadtxt(filbassel, dtype=int, skiprows=1) - 1
-        for ip in range(nparts):
-            filepm = prefix + '_ephmat_p%d.h5'%(ip+1)
-            path = os.path.join(epmdir, filepm)
-            en_p   = read_ephmath5(path, igroup=0, idset=3)
-            kpts_p = read_ephmath5(path, igroup=0, idset=1)
-            if ip==0:
-                en_tot = en_p
-                kpts_tot = kpts_p
-            else:
-                en_tot = np.vstack((en_tot, en_p))
-                kpts_tot = np.vstack((kpts_tot, kpts_p))
-
-    else:
+    if inp is None:
         en_tot   = read_ephmath5(filephmat, igroup=0, idset=3)
         kpts_tot = read_ephmath5(filephmat, igroup=0, idset=1)
+    else:
+        en_tot, kpts_tot = read_ektot(inp)
 
+    bassel  = np.loadtxt(filbassel, dtype=int, skiprows=1) - 1
     en = en_tot[bassel[:,0], bassel[:,1]]
     kpts = kpts_tot[bassel[:,0]]
 
@@ -400,6 +412,25 @@ def k_on_path(kpt, path, dk, norm):
     if (np.sum(np.abs(kpt-path[1,:]))<norm): return False
 
     return True
+
+
+def get_Enk(kpath, B, inp):
+    '''
+    Extract eigen values on kpath.
+    '''
+    en, kpts= read_ektot(inp)
+
+    b1, b2, b3 = (B[0], B[1], B[2])
+    kpts_cart = frac2cart(kpts, b1, b2, b3)
+    kpath_cart = frac2cart(kpath, b1, b2, b3)
+
+    k_index, kp_index = select_kpts_on_path(kpts, kpath)
+    k_loc, kp_loc = loc_on_kpath(kpts_cart, k_index, kp_index, kpath_cart)
+
+    Enk = np.hstack(( np.array([k_loc]).T, en[k_index,:] ))
+    sort = np.argsort(Enk[:,0])
+
+    return Enk[sort,:]
 
 
 def fit_decaytime(ft, time, ftype=1):
