@@ -104,7 +104,8 @@ module hamil
         do i=1,N
           do j=1,N
             iq = olap%kkqmap(i,j)
-            eptemp = ABS(olap%EPcoup(i,j,:,:,1) * olap%PhQ(iq,:,:,1)) ** 2
+            ! eptemp = ABS(olap%EPcoup(i,j,:,:,1) * olap%PhQ(iq,:,:,1)) ** 2
+            eptemp = ABS(olap%EPcoup(i,j,:,:,1) * (olap%PhQ(iq,:,:,1) ** 2))
             norm = SUM(eptemp)
             if (norm>0) then
               ks%ph_prop(i,j,:) = (eptemp(:,2) - eptemp(:,1)) / norm

@@ -1035,7 +1035,7 @@ module epcoup
   end subroutine
 
 
-  subroutine calcEPC(olap, inp)
+  subroutine calcEPC_Old(olap, inp)
   ! EPC calculations for large basis set.
     implicit none
 
@@ -1079,6 +1079,61 @@ module epcoup
     end do
     olap%gij = olap%gij / SQRT(olap%Np)
     olap%EPcoup = olap%EPcoup / SQRT(olap%Np)
+
+  end subroutine
+
+
+  subroutine calcEPC(olap, inp)
+  ! EPC calculations for large basis set.
+    implicit none
+
+    type(overlap), intent(inout) :: olap
+    type(namdInfo), intent(in) :: inp
+    integer :: nb, nm
+    integer :: ib, jb, im, iq
+    real(kind=q) :: dE, dE1, dE2
+    real(kind=q) :: kbT, sigma, T0
+    complex(kind=q) :: idwt
+
+    nb  = olap%NBANDS
+    nm  = olap%NMODES
+    kbT = inp%TEMP * BOLKEV
+    sigma = kbT
+    idwt = imgUnit / kbT * TPI
+    ! T0 = TPI / kbT / 2.0
+    ! T = TPI * hbar / kbT in unit of fs.
+    ! dw * T/2.0 = dE * T/2.0 / hbar
+    ! T0 = T / hbar / 2.0
+
+    allocate(olap%EPcoup(nb, nb, nm, 2, 1))
+    olap%EPcoup = cero
+
+    do ib=1,nb
+     do jb=ib,nb
+
+       dE = olap%Eig(ib,1) - olap%Eig(jb,1)
+       iq = olap%kkqmap(ib,jb)
+       if (iq<0) cycle
+
+       do im=1,nm
+         if (jb==ib) olap%gij(ib,ib,im)= ABS(olap%gij(ib,ib,im))
+         dE1 = dE - olap%Phfreq(iq,im) - 1.0E-8_q
+         olap%EPcoup(ib,jb,im,1,1) = olap%gij(ib,jb,im) ** 2 &
+           ! * (sin(dE1 * T0) / (dE1 * T0)) ** 2 * T0 ! * hbar / hbar
+           * exp(-0.5 * (dE1/sigma)**2)
+         dE2 = dE + olap%Phfreq(iq,im) + 1.0E-8_q
+         olap%EPcoup(ib,jb,im,2,1) = olap%gij(ib,jb,im) ** 2 &
+           ! * (sin(dE2 * T0) / (dE2 * T0)) ** 2 * T0
+           * exp(-0.5 * (dE2/sigma)**2)
+       end do ! im loop
+
+       olap%EPcoup(jb,ib,:,:,:) = CONJG(olap%EPcoup(ib,jb,:,:,:))
+
+     end do
+    end do
+    olap%gij = olap%gij / SQRT(olap%Np)
+    ! olap%EPcoup = olap%EPcoup / olap%Np
+    olap%EPcoup = olap%EPcoup / olap%Np * SQRT(TPI) / sigma
 
   end subroutine
 
@@ -1361,7 +1416,8 @@ module epcoup
           natxt(ib,jb) = natxt(ib,jb) + ABS( SUM(olap%gij(ib,jb,:) * &
             SUM(olap%PhQ(iq,:,:,it), dim=2)) )
           eptxt(ib,jb) = eptxt(ib,jb) + &
-            ABS( SUM(olap%EPcoup(ib,jb,:,:,1) * olap%PhQ(iq,:,:,it)) )
+            ! ABS( SUM(olap%EPcoup(ib,jb,:,:,1) * olap%PhQ(iq,:,:,it)) )
+            ABS( SUM(olap%EPcoup(ib,jb,:,:,1) * (olap%PhQ(iq,:,:,it) ** 2)) )
         end do
         natxt(jb,ib) = natxt(ib,jb)
         eptxt(jb,ib) = eptxt(ib,jb)

@@ -193,7 +193,7 @@ module shop
     ! allocate(epcoup(ks%ndim), eptemp(inp%NMODES, 2))
     do i=1,ks%ndim
       iq = olap%kkqmap(cstat, i)
-      epcoup(i) = SUM(olap%EPcoup(cstat,i,:,:,1) * ks%PhQ(iq,:,:,tion))
+      epcoup(i) = SUM(olap%EPcoup(cstat,i,:,:,1) * (ks%PhQ(iq,:,:,tion) ** 2))
       ! eptemp = olap%EPcoup(cstat,i,:,:,1) * ks%PhQ(iq,:,:,tion)
       ! ks%ph_prop(cstat, i, :, :) = ABS(eptemp) ** 2
       ! norm = SUM(ks%ph_prop(cstat, i, :, :))
