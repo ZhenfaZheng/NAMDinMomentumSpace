@@ -446,6 +446,8 @@ module shop
           pops(:,tion+1) = pops(:,tion) + pops(:, tion+1)
           cycle
         end if
+        ! prevent output error for small value
+        pops(:,tion) = pops(:,tion) + 1.0E-30
         write(unit=26, fmt='(*(G20.10))') &
             tion * inp%POTIM, SUM( olap%Phfreq(:,im) * pops(:,tion) ), &
             (pops(i,tion), i=1, inp%NQPOINTS)
