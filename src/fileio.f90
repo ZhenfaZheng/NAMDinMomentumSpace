@@ -65,6 +65,8 @@ module fileio
     ! selected basises whose energies are between EMIN ~ EMAX, in the range
     ! BMIN ~ BMAX and KMIN ~ KMAX.
     real(kind=q) :: EMIN, EMAX
+    real(kind=q) :: SIGMA    ! the width of energy conservation in eV.
+                             ! standard divation of guassian function.
     character(len=256) :: EPMDIR  ! directory of ephmat.h5 files
     character(len=256) :: EPMPREF ! prefix of ephmat.h5 files
     character(len=256) :: FILEPM  ! epc file from EPW package, if LEPC=.TRUE.
@@ -118,6 +120,7 @@ module fileio
       integer :: kmax
       real(kind=q) :: emin
       real(kind=q) :: emax
+      real(kind=q) :: sigma
       character(len=256) :: epmdir, epmpref
       character(len=256) :: filepm, filmd
 
@@ -125,7 +128,7 @@ module fileio
         bmin, bmax, nsw, nbands, ninibs, potim, namdtime, &
         nsample, ntraj, nelm, temp, &
         rundir, lhole, lshp, lcpext, tbinit, lgamma, lcprop, &
-        lepc, largebs, epctype, lbassel, lsort, &
+        lepc, largebs, epctype, lbassel, lsort, sigma, &
         Np, nkpoints, nmodes, nparts, kmin, kmax, emin, emax, &
         epmdir, epmpref, filepm, filmd
 
@@ -167,6 +170,7 @@ module fileio
       kmax = 0
       emin = -1.0E5_q
       emax =  1.0E5_q
+      sigma =  0.0_q
       epmdir = './'
       epmpref = ''
       filepm = ''
@@ -290,6 +294,7 @@ module fileio
       inp%NBASIS   = inp%NBASIS * ( kmax - kmin + 1 )
       inp%EMIN     = emin
       inp%EMAX     = emax
+      inp%SIGMA    = sigma
       inp%EPMDIR   = trim(epmdir)
       inp%EPMPREF  = trim(epmpref)
       inp%FILEPM   = trim(filepm)

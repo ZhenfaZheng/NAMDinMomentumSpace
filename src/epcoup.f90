@@ -1097,13 +1097,17 @@ module epcoup
 
     nb  = olap%NBANDS
     nm  = olap%NMODES
-    kbT = inp%TEMP * BOLKEV
-    sigma = kbT
-    idwt = imgUnit / kbT * TPI
+    ! kbT = inp%TEMP * BOLKEV
+    ! idwt = imgUnit / kbT * TPI
     ! T0 = TPI / kbT / 2.0
     ! T = TPI * hbar / kbT in unit of fs.
     ! dw * T/2.0 = dE * T/2.0 / hbar
     ! T0 = T / hbar / 2.0
+    if (inp%SIGMA==0) then
+      sigma = inp%TEMP * BOLKEV
+    else
+      sigma = inp%SIGMA
+    end if
 
     allocate(olap%EPcoup(nb, nb, nm, 2, 1))
     olap%EPcoup = cero
