@@ -620,7 +620,7 @@ module epcoup
 
         do im=1,nm
 
-          if (olap%Phfreq(iq,im)<5.0E-3_q) cycle
+          if (olap%Phfreq(iq,im)<inp%PHCUT) cycle
 
           do jb=1,nb
             do ib=1,nb
@@ -730,7 +730,7 @@ module epcoup
             if (iq<0) cycle
 
             do im=1,nm
-              if (olap_sec%Phfreq(iq,im)<5.0E-3_q) cycle
+              if (olap_sec%Phfreq(iq,im)<inp%PHCUT) cycle
               olap_sec%gij(ibas, jbas, im) = eptemp(ib, jb, im, iq)
             end do ! im loop
 
@@ -1020,7 +1020,7 @@ module epcoup
 
     do iq=1, nq
       do im=1, nmodes
-        if (olap%Phfreq(iq,im)<5.0E-3_q) cycle
+        if (olap%Phfreq(iq,im)<inp%PHCUT) cycle
         phn = 1.0 / ( exp(olap%Phfreq(iq,im)/kbT) - 1.0 )
         iw = iwtemp * olap%Phfreq(iq,im)
         olap%PhQ(iq,im,:,:) = SQRT(phn+0.5)
@@ -1178,7 +1178,7 @@ module epcoup
        if (iq<0) cycle
        do im=1,nm
 
-         ! if (olap%Phfreq(iq, im)<5.0E-3_q) cycle
+         ! if (olap%Phfreq(iq, im)<inp%PHCUT) cycle
          if (jb==ib) then
            olap%gij(ib,ib,im)= ABS(olap%gij(ib,ib,im))
            if (olap%COUPTYPE==2) &

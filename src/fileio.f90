@@ -67,6 +67,8 @@ module fileio
     real(kind=q) :: EMIN, EMAX
     real(kind=q) :: SIGMA    ! the width of energy conservation in eV.
                              ! standard divation of guassian function.
+    real(kind=q) :: PHCUT    ! The cutoff for the phonon energy in
+                             ! e-ph coupling calculations in eV.
     character(len=256) :: EPMDIR  ! directory of ephmat.h5 files
     character(len=256) :: EPMPREF ! prefix of ephmat.h5 files
     character(len=256) :: FILEPM  ! epc file from EPW package, if LEPC=.TRUE.
@@ -121,6 +123,7 @@ module fileio
       real(kind=q) :: emin
       real(kind=q) :: emax
       real(kind=q) :: sigma
+      real(kind=q) :: phcut
       character(len=256) :: epmdir, epmpref
       character(len=256) :: filepm, filmd
 
@@ -128,7 +131,7 @@ module fileio
         bmin, bmax, nsw, nbands, ninibs, potim, namdtime, &
         nsample, ntraj, nelm, temp, &
         rundir, lhole, lshp, lcpext, tbinit, lgamma, lcprop, &
-        lepc, largebs, epctype, lbassel, lsort, sigma, &
+        lepc, largebs, epctype, lbassel, lsort, sigma, phcut, &
         Np, nkpoints, nmodes, nparts, kmin, kmax, emin, emax, &
         epmdir, epmpref, filepm, filmd
 
@@ -171,6 +174,7 @@ module fileio
       emin = -1.0E5_q
       emax =  1.0E5_q
       sigma =  0.0_q
+      phcut =  1.0E-3_q
       epmdir = './'
       epmpref = ''
       filepm = ''
@@ -295,6 +299,7 @@ module fileio
       inp%EMIN     = emin
       inp%EMAX     = emax
       inp%SIGMA    = sigma
+      inp%PHCUT    = phcut
       inp%EPMDIR   = trim(epmdir)
       inp%EPMPREF  = trim(epmpref)
       inp%FILEPM   = trim(filepm)
