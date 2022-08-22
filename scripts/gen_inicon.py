@@ -42,7 +42,7 @@ else:
     ninibs = 1
 if (nbas<ninibs):
     print("\nNot enough states between%.2f ~ %.2f eV!\n"%(iniemin, iniemax))
-    os._exit()
+    os._exit(0)
 nsample = int( nbas // ninibs )
 
 # generate initial times randomly.

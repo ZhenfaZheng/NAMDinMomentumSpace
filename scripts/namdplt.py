@@ -51,8 +51,12 @@ def main():
     k_loc, kp_loc = pn.loc_on_kpath(kpts_cart, k_index, kp_index, kpath_cart)
 
     filshps = glob('SHPROP.*')
-    shp = pn.readshp(filshps)
-    ntsteps = shp.shape[0]
+    if filshps:
+        shp = pn.readshp(filshps)
+        ntsteps = shp.shape[0]
+    else:
+        shp = None ; ntsteps = 0
+        print('\nSHPROP files not found!')
 
 
     #                             Plot figures                            #
@@ -61,9 +65,9 @@ def main():
     if (1 in which_plt):
         coup = pn.read_couple(filcoup='EPECTXT', inp=inp)
         coup_av = np.average(np.abs(coup), axis=0)
-        # plot_couple(coup_av, figname='COUPLE.png')
-        plot_couple_el(coup_av, k_loc, en, kp_loc, kplabels, k_index, Enk,
-                       Eref, figname='COUPLE.png')
+        plot_couple(coup_av, figname='COUPLE.png')
+        # plot_couple_el(coup_av, k_loc, en, kp_loc, kplabels, k_index, Enk,
+        #                Eref, figname='COUPLE.png')
 
     if (2 in which_plt):
         plot_tdprop(shp, Eref, lplot=2, ksen=en, figname='TDEN.png')
