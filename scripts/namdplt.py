@@ -54,8 +54,9 @@ def main():
     if filshps:
         shp = pn.readshp(filshps)
         ntsteps = shp.shape[0]
+        namdtime = shp[-1,0]
     else:
-        shp = None ; ntsteps = 0
+        shp = None ; ntsteps = 0 ; namdtime = 0.0
         print('\nSHPROP files not found!')
 
 
@@ -81,7 +82,7 @@ def main():
 
     if (4 in which_plt):
         # times = [0, 50, 100, 200, 500, 1000]
-        times = list( range(0, ntsteps+1, int(ntsteps/4)) )
+        times = list( range(0, int(namdtime)+1, int(namdtime/4)) )
         plot_tdband_sns(k_loc, en, kp_loc, kplabels, shp, k_index, times,
                     Eref=Eref, figname='TDBAND.png')
 
@@ -104,14 +105,14 @@ def main():
         q_loc, qp_loc = pn.loc_on_kpath(qpts_cart, q_index, qp_index, qpath_cart)
 
         # times = [0, 50, 100, 200, 500, 1000]
-        times = list( range(0, ntsteps+1, int(ntsteps/4)) )
+        times = list( range(0, int(namdtime)+1, int(namdtime/4)) )
         plot_tdph_sns(q_loc, phen, qp_loc, qplabels, php, q_index, times, figname='TDPH.png')
 
     if (6 in which_plt):
         plot_tdphen(php, figname='TDPHEN.png')
 
     if (7 in which_plt):
-        times = list( range(0, ntsteps, int(ntsteps/4)) ) ; times.append(ntsteps-1)
+        times = list( range(0, int(namdtime)+1, int(namdtime/4)) )
         plot_distrib(en, shp, times, Ef=Eref, figname='DISTRIBUTION.png')
 
     if (8 in which_plt):
@@ -260,7 +261,7 @@ def plot_tdprop(shp, Eref=0.0, lplot=1, ksen=None, figname='tdshp.png'):
         T = np.tile(shp[:,0], nbands).reshape(nbands,ntsteps).T
         sc = ax.scatter(T, E[:,sort], s=dotsize, c=pop[:, sort], lw=0,
                         norm=norm, cmap=cmap)
-        ax.plot(shp[:,1]-Eref, 'b', lw=1, label='Average Energy')
+        ax.plot(shp[:,0], shp[:,1]-Eref, 'b', lw=1, label='Average Energy')
         plt.colorbar(sc)
 
         # x1 = 0.05 * namdtime; x2 = 0.1 * namdtime
@@ -557,9 +558,17 @@ def plot_tdphen(php, figname='TDPHEN.png'):
 def plot_distrib(en, shp, times, Ef=0.0, figname='DISTRIBUTION.png'):
 
     sort = np.argsort(en)
-    pop = shp[times, 2:][:,sort]
     en = en[sort] - Ef
     enfit = np.arange(en.min(), en.max(), 0.01)
+
+    ntsteps = shp.shape[0]
+    namdtime = shp[-1, 0]
+    potim = namdtime / ntsteps
+    tindex = []
+    for time in times:
+        if time==0: time = potim
+        tindex.append(int(time/potim)-1)
+    pop = shp[tindex, 2:][:,sort]
 
     nsns = len(times)
     ntsteps = shp.shape[0]
@@ -574,10 +583,7 @@ def plot_distrib(en, shp, times, Ef=0.0, figname='DISTRIBUTION.png'):
     fig.subplots_adjust(hspace=0.1)
     mpl.rcParams['axes.unicode_minus'] = False
 
-    for  ii, tt in enumerate(times):
-
-        time = tt * potim
-        if(time==namdtime-potim): time = namdtime
+    for  ii, time in enumerate(times):
 
         from scipy.optimize import curve_fit
         popt, pcov = curve_fit(pn.func_fd, en, pop[ii], p0=[1000])
