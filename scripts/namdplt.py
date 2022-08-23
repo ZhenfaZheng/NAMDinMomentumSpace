@@ -16,7 +16,7 @@ def main():
     which_plt = [1, 2, 31, 4, 5, 6]
     '''
     Select which figures to plot.
-    1: COUPLE.png; 2: TDEN.png;
+    1: COUPLE.png; 11:COUPLE_EL.png; 12:COUPLE_PH.png; 2: TDEN.png;
     31: TDKPROPxy.png; 32: TDKPROPyz.png; 33: TDKPROPxz.png;
     4: TDBAND.png; 5: TDPH.png; 6:TDPHEN.png
     7: DISTRIBUTION.png; 8: TPROP.png
@@ -49,6 +49,12 @@ def main():
     kpath_cart = pn.frac2cart(kpath, b1, b2, b3)
     k_index, kp_index = pn.select_kpts_on_path(kpts, kpath, norm=0.001)
     k_loc, kp_loc = pn.loc_on_kpath(kpts_cart, k_index, kp_index, kpath_cart)
+    qpts = pn.read_ephmath5(filepm, dset='/el_ph_band_info/q_list')
+    phen = pn.read_ephmath5(filepm, dset='/el_ph_band_info/ph_disp_meV')
+    qpts_cart = pn.frac2cart(qpts, b1, b2, b3)
+    qpath_cart = pn.frac2cart(qpath, b1, b2, b3)
+    q_index, qp_index = pn.select_kpts_on_path(qpts, qpath, norm=0.001)
+    q_loc, qp_loc = pn.loc_on_kpath(qpts_cart, q_index, qp_index, qpath_cart)
 
     filshps = glob('SHPROP.*')
     if filshps:
@@ -57,18 +63,29 @@ def main():
         namdtime = shp[-1,0]
     else:
         shp = None ; ntsteps = 0 ; namdtime = 0.0
-        print('\nSHPROP files not found!')
+        print('\nERROR: SHPROP files are not found!')
 
 
     #                             Plot figures                            #
     #######################################################################
 
-    if (1 in which_plt):
+    if ((1 in which_plt) or (11 in which_plt)):
         coup = pn.read_couple(filcoup='EPECTXT', inp=inp)
+        coup = coup * 1000.0 # change unit to meV
         coup_av = np.average(np.abs(coup), axis=0)
+    if (1 in which_plt):
         plot_couple(coup_av, figname='COUPLE.png')
-        # plot_couple_el(coup_av, k_loc, en, kp_loc, kplabels, k_index, Enk,
-        #                Eref, figname='COUPLE.png')
+    if (11 in which_plt):
+        plot_couple_el(coup_av, k_loc, en, kp_loc, kplabels, k_index, Enk,
+                       Eref, figname='COUPLE_EL.png')
+    if (12 in which_plt):
+        if os.path.isfile('EPPHTXT'):
+            coup_ph = np.loadtxt('EPPHTXT')
+            coup_ph *= 1000.0 # change unit to meV
+            plot_coup_ph(coup_ph, q_loc, phen, qp_loc, qplabels, q_index,
+                         figname='COUPLE_PH.png')
+        else:
+            print("\nERROR: EPPHTXT file is not found!")
 
     if (2 in which_plt):
         plot_tdprop(shp, Eref, lplot=2, ksen=en, figname='TDEN.png')
@@ -97,13 +114,6 @@ def main():
             php = php.reshape(nmodes, ntsteps, nqs+2)
 
     if (5 in which_plt):
-        qpath_cart = pn.frac2cart(qpath, b1, b2, b3)
-        qpts = pn.read_ephmath5(filepm, dset='/el_ph_band_info/q_list')
-        phen = pn.read_ephmath5(filepm, dset='/el_ph_band_info/ph_disp_meV')
-        qpts_cart = pn.frac2cart(qpts, b1, b2, b3)
-        q_index, qp_index = pn.select_kpts_on_path(qpts, qpath, norm=0.001)
-        q_loc, qp_loc = pn.loc_on_kpath(qpts_cart, q_index, qp_index, qpath_cart)
-
         # times = [0, 50, 100, 200, 500, 1000]
         times = list( range(0, int(namdtime)+1, int(namdtime/4)) )
         plot_tdph_sns(q_loc, phen, qp_loc, qplabels, php, q_index, times, figname='TDPH.png')
@@ -124,21 +134,20 @@ def main():
 ###############################################################################
 
 def plot_couple_el(coup_in, k_loc, en, kp_loc, kplabels, index, Enk,
-                   Eref=0.0, figname='COUPLE.png'):
+                   Eref=0.0, figname='COUPLE_EL.png'):
 
     X = k_loc
     E = en[index] - Eref
     coup = np.sum(coup_in, axis=1)[index]
-    coup *= 1000.0 # change unit to meV
     nbands = Enk.shape[1] - 1
 
     xmin = kp_loc[0] ; xmax = kp_loc[-1]
     ymin = E.min() ; ymax = E.max() ; dy = ymax - ymin
     ymin -= dy*0.05 ; ymax += dy*0.05
 
-    cmap = 'hot_r'
-    cmin = np.min(coup[coup>0.0]); cmax = np.max(coup)
-    norm = mpl.colors.LogNorm(cmin,cmax)
+    # cmap = 'hot_r'
+    # cmin = np.min(coup[coup>0.0]); cmax = np.max(coup)
+    # norm = mpl.colors.LogNorm(cmin,cmax)
     cmap = 'rainbow'
     cmin = 0.0; cmax = np.max(coup)
     norm = mpl.colors.Normalize(cmin,cmax)
@@ -172,19 +181,19 @@ def plot_couple_el(coup_in, k_loc, en, kp_loc, kplabels, index, Enk,
     ax.set_ylim(ymin, ymax)
     ax.set_ylabel('Energy (eV)')
 
-    cbar = plt.colorbar(sc)
+    cbar = plt.colorbar(sc, aspect=30)
     cbar.set_label('Coupling (meV)')
     plt.tight_layout()
     plt.savefig(figname, dpi=400)
     print("\n%s has been saved."%figname)
 
 
-def plot_couple(coup_in, figname='COUPLE.png'):
+def plot_couple(coup, figname='COUPLE.png'):
     '''
     This function plots average couplings.
 
     Parameters:
-    coup_in: ndarray, average coupling data in forms of coup[nb, nb]
+    coup   : ndarray, average coupling data in forms of coup[nb, nb]
     figname: string, output figure file name.
     '''
 
@@ -194,8 +203,7 @@ def plot_couple(coup_in, figname='COUPLE.png'):
     fig.set_size_inches(figsize_x, figsize_y)
 
     cmap = 'bwr'
-    n = coup_in.shape[0]
-    coup = coup_in * 1000.0 # change unit to meV
+    n = coup.shape[0]
     Bmin = 0.5; Bmax = n + 0.5
     cmin = 0.0; cmax = np.max(coup)
     norm = mpl.colors.Normalize(cmin,cmax)
@@ -205,6 +213,66 @@ def plot_couple(coup_in, figname='COUPLE.png'):
     cbar = plt.colorbar()
     # cbar.ax.set_title('   meV')
     cbar.set_label('Coupling (meV)')
+    plt.tight_layout()
+    plt.savefig(figname, dpi=400)
+    print("\n%s has been saved."%figname)
+
+
+def plot_coup_ph(coup_ph, q_loc, phen, qp_loc, qplabels, index,
+        figname='COUPLE_PH.png'):
+
+    X = q_loc
+    E = phen[index, :]
+    coup = coup_ph[index, :]
+    nmodes = phen.shape[1]
+
+    xmin = qp_loc[0] ; xmax = qp_loc[-1]
+    ymin = E.min() ; ymax = E.max() ; dy = ymax - ymin
+    ymin -= dy*0.05 ; ymax += dy*0.05
+
+    figsize_x = 4.2
+    figsize_y = 4.8 # in inches
+    fig, ax = plt.subplots()
+    fig.set_size_inches(figsize_x, figsize_y)
+    mpl.rcParams['axes.unicode_minus'] = False
+
+    cmap = 'rainbow'
+    cmin = coup.min() ; cmax = coup.max()
+    norm = mpl.colors.Normalize(cmin, cmax)
+    # cmap = 'plasma'
+    # cmin = np.min(coup[coup>0.0]); cmax = np.max(coup)
+    # norm = mpl.colors.LogNorm(cmin,cmax)
+
+    sort = np.argsort(X)
+    for im in range(nmodes):
+        ax.plot(X[sort], E[sort, im], '#1A5599', lw=0.7)
+
+    nqpath = qp_loc.shape[0]
+    for ipath in range(1, nqpath):
+        x = qp_loc[ipath]
+        ax.plot([x,x], [ymin,ymax], 'gray', lw=0.7, ls='--')
+
+    for im in range(nmodes):
+        sort = np.argsort(coup[:,im])
+        sc = ax.scatter(X[sort], E[sort,im], s=10, lw=0,
+                c=coup[sort,im], cmap=cmap, norm=norm)
+
+    ticks = []
+    for s in qplabels:
+        s = u'\u0393' if (s=='g' or s=='G') else s.upper()
+        ticks.append(s)
+
+    ax.set_xticks(qp_loc)
+    ax.set_xticklabels(ticks)
+
+    ax.set_xlim(xmin, xmax)
+    ax.set_ylim(ymin, ymax)
+
+    ax.set_ylabel('Phonon energy (meV)')
+
+    cbar = plt.colorbar(sc, aspect=30)
+    cbar.set_label('Coupling (meV)')
+
     plt.tight_layout()
     plt.savefig(figname, dpi=400)
     print("\n%s has been saved."%figname)
