@@ -1403,45 +1403,58 @@ module epcoup
     implicit none
 
     type(overlap), intent(inout) :: olap
-    integer :: im, nmodes, ib, jb, nb, iq, ierr, it, nsw
-    real(kind=q), allocatable :: epc(:,:), epcec(:,:)
+    integer :: iq, jq, nqs, im, nmodes, ib, jb, nb, ierr, it, nsw
+    real(kind=q), allocatable :: epc(:,:), epcec(:,:), epcph(:,:)
 
     nb = olap%NBANDS
+    nqs = olap%NQ
     nmodes = olap%NMODES
     nsw = olap%TSTEPS
 
-    allocate(epc(nb,nb), epcec(nb,nb))
-    epc = 0.0_q; epcec = 0.0_q
+    allocate(epc(nb,nb), epcec(nb,nb), epcph(nqs, nmodes))
+    epc = 0.0_q; epcec = 0.0_q; epcph = 0.0_q
 
     do ib=1,nb
       do jb=ib,nb
         iq = olap%kkqmap(ib,jb)
+        if (iq<0) cycle
         do it=1,nsw-1
           epc(ib,jb) = epc(ib,jb) + ABS( SUM(olap%gij(ib,jb,:) * &
             SUM(olap%PhQ(iq,:,:,it), dim=2)) )
           epcec(ib,jb) = epcec(ib,jb) + &
             ! ABS( SUM(olap%EPcoup(ib,jb,:,:,1) * olap%PhQ(iq,:,:,it)) )
-            ABS( SUM(olap%EPcoup(ib,jb,:,:,1) * (olap%PhQ(iq,:,:,it) ** 2)) )
+            ABS( SUM(olap%EPcoup(ib,jb,:,:,1) * (olap%PhQ(iq,:,:,it)**2)) )
+          epcph(iq,:) = epcph(iq,:) + &
+            ABS( SUM(olap%EPcoup(ib,jb,:,:,1) * (olap%PhQ(iq,:,:,it)**2), DIM=2) )
         end do
         epc(jb,ib) = epc(ib,jb)
         epcec(jb,ib) = epcec(ib,jb)
+        jq = olap%kkqmap(jb,ib)
+        if (jq<0) cycle
+        epcph(jq,:) = epcph(iq,:)
       end do
     end do
     epc = epc / (nsw-1)
     epcec = epcec / (nsw-1)
+    epcph = epcph / (nsw-1)
 
     open(unit=32, file='EIGTXT', status='unknown', action='write')
     open(unit=33, file='EPTXT', status='unknown', action='write')
     open(unit=34, file='EPECTXT', status='unknown', action='write')
+    open(unit=35, file='EPPHTXT', status='unknown', action='write')
 
 
     write(unit=32, fmt='(*(f12.6))') (olap%Eig(ib,1), ib=1,nb)
     write(unit=33, fmt='(*(f15.9))') (( epc(ib,jb), jb=1,nb ), ib=1,nb)
     write(unit=34, fmt='(*(f15.9))') (( epcec(ib,jb), jb=1,nb ), ib=1,nb)
+    do iq=1,nqs
+      write(unit=35, fmt='(*(f15.9))') (epcph(iq,im), im=1,nmodes)
+    end do
 
     close(unit=32)
     close(unit=33)
     close(unit=34)
+    close(unit=35)
 
   end subroutine
 
