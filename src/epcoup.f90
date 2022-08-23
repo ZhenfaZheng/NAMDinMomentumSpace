@@ -74,12 +74,12 @@ module epcoup
     write(*,*) "Calculating e-ph couplings."
     if (inp%LARGEBS) then
       call calcEPC(olap_sec, inp)
-      call writeTXT_EPC(olap_sec)
-      ! call writeTXT_EPC_Mode(olap_sec)
+      call writeTXT_LBS(olap_sec)
+      ! call writeTXT_LBS_Mode(olap_sec)
       ! call writeKKQMap(olap_sec)
     else
       call calcNAC(olap_sec, inp)
-      call writeEPTXTs(olap_sec)
+      call writeTXT(olap_sec)
       deallocate(olap_sec%Dij, olap_sec%EPcoup)
       call calcEPC(olap_sec, inp)
     end if
@@ -1399,36 +1399,36 @@ module epcoup
 
   end subroutine
 
-  subroutine writeTXT_EPC(olap)
+  subroutine writeTXT_LBS(olap)
     implicit none
 
     type(overlap), intent(inout) :: olap
     integer :: im, nmodes, ib, jb, nb, iq, ierr, it, nsw
-    real(kind=q), allocatable :: natxt(:,:), eptxt(:,:)
+    real(kind=q), allocatable :: epc(:,:), epcec(:,:)
 
     nb = olap%NBANDS
     nmodes = olap%NMODES
     nsw = olap%TSTEPS
 
-    allocate(natxt(nb,nb), eptxt(nb,nb))
-    natxt = 0.0_q; eptxt = 0.0_q
+    allocate(epc(nb,nb), epcec(nb,nb))
+    epc = 0.0_q; epcec = 0.0_q
 
     do ib=1,nb
       do jb=ib,nb
         iq = olap%kkqmap(ib,jb)
         do it=1,nsw-1
-          natxt(ib,jb) = natxt(ib,jb) + ABS( SUM(olap%gij(ib,jb,:) * &
+          epc(ib,jb) = epc(ib,jb) + ABS( SUM(olap%gij(ib,jb,:) * &
             SUM(olap%PhQ(iq,:,:,it), dim=2)) )
-          eptxt(ib,jb) = eptxt(ib,jb) + &
+          epcec(ib,jb) = epcec(ib,jb) + &
             ! ABS( SUM(olap%EPcoup(ib,jb,:,:,1) * olap%PhQ(iq,:,:,it)) )
             ABS( SUM(olap%EPcoup(ib,jb,:,:,1) * (olap%PhQ(iq,:,:,it) ** 2)) )
         end do
-        natxt(jb,ib) = natxt(ib,jb)
-        eptxt(jb,ib) = eptxt(ib,jb)
+        epc(jb,ib) = epc(ib,jb)
+        epcec(jb,ib) = epcec(ib,jb)
       end do
     end do
-    natxt = natxt / (nsw-1)
-    eptxt = eptxt / (nsw-1)
+    epc = epc / (nsw-1)
+    epcec = epcec / (nsw-1)
 
     open(unit=32, file='EIGTXT', status='unknown', action='write')
     open(unit=33, file='EPTXT', status='unknown', action='write')
@@ -1436,8 +1436,8 @@ module epcoup
 
 
     write(unit=32, fmt='(*(f12.6))') (olap%Eig(ib,1), ib=1,nb)
-    write(unit=33, fmt='(*(f15.9))') (( natxt(ib,jb), jb=1,nb ), ib=1,nb)
-    write(unit=34, fmt='(*(f15.9))') (( eptxt(ib,jb), jb=1,nb ), ib=1,nb)
+    write(unit=33, fmt='(*(f15.9))') (( epc(ib,jb), jb=1,nb ), ib=1,nb)
+    write(unit=34, fmt='(*(f15.9))') (( epcec(ib,jb), jb=1,nb ), ib=1,nb)
 
     close(unit=32)
     close(unit=33)
@@ -1446,20 +1446,20 @@ module epcoup
   end subroutine
 
 
-  subroutine writeTXT_EPC_Mode(olap)
+  subroutine writeTXT_LBS_Mode(olap)
     implicit none
 
     type(overlap), intent(inout) :: olap
     integer :: im, nmodes, ib, jb, nb, iq, ierr, it, nsw
-    real(kind=q), allocatable :: natxt(:,:), eptxt(:,:)
-    character(len=48) :: mtag, fileptxt
+    real(kind=q), allocatable :: epc(:,:), epcec(:,:)
+    character(len=48) :: mtag, filename
 
     nb = olap%NBANDS
     nmodes = olap%NMODES
     nsw = olap%TSTEPS
 
-    allocate(natxt(nb,nb), eptxt(nb,nb))
-    natxt = 0.0_q; eptxt = 0.0_q
+    allocate(epc(nb,nb), epcec(nb,nb))
+    epc = 0.0_q; epcec = 0.0_q
 
     open(unit=32, file='EIGTXT', status='unknown', action='write')
     write(unit=32, fmt='(*(f12.6))') (olap%Eig(ib,1), ib=1,nb)
@@ -1470,27 +1470,27 @@ module epcoup
         do jb=ib,nb
           iq = olap%kkqmap(ib,jb)
           do it=1,nsw-1
-            natxt(ib,jb) = natxt(ib,jb) + ABS( olap%gij(ib,jb,im) * &
+            epc(ib,jb) = epc(ib,jb) + ABS( olap%gij(ib,jb,im) * &
               SUM(olap%PhQ(iq,im,:,it)) )
-            eptxt(ib,jb) = eptxt(ib,jb) + &
+            epcec(ib,jb) = epcec(ib,jb) + &
               ABS( SUM(olap%EPcoup(ib,jb,im,:,1) * olap%PhQ(iq,im,:,it)) )
           end do
-          natxt(jb,ib) = natxt(ib,jb)
-          eptxt(jb,ib) = eptxt(ib,jb)
+          epc(jb,ib) = epc(ib,jb)
+          epcec(jb,ib) = epcec(ib,jb)
         end do
       end do
-      natxt = natxt / (nsw-1)
-      eptxt = eptxt / (nsw-1)
+      epc = epc / (nsw-1)
+      epcec = epcec / (nsw-1)
 
       write(mtag, *) im
 
-      fileptxt = 'EPTXT.' // trim(adjustl(mtag))
-      open(unit=33, file=fileptxt, status='unknown', action='write')
-      fileptxt = 'EPECTXT.' // trim(adjustl(mtag))
-      open(unit=34, file=fileptxt, status='unknown', action='write')
+      filename = 'EPTXT.' // trim(adjustl(mtag))
+      open(unit=33, file=filename, status='unknown', action='write')
+      filename = 'EPECTXT.' // trim(adjustl(mtag))
+      open(unit=34, file=filename, status='unknown', action='write')
 
-      write(unit=33, fmt='(*(f15.9))') (( natxt(ib,jb), jb=1,nb ), ib=1,nb)
-      write(unit=34, fmt='(*(f15.9))') (( eptxt(ib,jb), jb=1,nb ), ib=1,nb)
+      write(unit=33, fmt='(*(f15.9))') (( epc(ib,jb), jb=1,nb ), ib=1,nb)
+      write(unit=34, fmt='(*(f15.9))') (( epcec(ib,jb), jb=1,nb ), ib=1,nb)
 
       close(unit=33)
       close(unit=34)
@@ -1518,7 +1518,7 @@ module epcoup
   end subroutine
 
 
-  subroutine writeEPTXTs(olap)
+  subroutine writeTXT(olap)
     implicit none
 
     type(overlap), intent(in) :: olap
