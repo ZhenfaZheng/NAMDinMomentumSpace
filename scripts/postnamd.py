@@ -21,7 +21,7 @@ def read_inp(infile='inp'):
     for line in text:
         if (line[0]=='&' or line[0]=='/' or line[0]=='!'):
             continue
-        temp = line.split('=')
+        temp = line.split('!')[0].split('=')
         key = temp[0].strip()
         value = temp[1].strip().strip('\'').strip('\"')
         inp[key] = value
@@ -433,14 +433,14 @@ def get_Enk(kpath, B, inp):
     return Enk[sort,:]
 
 
-def fit_decaytime(ft, time, ftype=1):
+def fit_decaytime(time, ft, ftype=1):
     '''
     Fit decay time.
 
     Parameters:
+    time : ndarray, evolution time, in forms of time[nt].
     ft   : ndarray, time evolution of a specified quantity, in forms of
            ft[nt].
-    time : ndarray, evolution time, in forms of time[nt].
     ftype: integer, fitting type. 1: exponential; 2: gaussian.
 
     Returns:
@@ -451,11 +451,13 @@ def fit_decaytime(ft, time, ftype=1):
     if ftype==1:
         popt, pcov = curve_fit(func_exp, time, ft)
         ffit = func_exp(time, *popt)
+        dct = popt[1]
     elif ftype==2:
         popt, pcov = curve_fit(func_gauss, time, ft)
         ffit = func_gauss(time, *popt)
+        dct = popt[2]
 
-    return ffit, popt[1]
+    return ffit, dct
 
 
 def func_exp(x, a, b, c):
@@ -469,15 +471,15 @@ def func_exp(x, a, b, c):
     return a * np.exp(-x/b) + c
 
 
-def func_gauss(x, a, b, c):
+def func_gauss(x, a, b, sigma, c):
     '''
     Gaussian function.
 
     Parameters:
     x : ndarray, function variable.
-    a, b, c : float, function patameters.
+    a, b, sigma, c : float, function patameters.
     '''
-    return a * np.exp( -0.5 * ((x-b)/c)**2 )
+    return a * np.exp( -0.5 * ((x-b)/sigma)**2 ) + c
 
 def func_fd(en, T):
     '''
