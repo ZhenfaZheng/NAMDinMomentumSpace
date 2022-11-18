@@ -71,6 +71,8 @@ module epcoup
       call phDecomp(inp, olap_sec, epc)
     end if
 
+    call savePhQ(olap_sec)
+
     write(*,*) "Calculating e-ph couplings."
     if (inp%LARGEBS) then
       call calcEPC(olap_sec, inp)
@@ -916,6 +918,59 @@ module epcoup
     ! Np is the number of unit cells in MD cell.
     Np = epc%natmd / epc%natepc
     olap%PhQ = olap%PhQ / SQRT(Np)
+
+  end subroutine
+
+
+  subroutine savePhQ(olap)
+    implicit none
+
+    type(overlap), intent(in) :: olap
+
+    integer :: it, im, iq
+    integer :: nsw, nmodes, nqs
+    integer :: order, ntemp, steps, ierr
+    character(len=48) :: mtag
+    real(kind=q) :: potim
+
+    nsw = olap%TSTEPS
+    nmodes = olap%NMODES
+    nqs = olap%NQ
+    potim = olap%dt
+
+    if (nsw<1000) then
+      steps = 1
+    else
+      order = int( LOG10(REAL(nsw)) )
+      ntemp = int( nsw / (10**order) )
+      if (ntemp < 2) then
+        steps = 1 * 10**(order-3)
+      else if (ntemp < 5) then
+        steps = 2 * 10**(order-3)
+      else
+        steps = 5 * 10**(order-3)
+      end if
+    end if
+
+    do im=1, nmodes
+
+      write(mtag, *) im
+
+      open(unit=36, file='PHQ.' // trim(adjustl(mtag)), &
+           status='unknown', action='write', iostat=ierr)
+      if (ierr /= 0) then
+        write(*,*) "PHQ file I/O error!"
+        stop
+      end if
+
+      do it=1, nsw-1, steps
+        write(unit=36, fmt='(*(G20.10))') &
+          it*potim, (olap%PhQ(iq, im, 1, it), iq=1,nqs)
+      end do
+
+      close(36)
+
+    end do
 
   end subroutine
 
