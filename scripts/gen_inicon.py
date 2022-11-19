@@ -7,8 +7,11 @@ import postnamd as pn
 
 # select initial states
 # between iniemin ~ iniemax
-iniemin = -4.0
-iniemax = -3.95
+iniemin = 0.98
+iniemax = 1.02
+Ef = -4.52862
+iniemin += Ef
+iniemax += Ef
 
 # select initial time between
 # init_time_min ~ init_time_max randomly.
