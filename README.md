@@ -1,8 +1,7 @@
 
 # NAMD in Momentum Space (Hefei-NAMD-EPC)
 
-[![arXiv shield](https://img.shields.io/badge/arXiv-2210.00529-red.svg?style=flat)]
-(https://doi.org/10.38550/arXiv.2210.00529)
+[![arXiv shield](https://img.shields.io/badge/arXiv-2210.00529-red.svg?style=flat)](https://doi.org/10.38550/arXiv.2210.00529)
 
 # 1. Overview
 
@@ -36,7 +35,7 @@ LFLAGS = -I/path/to/your/hdf5/include -lhdf5 -lhdf5_fortran
 ```
 After modifying the "Makefile", compile the Hefei-NAMD-EPC
 ```
-make clen
+make clean
 make
 ```
 You will get an excutable file "namd-epc" for simulation of NAMD in momentum
@@ -74,8 +73,8 @@ and it will output files containing *e-ph* information (named
 
 # 4. Citation
 
-For more details on the code, we refer the users to the manuscript accompying
-the source code:
+For theoretical details on the code, we refer the users to the manuscript
+accompying the source code:
 
 > Z. Zheng, Y. Shi, J.J. Zhou, O. V. Prezhdo, Q. Zheng, J. Zhao, *"Ab initio
 real-time quantum dynamics of charge carriers in momentum space"*,
@@ -85,5 +84,14 @@ When using results from this program in your publications, please cite the
 paper given above and acknowledge the use of the code.
 
 It would also be appropriate to cite the original articles:
+
+> Q. Zheng, W. A. Saidi, Y. Xie, Z. Lan, O. V. Prezhdo, H. Petek, J. Zhao,
+"*Phonon-Assisted Ultrafast Charge Transfer at van der Waals Heterostructure
+Interface*". [Nano Lett 17, 6435-6442, (2017)](doi:10.1021/acs.nanolett.7b03429)
+
+> Q. Zheng, W. Chu, C. Zhao, L. Zhang, H. Guo, Y. Wang, X. Jiang, J. Zhao,
+"*Ab initio nonadiabatic molecular dynamics investigations on the excited
+carriers in condensed matter systems*" 
+[WIREs Comput. Mol. Sci. 9:e1411, (2019)](https://doi.org/10.1002/wcms.1411)
 
 
