@@ -24,21 +24,21 @@ Then, go into folder of source files
 cd src
 ```
 To compile this program, you should specify the path to your HDF5 library.
-Firstly, open the "Makefile"
+Open the "Makefile"
 ```
 vim Makefile
 ```
 Modify the two flags "IFLAGS" and "LFLAGS"
 ```
-IFLAGS = -I/path/to/your/hdf5/include
-LFLAGS = -I/path/to/your/hdf5/include -lhdf5 -lhdf5_fortran
+IFLAGS = -I/\${path-to-your-hdf5-dir}/include
+LFLAGS = -I/\${path-to-your-hdf5-dir}/include -lhdf5 -lhdf5_fortran
 ```
 After modifying the "Makefile", compile the Hefei-NAMD-EPC
 ```
 make clean
 make
 ```
-You will get an excutable file "namd-epc" for simulation of NAMD in momentum
+You will get an excutable file "namd-epc" for simulations of NAMD in momentum
 space.
 
 
@@ -63,6 +63,73 @@ and it will output files containing *e-ph* information (named
 "calc\_mode = 'ephmat'".
 
 ## 3.2 Prepare input files
+
+To run Hefei-NAMD-EPC, the user should prepare 3 kinds of files:
+"\${prefix}\_ephmat\_p\${ipart}.h5" files containing *e-ph* information from
+PERTURBO calculations, "inp" file for input parameters setting, and "INICON"
+file for initial conditions setting.
+
+First, copy or link "\${prefix}\_ephmat\_p\${No. of parts}.h5" files from
+PERTURBO calculations
+```
+mkdir epfiles
+cd epfiles
+for ipart in {1..8} # Here, 8 is the No. of parts as an example.
+do
+ln -sf \${path-to-your-perturbo-work-dir}/\${prefix}\_ephmat\_p\${ipart}.h5 .
+done
+cd ..
+```
+
+Then, generate "inp" file, below is an example
+```
+&NAMDPARA
+  BMIN       = 1
+  BMAX       = 2
+  KMIN       = 1
+  KMAX       = 40
+  EMIN       = -4.6
+  EMAX       = -1.5
+  NBANDS     = 2
+  NKPOINTS   = 81
+  NINIBS     = 1
+  Np         = 81
+
+  NSW        = 1200
+  POTIM      = 1.0
+  TEMP       = 300
+
+  NSAMPLE    = 6
+  NAMDTIME   = 1000
+  NELM       = 1000
+  NTRAJ      = 10000
+  LHOLE      = .F.
+  LCPEXT     = .F.
+
+  LEPC       = .T.
+  LBASSEL    = .F.
+  LARGEBS    = .T.
+  LSORT      = .T.
+  EPCTYPE    = 1
+  NPARTS     = 1
+  EPMDIR     = './'
+  EPMPREF    = 'graphene'
+/
+```
+
+The last file we need is "INICON" file, for example
+```
+   11     4     2
+   23    10     1
+   47    17     2
+   51    21     2
+   85    34     2
+   93    38     2
+```
+Each line of "INICON" represents initial condition of each sample, the first
+column indicates initial time, the second and third column indicate
+$\mathbf{k}$ and band indices of initial electronic state.
+
 
 ## 3.3 Run Hefei-NAMD-EPC
 

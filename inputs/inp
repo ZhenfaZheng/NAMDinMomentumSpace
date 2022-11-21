@@ -24,10 +24,10 @@
   LEPC       = .T.
   LBASSEL    = .F.
   LARGEBS    = .T.
-  LSORT      = .F.
+  LSORT      = .T.
   EPCTYPE    = 1
   NPARTS     = 1
   EPMDIR     = './'
   EPMPREF    = 'graphene'
-  FILMD      = 'XDATCAR'
+! FILMD      = 'XDATCAR'
 /
