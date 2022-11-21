@@ -6,7 +6,6 @@
 
 ## Contents
 - [Overview](#overview)
-; - [Citation](#citation)
 - [Installation Guide](#installation-guide)
 - [Tutorials of Runing Hefei-NAMD-EPC](#tutorials-of-runing-hefei-namd-epc)
 
@@ -20,8 +19,6 @@ electron-phonon (*e-ph*) coupling (EPC).
 The codes are based on [Hefei-NAMD](https://github.com/QijingZheng/Hefei-NAMD)
 developed by [Qijing Zheng](http://staff.ustc.edu.cn/~zqj), et al.
 
-
-; # Citation
 
 For theoretical details on the code, we refer the users to the manuscript
 accompying the source code:
