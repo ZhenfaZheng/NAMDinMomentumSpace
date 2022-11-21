@@ -6,7 +6,7 @@
 
 ## Contents
 - [Overview](#overview)
-- [Citation](#citation)
+; - [Citation](#citation)
 - [Installation Guide](#installation-guide)
 - [Tutorials of Runing Hefei-NAMD-EPC](#tutorials-of-runing-hefei-namd-epc)
 
@@ -21,14 +21,14 @@ The codes are based on [Hefei-NAMD](https://github.com/QijingZheng/Hefei-NAMD)
 developed by [Qijing Zheng](http://staff.ustc.edu.cn/~zqj), et al.
 
 
-# Citation
+; # Citation
 
 For theoretical details on the code, we refer the users to the manuscript
 accompying the source code:
 
 > Z. Zheng, Y. Shi, J.J. Zhou, O. V. Prezhdo, Q. Zheng, J. Zhao. *"Ab initio
 real-time quantum dynamics of charge carriers in momentum space"*.
-[arXiv:2210.00529 (2022)](https://doi.org/10.38550/arXiv.2210.00529)
+[arXiv:2210.00529 (2022)](https://doi.org/10.48550/arXiv.2210.00529)
 
 When using results from this program in your publications, please cite the
 paper given above and acknowledge the use of the code.
