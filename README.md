@@ -2,6 +2,7 @@
 # NAMD in Momentum Space (Hefei-NAMD-EPC)
 
 [![arXiv shield](https://img.shields.io/badge/arXiv-2210.00529-red.svg?style=flat)](https://doi.org/10.38550/arXiv.2210.00529)
+[![Github Stars](https://img.shields.io/github/stars/ZhenfaZheng/NAMDinMomentumSpace.svg?style=social&label=Star&maxAge=60)](https://github.com/ZhenfaZheng/NAMDinMomentumSpace)
 
 ## Contents
 - [Overview](#overview)
@@ -51,7 +52,7 @@ space.
 
 # Tutorials of Runing Hefei-NAMD-EPC
 
-1. Calculate *e-ph* matrix elements using PERTURBO
+## 1. Calculate *e-ph* matrix elements using PERTURBO
 
 Befor carrying out NAMD simulations in momentum space, the user needs to
 calculate *e-ph* matrix elements $g\_{mn\nu}(\mathbf{k}, \mathbf{q})$ using a
@@ -69,7 +70,7 @@ and it will output files containing *e-ph* information (named
 "\${prefix}\_ephmat\_p2.h5", ...) additionally when run "perturbo.x" with
 "calc\_mode = 'ephmat'".
 
-2. Prepare input files
+## 2. Prepare input files
 
 To run Hefei-NAMD-EPC, the user should prepare 3 kinds of files:
 "\${prefix}\_ephmat\_p\${ipart}.h5" files containing *e-ph* information from
@@ -138,14 +139,14 @@ column indicates initial time, the second and third column indicate
 $\mathbf{k}$ and band indices of initial electronic state.
 
 
-3. Run Hefei-NAMD-EPC
+## 3. Run Hefei-NAMD-EPC
 
 Copy executable file "namd-epc" to your work diretory, then execute
 ```
 ./namd-epc
 ```
 
-4. Output files
+## 4. Output files
 
 After Hefei-NAMD-EPC calculation, we obtain files as bellow:
 
@@ -161,7 +162,7 @@ PSICT.\${initime} (Evolution of expanding coefficients for each sample)
 
 SHPROP.\${initime} (Evolution of population for each sample)
 
-5. Data processing
+## 5. Data processing
 
 We provide python scripts to do the data processing, just copy the
 "postnamd.py" and "namdplt.py" from the folder "scripts" to your work diretory,
