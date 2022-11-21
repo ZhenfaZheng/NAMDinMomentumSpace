@@ -3,6 +3,13 @@
 
 [![arXiv shield](https://img.shields.io/badge/arXiv-2210.00529-red.svg?style=flat)](https://doi.org/10.38550/arXiv.2210.00529)
 
+## Contents
+- [1. Overview](#1. Overview)
+-[2. Installation Guide](#2. Installation Guide)
+-[3. Tutorials of Runing Hefei-NAMD-EPC](#3. Tutorials of Runing Hefei-NAMD-EPC)
+-[4. Citation](#4. Citation)
+
+
 # 1. Overview
 
 This is a program to perform non-adiabatic molecular dynamics (NAMD) simultion
@@ -50,7 +57,7 @@ Befor carrying out NAMD simulations in momentum space, the user needs to
 calculate *e-ph* matrix elements $g\_{mn\nu}(\mathbf{k}, \mathbf{q})$ using a
 modified version PERTURBO. Therefore, first of all, the user needs to install
 and learn using PERTURBO. We recommend users to visit the home page of PERTURBO
-[https://perturbo-code.github.io](https://perturbo-code.github.io) to get the
+([https://perturbo-code.github.io](https://perturbo-code.github.io)) to get the
 source code and tutorials of PERTURBO 1.0 which compatible with the 6.5 and 6.3
 version Quantum Espresso (QE).
 
@@ -141,11 +148,17 @@ Copy executable file "namd-epc" to your work diretory, then execute
 ## 3.4 Output files
 
 After Hefei-NAMD-EPC calculation, we obtain files as bellow:
+
 BASSEL (Belected basises in NAMD simulation)
+
 EIGTXT (Eigen energy of each basis)
+
 EPTXT, EPECTXT, EPPHTXT (*e-ph* couplings)
+
 PHPROP.\${imode} (Evolution of phonon number for each mode)
+
 PSICT.\${initime} (Evolution of expanding coefficients for each sample)
+
 SHPROP.\${initime} (Evolution of population for each sample)
 
 ## 3.5 Data processing
