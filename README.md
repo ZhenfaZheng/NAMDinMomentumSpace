@@ -38,7 +38,7 @@ After modifying the "Makefile", compile the Hefei-NAMD-EPC
 make clean
 make
 ```
-You will get an excutable file "namd-epc" for simulations of NAMD in momentum
+You will get an executable file "namd-epc" for simulations of NAMD in momentum
 space.
 
 
@@ -69,14 +69,14 @@ To run Hefei-NAMD-EPC, the user should prepare 3 kinds of files:
 PERTURBO calculations, "inp" file for input parameters setting, and "INICON"
 file for initial conditions setting.
 
-First, copy or link "\${prefix}\_ephmat\_p\${No. of parts}.h5" files from
-PERTURBO calculations
+First, copy or link "\${prefix}\_ephmat\_p\${ipart}.h5" files from PERTURBO
+calculations
 ```
 mkdir epfiles
 cd epfiles
-for ipart in {1..8} # Here, 8 is the No. of parts as an example.
+for ipart in {1..8}  # Here, 8 is the No. of parts as an example.
 do
-ln -sf \${path-to-your-perturbo-work-dir}/\${prefix}\_ephmat\_p\${ipart}.h5 .
+ln -sf ${path-to-your-perturbo-work-dir}/${prefix}_ephmat_p${ipart}.h5 .
 done
 cd ..
 ```
@@ -133,9 +133,31 @@ $\mathbf{k}$ and band indices of initial electronic state.
 
 ## 3.3 Run Hefei-NAMD-EPC
 
+Copy executable file "namd-epc" to your work diretory, then execute
+```
+./namd-epc
+```
+
 ## 3.4 Output files
 
+After Hefei-NAMD-EPC calculation, we obtain files as bellow:
+BASSEL (Belected basises in NAMD simulation)
+EIGTXT (Eigen energy of each basis)
+EPTXT, EPECTXT, EPPHTXT (*e-ph* couplings)
+PHPROP.\${imode} (Evolution of phonon number for each mode)
+PSICT.\${initime} (Evolution of expanding coefficients for each sample)
+SHPROP.\${initime} (Evolution of population for each sample)
+
 ## 3.5 Data processing
+
+We provide python scripts to do the data processing, just copy the
+"postnamd.py" and "namdplt.py" from the folder "scripts" to your work diretory,
+and execute
+```
+python namdplt.py
+```
+You will obtain figures of results, including: COUPLE.png, COUPLE_EL.png,
+COUPLE_PH.png, TDEN.png, TDBAND.png, TDPH.png, TDPHEN.png.
 
 
 # 4. Citation
