@@ -4,13 +4,13 @@
 [![arXiv shield](https://img.shields.io/badge/arXiv-2210.00529-red.svg?style=flat)](https://doi.org/10.38550/arXiv.2210.00529)
 
 ## Contents
-- [1. Overview](#1. Overview)
--[2. Installation Guide](#2. Installation Guide)
--[3. Tutorials of Runing Hefei-NAMD-EPC](#3. Tutorials of Runing Hefei-NAMD-EPC)
--[4. Citation](#4. Citation)
+- [Overview](#overview)
+- [Installation Guide](#installation-guide)
+- [Tutorials of Runing Hefei-NAMD-EPC](#tutorials-of-runing-hefei-namd-epc)
+- [Citation](#citation)
 
 
-# 1. Overview
+# Overview
 
 This is a program to perform non-adiabatic molecular dynamics (NAMD) simultion
 in momentum space, where the non-adiabatic coupling (NAC) are replaced by
@@ -20,7 +20,7 @@ The codes are based on [Hefei-NAMD](https://github.com/QijingZheng/Hefei-NAMD)
 developed by [Qijing Zheng](http://staff.ustc.edu.cn/~zqj), et al.
 
 
-# 2. Installation Guide
+# Installation Guide
 
 The user can get the source files of this program from Github
 ```
@@ -49,9 +49,9 @@ You will get an executable file "namd-epc" for simulations of NAMD in momentum
 space.
 
 
-# 3. Tutorials of Runing Hefei-NAMD-EPC
+# Tutorials of Runing Hefei-NAMD-EPC
 
-## 3.1 Calculate *e-ph* matrix elements using PERTURBO
+1. Calculate *e-ph* matrix elements using PERTURBO
 
 Befor carrying out NAMD simulations in momentum space, the user needs to
 calculate *e-ph* matrix elements $g\_{mn\nu}(\mathbf{k}, \mathbf{q})$ using a
@@ -69,7 +69,7 @@ and it will output files containing *e-ph* information (named
 "\${prefix}\_ephmat\_p2.h5", ...) additionally when run "perturbo.x" with
 "calc\_mode = 'ephmat'".
 
-## 3.2 Prepare input files
+2. Prepare input files
 
 To run Hefei-NAMD-EPC, the user should prepare 3 kinds of files:
 "\${prefix}\_ephmat\_p\${ipart}.h5" files containing *e-ph* information from
@@ -138,14 +138,14 @@ column indicates initial time, the second and third column indicate
 $\mathbf{k}$ and band indices of initial electronic state.
 
 
-## 3.3 Run Hefei-NAMD-EPC
+3. Run Hefei-NAMD-EPC
 
 Copy executable file "namd-epc" to your work diretory, then execute
 ```
 ./namd-epc
 ```
 
-## 3.4 Output files
+4. Output files
 
 After Hefei-NAMD-EPC calculation, we obtain files as bellow:
 
@@ -161,7 +161,7 @@ PSICT.\${initime} (Evolution of expanding coefficients for each sample)
 
 SHPROP.\${initime} (Evolution of population for each sample)
 
-## 3.5 Data processing
+5. Data processing
 
 We provide python scripts to do the data processing, just copy the
 "postnamd.py" and "namdplt.py" from the folder "scripts" to your work diretory,
@@ -169,11 +169,11 @@ and execute
 ```
 python namdplt.py
 ```
-You will obtain figures of results, including: COUPLE.png, COUPLE_EL.png,
-COUPLE_PH.png, TDEN.png, TDBAND.png, TDPH.png, TDPHEN.png.
+You will obtain figures of results, including: COUPLE.png, COUPLE\_EL.png,
+COUPLE\_PH.png, TDEN.png, TDBAND.png, TDPH.png, TDPHEN.png.
 
 
-# 4. Citation
+# Citation
 
 For theoretical details on the code, we refer the users to the manuscript
 accompying the source code:
