@@ -1,7 +1,7 @@
 
 # NAMD in Momentum Space (Hefei-NAMD-EPC)
 
-[![arXiv shield](https://img.shields.io/badge/arXiv-2210.00529-red.svg?style=flat)](https://doi.org/10.38550/arXiv.2210.00529)
+[![arXiv shield](https://img.shields.io/badge/arXiv-2210.00529-red.svg?style=flat)](https://doi.org/10.48550/arXiv.2210.00529)
 [![Github Stars](https://img.shields.io/github/stars/ZhenfaZheng/NAMDinMomentumSpace.svg?style=social&label=Star&maxAge=60)](https://github.com/ZhenfaZheng/NAMDinMomentumSpace)
 
 ## Contents
