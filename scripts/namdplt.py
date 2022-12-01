@@ -13,7 +13,7 @@ def main():
     #######################################################################
 
     Eref = 0.0
-    which_plt = [1, 2, 31, 4, 5, 6]
+    which_plt = [1, 11, 12, 2, 31, 4, 5, 6]
     '''
     Select which figures to plot.
     1: COUPLE.png; 11:COUPLE_EL.png; 12:COUPLE_PH.png; 2: TDEN.png;
@@ -42,6 +42,10 @@ def main():
     A = pn.read_ephmath5(filepm, dset='/el_ph_band_info/lattice_vec_angstrom')
     a1, a2, a3 = (A[0], A[1], A[2])
     b1, b2, b3 = pn.calc_rec_vec(a1, a2, a3)
+
+    filbassel='BASSEL'
+    bassel  = np.loadtxt(filbassel, dtype=int, skiprows=1)
+    b_index = bassel[:, 1] - 1
 
     en, kpts = pn.ek_selected(inp=inp) # en & kpts selected
     Enk = pn.get_Enk(kpath, B=[b1, b2, b3], inp=inp) # total Enk
@@ -101,7 +105,7 @@ def main():
         # times = [0, 50, 100, 200, 500, 1000]
         times = list( range(0, int(namdtime)+1, int(namdtime/4)) )
         plot_tdband_sns(k_loc, en, kp_loc, kplabels, shp, k_index, times,
-                    Eref=Eref, figname='TDBAND.png')
+                        b_index=b_index, Eref=Eref, figname='TDBAND.png')
 
 
     if ((5 in which_plt) or (6 in which_plt)):
@@ -451,7 +455,7 @@ def plot_tdband(k_loc, en, kp_loc, kplabels, shp, index,
 
 
 def plot_tdband_sns(k_loc, en, kp_loc, kplabels, shp, index, times,
-        X_bg=None, E_bg=None, Eref=0.0, figname='TDBAND.png'):
+        b_index=None, X_bg=None, E_bg=None, Eref=0.0, figname='TDBAND.png'):
 
     nbasis = index.shape[0]
     ntsteps = shp.shape[0]
@@ -487,7 +491,18 @@ def plot_tdband_sns(k_loc, en, kp_loc, kplabels, shp, index, times,
         ax = axes[it]
         ax.set_title('%.0f fs'%times[it])
 
-        sc = ax.scatter(X, E, s=10, lw=0,
+        # plot background E-k lines
+        if b_index is not None:
+            if (it==0):
+                sort_index = np.argsort(k_loc)
+                X_bg = k_loc[sort_index]
+                E_bg = en[index][sort_index] - Eref
+                b_ind_bg = b_index[index][sort_index]
+
+            for ib in np.unique(b_ind_bg):
+                ax.plot(X_bg[b_ind_bg==ib], E_bg[b_ind_bg==ib], '#1A5599', lw=0.7)
+
+        sc = ax.scatter(X, E, s=50, lw=0,
                 c=pop[it,:], cmap=cmap, norm=norm)
 
         nkpath = kp_loc.shape[0]

@@ -71,7 +71,7 @@ module epcoup
       call phDecomp(inp, olap_sec, epc)
     end if
 
-    ! call savePhQ(olap_sec)
+    call savePhQ(olap_sec)
 
     write(*,*) "Calculating e-ph couplings."
     if (inp%LARGEBS) then

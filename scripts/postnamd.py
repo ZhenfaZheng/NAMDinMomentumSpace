@@ -357,7 +357,8 @@ def select_kpts_on_path(kpts, kpath, norm=1e-4):
     for ik in range(nks):
         kpt = kpts[ik,:]
         for ipath in range(npath):
-            zz = k_on_path(kpt, pathes[ipath], dks[ipath], norm)
+            lendkpt = False if (ipath<npath-1) else True
+            zz = k_on_path(kpt, pathes[ipath], dks[ipath], norm, lendkpt)
             if (zz):
                 #k_tag[ik, ipath] = 1
                 k_index.append(ik); path_index.append(ipath)
@@ -367,7 +368,7 @@ def select_kpts_on_path(kpts, kpath, norm=1e-4):
     return k_index, path_index
 
 
-def k_on_path(kpt, path, dk, norm):
+def k_on_path(kpt, path, dk, norm, lendkpt=False):
     '''
     Determine whether k point is on path.
 
@@ -378,6 +379,7 @@ def k_on_path(kpt, path, dk, norm):
     dk  : array, with shape of (3), difference between begin and end points
           of path.
     norm: float, stard value to determine whether k point is on path.
+    lendkpt: bool, whether to include end point of path
 
     Returns: True or False.
     '''
@@ -408,8 +410,9 @@ def k_on_path(kpt, path, dk, norm):
     b = (kpt[2]-path[0,2]) * dk[0]
     if ( abs(b-a)>norm ): return False
 
-    # Not including end point of path
-    if (np.sum(np.abs(kpt-path[1,:]))<norm): return False
+    if not lendkpt:
+        # do not include end point of path
+        if (np.sum(np.abs(kpt-path[1,:]))<norm): return False
 
     return True
 
