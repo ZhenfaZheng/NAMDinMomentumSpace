@@ -162,7 +162,7 @@ def plot_couple_el(coup_in, k_loc, en, kp_loc, kplabels, index, Enk,
     fig.set_size_inches(figsize_x, figsize_y)
     mpl.rcParams['axes.unicode_minus'] = False
 
-    sc = ax.scatter(X, E, s=50, lw=0,
+    sc = ax.scatter(X, E, s=30, lw=0,
             c=coup, cmap=cmap, norm=norm)
 
     for ib in range(nbands):
@@ -258,7 +258,7 @@ def plot_coup_ph(coup_ph, q_loc, phen, qp_loc, qplabels, index,
 
     for im in range(nmodes):
         sort = np.argsort(coup[:,im])
-        sc = ax.scatter(X[sort], E[sort,im], s=10, lw=0,
+        sc = ax.scatter(X[sort], E[sort,im], s=30, lw=0,
                 c=coup[sort,im], cmap=cmap, norm=norm)
 
     ticks = []
@@ -314,7 +314,7 @@ def plot_tdprop(shp, Eref=0.0, lplot=1, ksen=None, figname='tdshp.png'):
         ax.set_ylabel(ylabel)
     else:
         cmap = 'hot_r'
-        dotsize = 50
+        dotsize = 30
         ylabel = 'Energy (eV)'
         ntsteps = shp.shape[0]
         nbands = shp.shape[1] -2
@@ -550,6 +550,10 @@ def plot_tdph_sns(q_loc, phen, qp_loc, qplabels, php, index, times,
     pop = php[:,:,index+2][:,tindex,:]
     nts = len(times)
 
+    # calculate ph number variation between it-1 and it.
+    for ii in range(nts-1, 1, -1):
+        pop[:,ii,:] = pop[:,ii,:] - pop[:,ii-1,:]
+
     X = q_loc
     E = phen[index, :]
 
@@ -563,13 +567,18 @@ def plot_tdph_sns(q_loc, phen, qp_loc, qplabels, php, index, times,
     fig.set_size_inches(figsize_x, figsize_y)
     mpl.rcParams['axes.unicode_minus'] = False
 
-    cmap = 'plasma'
-    cmap = 'autumn'
     cmin = pop.min() ; cmax = pop.max()
     norm = mpl.colors.Normalize(cmin, cmax)
+    cmap = genrcmap(cmin, cmax)
+    # cmap = 'hot_r'
+    # cmax = np.max(pop) * 1.2 ; cmin = cmax / 1000
+    # norm = mpl.colors.LogNorm(cmin,cmax)
     size = np.sqrt(np.abs(pop))
+    size = np.abs(pop)
     s_avg = np.average(size[size>0])
-    size = size / s_avg * 5
+    size = size / size.max()  * 50
+
+
 
     for it in range(nts):
 
@@ -578,15 +587,18 @@ def plot_tdph_sns(q_loc, phen, qp_loc, qplabels, php, index, times,
 
         sort_index = np.argsort(q_loc)
         for im in range(nmodes):
-            ax.plot(q_loc[sort_index], E[sort_index, im], '#1A5599', lw=0.7)
+            # ax.plot(q_loc[sort_index], E[sort_index, im], '#1A5599', lw=0.7)
+            ax.plot(q_loc[sort_index], E[sort_index, im], 'gray', lw=0.7)
         nqpath = qp_loc.shape[0]
         for ipath in range(1, nqpath):
             x = qp_loc[ipath]
             ax.plot([x,x], [ymin,ymax], 'gray', lw=0.7, ls='--')
 
         for im in range(nmodes):
-            sc = ax.scatter(X, E[:,im], s=size[im,it,:], lw=0,
-                    c=pop[im,it,:], cmap=cmap, norm=norm)
+            sort = np.argsort(pop[im,it,:])
+            sc = ax.scatter(X[sort], E[sort,im], s=size[im,it,sort], lw=0,
+            # sc = ax.scatter(X[sort], E[sort,im], s=50, lw=0,
+                            c=pop[im,it,sort], cmap=cmap, norm=norm)
 
         ticks = []
         for s in qplabels:
@@ -608,6 +620,23 @@ def plot_tdph_sns(q_loc, phen, qp_loc, qplabels, php, index, times,
 
     plt.savefig(figname, dpi=400)
     print("\n%s has been saved."%figname)
+
+
+def genrcmap(cmin=-1.0, cmax=1.0):
+
+    num_pos = 100
+    num_neg = int( np.abs(cmin) / cmax * num_pos )
+    index = np.hstack((np.linspace(0.1, 0.5, num_neg),
+                       np.linspace(0.5, 0.9, num_pos)))
+    if (cmin>=0): index = np.linspace(0.5, 0.9, num_pos)
+
+    cmap = plt.cm.jet
+    clist = [cmap(i) for i in index]
+
+    cmap_new = mpl.colors.LinearSegmentedColormap.from_list(
+                   name='mycmap', colors=clist)
+
+    return cmap_new
 
 
 def plot_tdphen(php, figname='TDPHEN.png'):
