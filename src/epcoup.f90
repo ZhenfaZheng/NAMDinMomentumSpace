@@ -86,7 +86,7 @@ module epcoup
       call calcEPC(olap_sec, inp)
     end if
 
-    call releaseEPC(epc)
+  ! call releaseEPC(epc)
 
     write(*,*) "Done!"
     write(*,'(A)') &
@@ -502,7 +502,7 @@ module epcoup
     epc%phfreq = transpose(freqtemp)
 
 
-    if (inp%EPCTYPE==2) then
+  ! if (inp%EPCTYPE==2) then
       dsetname = 'mass_a.u.'
       dim1 = shape(epc%mass, kind=hsize_t)
       call h5dopen_f(gr_id, dsetname, dset_id, hdferror)
@@ -538,7 +538,7 @@ module epcoup
       call h5dread_f(dset_id, H5T_NATIVE_DOUBLE, phmtemp, dim2, hdferror)
       call h5dclose_f(dset_id, hdferror)
       epc%phmodes = epc%phmodes + imgUnit * phmtemp
-    end if
+  ! end if
 
     call h5gclose_f(gr_id, hdferror)
 
@@ -812,7 +812,7 @@ module epcoup
         temp = 0.0_q
         do iax=1,3
           ! minus average coordinates.
-          ! change from crastal coordinates to cartesian coordinates.
+          ! change from crystal coordinates to cartesian coordinates.
           temp = temp + ( epc%displ(it,ia,iax) - epc%cellmd(ia+3, iax) ) * &
                  lattvec(iax, :)
         end do
@@ -857,6 +857,142 @@ module epcoup
         endif
       enddo
     enddo
+
+  end subroutine
+
+
+  subroutine phQ2R(inp, olap, epc, dQ)
+    ! Calculate atomic motion R(t) from normal coordinates Q_qv(t)
+    implicit none
+
+    type(namdInfo), intent(in) :: inp
+    type(overlap), intent(inout) :: olap
+    type(epCoupling), intent(in) :: epc
+    real(kind=q), dimension(:,:,:), intent(in) :: dQ
+
+    integer :: iq, im, ia, ja, iax, it
+    integer :: nqs, nmodes, nat, nsw
+    integer :: ix, iy, iz, nx, ny, nz, ntot ! numbers of cells in supercell
+    real(kind=q) :: lqvtemp, lqv, theta, qR, eiqR
+    real(kind=q) :: B(3,3)
+    real(kind=q), allocatable, dimension(:,:,:) :: dR, dR_frac
+    complex(kind=q), allocatable, dimension(:,:,:) :: Qt
+
+    nqs = epc%nqpts
+    nmodes = epc%nmodes
+    nat = epc%natepc
+    nsw = inp%NSW
+    nsw = inp%NAMDTIME / inp%POTIM
+
+    nx = 9; ny = 9; nz = 1
+    ntot = nx * ny * nz
+
+    lqvtemp = hbar * SQRT( EVTOJ / (2.0_q*AMTOKG) ) * 1.0E-5_q
+
+    allocate(dR(nsw, ntot*nat, 3))
+    allocate(dR_frac(nsw, ntot*nat, 3))
+    allocate(olap%Rt(nsw, ntot*nat, 3))
+    allocate(Qt(nqs, nmodes, nsw))
+
+    Qt = dQ + SUM(olap%PhQ(:,:,:,:nsw), dim=3)
+
+    dR = 0.0; dR_frac = 0.0
+
+    do ix=1,nx
+    do iy=1,ny
+    do iz=1,nz
+
+      do iq=1,nqs
+
+        qR = epc%qpts(iq,1) * (ix - 1) + epc%qpts(iq,2) * (iy - 1) &
+           + epc%qpts(iq,3) * (iz - 1)
+        eiqR = EXP( -imgUnit * 2 * PI * qR )
+
+        do im=1,nmodes
+          lqv = lqvtemp / SQRT(olap%Phfreq(iq,im)) ! unit of Angstrom
+          do it=1,nsw
+            do ia=1,nat
+              ja = ny*nz*nat*(ix-1) + nz*nat*(iy-1) + nat*(iz-1) + ia
+              dR(it, ja, :) = dR(it, ja, :) &
+                  + eiqR * lqv * Qt(iq, im, it) / SQRT(epc%mass(ia)) * &
+                    epc%phmodes(iq, im, ia, :)
+            end do
+          end do
+        end do
+      end do
+
+    end do
+    end do
+    end do
+
+    dR = dR / SQRT(olap%Np)
+
+    call calcRecVec(epc%cellep(:3,:), B)
+    do it=1,nsw
+      ! calc fractional coordinates from Cartisian coord.
+      dR_frac(it,:,:) = matmul(dR(it,:,:), B)
+    end do
+
+    do ix=1,nx
+    do iy=1,ny
+    do iz=1,nz
+      do ia=1,nat
+        ja = ny*nz*nat*(ix-1) + nz*nat*(iy-1) + nat*(iz-1) + ia
+        do it=1,nsw
+          olap%Rt(it, ja, 1) = epc%cellep(ia+3, 1) + ix - 1 + dR_frac(it, ja, 1)
+          olap%Rt(it, ja, 2) = epc%cellep(ia+3, 2) + iy - 1 + dR_frac(it, ja, 2)
+          olap%Rt(it, ja, 3) = epc%cellep(ia+3, 3) + iz - 1 + dR_frac(it, ja, 3)
+        end do
+      end do
+    end do
+    end do
+    end do
+
+    olap%Rt(:,:,1) = olap%Rt(:,:,1) / nx
+    olap%Rt(:,:,2) = olap%Rt(:,:,2) / ny
+    olap%Rt(:,:,3) = olap%Rt(:,:,3) / nz
+
+  end subroutine
+
+
+  subroutine calcRecVec(A,B)
+    ! Calculate reciprocal lattice vectors.
+    implicit none
+
+    real(kind=q), intent(in) :: A(3,3)
+    real(kind=q), intent(inout) :: B(3,3)
+
+    real(kind=q) :: a1(3), a2(3), a3(3)
+    real(kind=q) :: a12(3), a23(3), a31(3) ! cross product
+    real(kind=q) :: V
+
+    a1 = A(1,:)
+    a2 = A(2,:)
+    a3 = A(3,:)
+
+    call cross(a1, a2, a12)
+    call cross(a2, a3, a23)
+    call cross(a3, a1, a31)
+
+    V = DOT_PRODUCT(a1, a23)
+
+    B(1,:) = a23 / V
+    B(2,:) = a31 / V
+    B(3,:) = a12 / V
+
+  end subroutine
+
+
+  subroutine cross(a, b, c)
+    ! Calculate cross product of 3D vector a and b.
+    implicit none
+    real(kind=q), intent(in) :: a(3)
+    real(kind=q), intent(in) :: b(3)
+    real(kind=q), intent(inout) :: c(3)
+
+    c(1) = a(2) * b(3) - a(3) * b(2)
+    c(2) = a(3) * b(1) - a(1) * b(3)
+    c(3) = a(1) * b(2) - a(2) * b(1)
 
   end subroutine
 
