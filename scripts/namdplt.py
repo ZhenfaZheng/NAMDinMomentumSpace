@@ -574,7 +574,6 @@ def plot_tdph_sns(q_loc, phen, qp_loc, qplabels, php, index, times,
     # cmax = np.max(pop) * 1.2 ; cmin = cmax / 1000
     # norm = mpl.colors.LogNorm(cmin,cmax)
     size = np.sqrt(np.abs(pop))
-    size = np.abs(pop)
     s_avg = np.average(size[size>0])
     size = size / size.max()  * 50
 

@@ -861,6 +861,51 @@ module epcoup
   end subroutine
 
 
+  subroutine saveXDAT(inp, olap, epc)
+    implicit none
+
+    type(namdInfo), intent(in) :: inp
+    type(overlap), intent(in) :: olap
+    type(epCoupling), intent(in) :: epc
+
+    integer :: ierr, i, j, it
+    integer :: nat, nsw, nx, ny, nz
+    real(kind=q) :: cell(3,3)
+    character(40) :: FORM
+
+    nx = 9; ny = 9; nz = 1
+    nsw = inp%NAMDTIME / inp%POTIM
+    nat = epc%natepc * nx * ny * nz
+
+    cell = epc%cellep(1:3,:)
+    cell(:,1) = cell(:,1) * nx
+    cell(:,2) = cell(:,2) * ny
+    cell(:,3) = cell(:,3) * nz
+
+    open(unit=310, file='XDATCAR', status='unknown', &
+         action='write', iostat=ierr)
+    if (ierr /= 0) then
+      write(*,*) "XDATCAR file I/O error!"
+      stop
+    end if
+
+    ! Write out initial header for XDATCAR
+    write(unit=310, fmt='(A40)') inp%EPMPREF
+    write(unit=310, fmt='(I12)') 1 ! scale
+    write(unit=310, fmt='(1X,3F12.6)') ((cell(i,j), j=1,3), i=1,3)
+    write(unit=310, fmt='(*(A8))') 'C'
+    write(unit=310, fmt='(*(I8))') 162
+
+    do it=1,nsw
+      write(unit=310, fmt='(A,I6)') 'Direct configuration=', it
+      write(unit=310, fmt='(1X,3F12.8)') ((olap%Rt(it,i,j),j=1,3),i=1,nat)
+    end do
+
+    close(unit=310)
+
+  end subroutine
+
+
   subroutine phQ2R(inp, olap, epc, dQ)
     ! Calculate atomic motion R(t) from normal coordinates Q_qv(t)
     implicit none
@@ -894,7 +939,8 @@ module epcoup
     allocate(olap%Rt(nsw, ntot*nat, 3))
     allocate(Qt(nqs, nmodes, nsw))
 
-    Qt = dQ + SUM(olap%PhQ(:,:,:,:nsw), dim=3)
+    ! Qt = dQ + SUM(olap%PhQ(:,:,:,1:nsw), dim=3)
+    Qt = dQ + olap%PhQ(:,:,1,1:nsw) + olap%PhQ(:,:,2,1:nsw)
 
     dR = 0.0; dR_frac = 0.0
 
