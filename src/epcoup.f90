@@ -921,7 +921,7 @@ module epcoup
     real(kind=q) :: lqvtemp, lqv, theta, qR, eiqR
     real(kind=q) :: B(3,3)
     real(kind=q), allocatable, dimension(:,:,:) :: dR, dR_frac
-    complex(kind=q), allocatable, dimension(:,:,:) :: Qt
+    complex(kind=q), allocatable, dimension(:,:,:) :: Qt, dQcum
 
     nqs = epc%nqpts
     nmodes = epc%nmodes
@@ -938,9 +938,13 @@ module epcoup
     allocate(dR_frac(nsw, ntot*nat, 3))
     allocate(olap%Rt(nsw, ntot*nat, 3))
     allocate(Qt(nqs, nmodes, nsw))
+    allocate(dQcum(nqs, nmodes, nsw))
 
-    ! Qt = dQ + SUM(olap%PhQ(:,:,:,1:nsw), dim=3)
-    Qt = dQ + olap%PhQ(:,:,1,1:nsw) + olap%PhQ(:,:,2,1:nsw)
+    dQcum(:,:,1) = dQ(:,:,1)
+    do it=2,nsw
+      dQcum(:,:,it) = dQcum(:,:,it-1) + dQ(:,:,it)
+    end do
+    Qt = dQcum + olap%PhQ(:,:,1,1:nsw) + olap%PhQ(:,:,2,1:nsw)
 
     dR = 0.0; dR_frac = 0.0
 
