@@ -17,7 +17,7 @@ module shotf
     type(overlap), intent(in) :: olap
 
     integer :: i, j, ibas, nbas, tion, Nt, iq
-    integer, allocatable :: cstat_all(:,:), occb(:,:), occbtot(:)
+    integer, allocatable :: cstat_all(:,:), occb(:,:)
     integer :: cstat, nstat
 
     ks%sh_pops = 0
@@ -27,15 +27,13 @@ module shotf
 
     allocate(cstat_all(inp%NTRAJ, inp%NINIBS))
     allocate(occb(inp%NTRAJ, inp%NBASIS))
-    allocate(occbtot(inp%NBASIS))
     ! tag of basis occupied
 
-    occb = 0; occbtot = 0
+    occb = 0
     do i=1, inp%NINIBS
       ibas = inp%BASSEL(inp%INIKPT(i), inp%INIBAND(i))
       cstat_all(:,i) = ibas
       occb(:,ibas) = 1
-      occbtot(ibas) = 1
     end do
 
     ! initialize the random seed for ramdom number production
@@ -50,7 +48,6 @@ module shotf
       call CProp(tion, ks, inp, olap)
 
       do ibas=1,nbas
-        if (occbtot(ibas)==0) cycle
         call calcprop_EPC(tion, ibas, ks, inp, olap)
       end do
 
@@ -63,7 +60,6 @@ module shotf
 
           if (nstat /= cstat .AND. occb(i,nstat)>0) cycle
           occb(i,cstat) = 0; occb(i,nstat) = 1
-          occbtot(cstat) = 0; occbtot(nstat) = 1
           ks%sh_pops(nstat, tion) = ks%sh_pops(nstat, tion) + 1
           cstat_all(i,j) = nstat
 
