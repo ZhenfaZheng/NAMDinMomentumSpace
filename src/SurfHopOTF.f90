@@ -1,0 +1,127 @@
+module shotf
+  use prec
+  use fileio
+  use hamil
+  use couplings
+  use shop
+  implicit none
+
+  contains
+
+  subroutine runSHotf(ks, inp, olap)
+  ! Surface Hopping Simulation without CPA (On-The-Fly type)
+    implicit none
+
+    type(TDKS), intent(inout) :: ks
+    type(namdInfo), intent(in) :: inp
+    type(overlap), intent(in) :: olap
+
+    integer :: i, j, ibas, nbas, tion, Nt, iq
+    integer, allocatable :: cstat_all(:,:), occb(:,:), occbtot(:)
+    integer :: cstat, nstat
+
+    ks%sh_pops = 0
+    ks%sh_prop = 0
+    nbas = ks%ndim
+    Nt = inp%NAMDTIME / inp%POTIM
+
+    allocate(cstat_all(inp%NTRAJ, inp%NINIBS))
+    allocate(occb(inp%NTRAJ, inp%NBASIS))
+    allocate(occbtot(inp%NBASIS))
+    ! tag of basis occupied
+
+    occb = 0; occbtot = 0
+    do i=1, inp%NINIBS
+      ibas = inp%BASSEL(inp%INIKPT(i), inp%INIBAND(i))
+      cstat_all(:,i) = ibas
+      occb(:,ibas) = 1
+      occbtot(ibas) = 1
+    end do
+
+    ! initialize the random seed for ramdom number production
+    call init_random_seed()
+    call calcBftot(ks, inp)
+
+    do tion=1,Nt
+
+      ks%pop_a(:,tion) = CONJG(ks%psi_c) * ks%psi_c
+      ks%norm(tion) = SUM(ks%pop_a(:,tion))
+      ks%psi_a(:,tion) = ks%psi_c
+      call CProp(tion, ks, inp, olap)
+
+      do ibas=1,nbas
+        if (occbtot(ibas)==0) cycle
+        call calcprop_EPC(tion, ibas, ks, inp, olap)
+      end do
+
+      do i=1, inp%NTRAJ
+
+        do j=1, inp%NINIBS
+
+          cstat = cstat_all(i,j)
+          call whichToHop(cstat, nstat, ks)
+
+          if (nstat /= cstat .AND. occb(i,nstat)>0) cycle
+          occb(i,cstat) = 0; occb(i,nstat) = 1
+          occbtot(cstat) = 0; occbtot(nstat) = 1
+          ks%sh_pops(nstat, tion) = ks%sh_pops(nstat, tion) + 1
+          cstat_all(i,j) = nstat
+
+          if (nstat == cstat) cycle
+          iq = olap%kkqmap(cstat, nstat)
+          if (iq>0) then
+            ks%ph_pops(iq, :, tion) &
+              = ks%ph_pops(iq, :, tion) + ks%ph_prop(cstat, nstat, :)
+          end if
+
+        end do
+
+      end do
+
+    end do
+
+    ks%sh_pops = ks%sh_pops / inp%NTRAJ
+
+  end subroutine
+
+
+  subroutine CProp(tion, ks, inp, olap)
+    implicit none
+    integer, intent(in) :: tion
+    type(TDKS), intent(inout)  :: ks
+    type(namdInfo), intent(in) :: inp
+    type(overlap), intent(in) :: olap
+
+    integer :: tele
+    real(kind=q) :: edt
+
+    edt = inp%POTIM / inp%NELM
+
+    do tele = 1, inp%NELM-1
+      ! construct hamiltonian matrix
+      if (inp%LEPC) then
+        call make_hamil_EPC(tion, tele, ks, inp, olap)
+      else
+        call make_hamil(tion, tele, ks, inp)
+      end if
+      ! apply hamiltonian to state vector
+      ! call hamil_act(ks)
+      ks%hpsi = matmul(ks%ham_c, ks%psi_c)
+      if (tion == 1 .AND. tele == 1) then
+        ! write(*,*) ((ks%ham_c(i,j), j=1, ks%ndim), i=1, ks%ndim)
+        ! This is the very first step of the time propagation
+        ! use first order difference
+        ! [c,n,p] meas current, next, previous respectively
+        ks%psi_n = ks%psi_c - imgUnit * edt * ks%hpsi / hbar
+      else
+        ! use second order difference
+        ks%psi_n = ks%psi_p - 2 * imgUnit * edt * ks%hpsi / hbar
+      end if
+      ks%psi_p = ks%psi_c
+      ks%psi_c = ks%psi_n
+    end do
+ 
+  end subroutine
+
+
+end module

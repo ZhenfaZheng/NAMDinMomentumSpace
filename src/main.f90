@@ -6,6 +6,7 @@ Program main
   use epcoup
   use hamil
   use shop
+  use shotf
   use fileio
   use TimeProp
 
@@ -21,7 +22,7 @@ Program main
   integer :: ns
 
   write(*,*)
-  write(*,*) "Hefei-NAMD (epc version 1.11.3, Jan 06, 2023)"
+  write(*,*) "Hefei-NAMD (epc version 2.0.0, Mar 09, 2023)"
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   ! First, get user inputs
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -56,11 +57,12 @@ Program main
       ! initiate KS matrix
       call initTDKS(ks, inp, olap_sec)
     ! Time propagation
-      call Propagation(ks, inp, olap_sec)
+    ! call Propagation(ks, inp, olap_sec)
     end if
     ! Run surface hopping
     if (inp%LSHP) then
-      call runSH(ks, inp, olap_sec)
+    ! call runSH(ks, inp, olap_sec)
+      call runSHotf(ks, inp, olap_sec)
       call printSH(ks, inp)
       if (inp%LEPC) call phQ2R(inp, olap_sec, epc, ks%ph_pops)
       if (inp%LEPC) call saveXDAT(inp, olap_sec, epc)
