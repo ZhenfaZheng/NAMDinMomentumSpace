@@ -17,7 +17,7 @@ module shotf
     type(overlap), intent(in) :: olap
 
     integer :: i, j, ibas, nbas, tion, Nt, iq
-    integer, allocatable :: cstat_all(:,:), occb(:,:)
+    integer, allocatable :: cstat_all(:), occb(:)
     integer :: cstat, nstat
 
     ks%sh_pops = 0
@@ -25,43 +25,42 @@ module shotf
     nbas = ks%ndim
     Nt = inp%NAMDTIME / inp%POTIM
 
-    allocate(cstat_all(inp%NTRAJ, inp%NINIBS))
-    allocate(occb(inp%NTRAJ, inp%NBASIS))
+    allocate(cstat_all(inp%NINIBS))
+    allocate(occb(inp%NBASIS))
     ! tag of basis occupied
-
-    occb = 0
-    do i=1, inp%NINIBS
-      ibas = inp%BASSEL(inp%INIKPT(i), inp%INIBAND(i))
-      cstat_all(:,i) = ibas
-      occb(:,ibas) = 1
-    end do
 
     ! initialize the random seed for ramdom number production
     call init_random_seed()
     call calcBftot(ks, inp)
 
-    do tion=1,Nt
+    do i=1, inp%NTRAJ
 
-      ks%pop_a(:,tion) = CONJG(ks%psi_c) * ks%psi_c
-      ks%norm(tion) = SUM(ks%pop_a(:,tion))
-      ks%psi_a(:,tion) = ks%psi_c
-      call CProp(tion, ks, inp, olap)
-
-      do ibas=1,nbas
-        call calcprop_EPC(tion, ibas, ks, inp, olap)
+      occb = 0
+      do j=1, inp%NINIBS
+        ibas = inp%BASSEL(inp%INIKPT(j), inp%INIBAND(j))
+        cstat_all(j) = ibas
+        occb(ibas) = 1
       end do
 
-      do i=1, inp%NTRAJ
+      do tion=1,Nt
+
+        if (i==1) then
+        ks%pop_a(:,tion) = CONJG(ks%psi_c) * ks%psi_c
+        ks%norm(tion) = SUM(ks%pop_a(:,tion))
+        ks%psi_a(:,tion) = ks%psi_c
+        call CProp(tion, ks, inp, olap)
+        end if
 
         do j=1, inp%NINIBS
 
-          cstat = cstat_all(i,j)
+          cstat = cstat_all(j)
+          call calcprop_EPC(tion, cstat, ks, inp, olap)
           call whichToHop(cstat, nstat, ks)
 
-          if (nstat /= cstat .AND. occb(i,nstat)>0) cycle
-          occb(i,cstat) = 0; occb(i,nstat) = 1
+          if (nstat /= cstat .AND. occb(nstat)>0) cycle
+          occb(cstat) = 0; occb(nstat) = 1
           ks%sh_pops(nstat, tion) = ks%sh_pops(nstat, tion) + 1
-          cstat_all(i,j) = nstat
+          cstat_all(j) = nstat
 
           if (nstat == cstat) cycle
           iq = olap%kkqmap(cstat, nstat)
