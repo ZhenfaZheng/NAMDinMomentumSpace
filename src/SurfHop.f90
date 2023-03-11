@@ -68,7 +68,8 @@ module shop
             iq = olap%kkqmap(cstat, nstat)
             if (iq>0) then
               ks%ph_pops(iq, :, tion) &
-                = ks%ph_pops(iq, :, tion) + ks%ph_prop(cstat, nstat, :)
+                = ks%ph_pops(iq, :, tion) &
+                + SUM(ks%ph_prop(cstat,nstat,:,:), dim=2)
             end if
 
           end do

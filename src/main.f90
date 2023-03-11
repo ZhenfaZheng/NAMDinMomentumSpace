@@ -22,7 +22,7 @@ Program main
   integer :: ns
 
   write(*,*)
-  write(*,*) "Hefei-NAMD (epc version 2.0.2, Mar 10, 2023)"
+  write(*,*) "Hefei-NAMD (epc version 2.0.3, Mar 10, 2023)"
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   ! First, get user inputs
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -64,8 +64,8 @@ Program main
     ! call runSH(ks, inp, olap_sec)
       call runSHotf(ks, inp, olap_sec)
       call printSH(ks, inp)
-      if (inp%LEPC) call phQ2R(inp, olap_sec, epc, ks%ph_pops)
-      if (inp%LEPC) call saveXDAT(inp, olap_sec, epc)
+      ! if (inp%LEPC) call phQ2R(inp, olap_sec, epc, ks%ph_pops)
+      ! if (inp%LEPC) call saveXDAT(inp, olap_sec, epc)
       if (inp%LEPC) call printPHPROP(ks, inp, olap_sec, ns)
     end if
     call system_clock(t2)

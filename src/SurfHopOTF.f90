@@ -16,9 +16,11 @@ module shotf
     type(namdInfo), intent(in) :: inp
     type(overlap), intent(in) :: olap
 
-    integer :: i, j, ibas, nbas, tion, Nt, iq
-    integer, allocatable :: cstat_all(:), occb(:)
     integer :: cstat, nstat
+    integer, allocatable :: cstat_all(:), occb(:)
+    integer :: i, j, ibas, nbas, tion, Nt, iq
+    complex(kind=q), allocatable :: dQ(:,:,:), Qtemp(:,:,:)
+    logical :: lhop
 
     ks%sh_pops = 0
     ks%sh_prop = 0
@@ -26,12 +28,14 @@ module shotf
     Nt = inp%NAMDTIME / inp%POTIM
 
     allocate(cstat_all(inp%NINIBS))
-    allocate(occb(inp%NBASIS))
-    ! tag of basis occupied
+    allocate(occb(inp%NBASIS)) ! tag of basis occupied
+    allocate(dQ(olap%NQ, olap%NMODES, 2))
+    allocate(Qtemp(olap%NQ, olap%NMODES, 2))
 
     ! initialize the random seed for ramdom number production
     call init_random_seed()
-    call calcBftot(ks, inp)
+    ! call calcBftot(ks, inp)
+    ks%sh_Bfactor = 1.0
 
     do i=1, inp%NTRAJ
 
@@ -42,14 +46,19 @@ module shotf
         occb(ibas) = 1
       end do
 
+      dQ = cero
+
       do tion=1,Nt
 
-        if (i==1) then
+        Qtemp = ks%PhQ(:,:,:,tion)
+        ks%PhQ(:,:,:,tion) = ks%PhQ(:,:,:,tion) + dQ
+
+      ! if (i==1) then
         ks%pop_a(:,tion) = CONJG(ks%psi_c) * ks%psi_c
         ks%norm(tion) = SUM(ks%pop_a(:,tion))
         ks%psi_a(:,tion) = ks%psi_c
         call CProp(tion, ks, inp, olap)
-        end if
+      ! end if
 
         do j=1, inp%NINIBS
 
@@ -64,18 +73,67 @@ module shotf
 
           if (nstat == cstat) cycle
           iq = olap%kkqmap(cstat, nstat)
-          if (iq>0) then
+          if (iq<0) cycle
+          call calcDQ(tion, cstat, nstat, dQ, ks, olap, lhop)
+          if (lhop) then
             ks%ph_pops(iq, :, tion) &
-              = ks%ph_pops(iq, :, tion) + ks%ph_prop(cstat, nstat, :)
+              = ks%ph_pops(iq, :, tion) &
+              + SUM(ks%ph_prop(cstat, nstat, :, :), dim=2)
           end if
 
         end do
+
+        ks%PhQ(:,:,:,tion) = Qtemp
 
       end do
 
     end do
 
     ks%sh_pops = ks%sh_pops / inp%NTRAJ
+
+  end subroutine
+
+
+  subroutine calcDQ(tion, cstat, nstat, dQ, ks, olap, lhop)
+    implicit none
+    integer, intent(in) :: tion, cstat, nstat
+    complex(kind=q), intent(inout) :: dQ(:,:,:)
+    type(TDKS), intent(in)  :: ks
+    type(overlap), intent(in) :: olap
+    logical, intent(inout) :: lhop
+
+    integer :: iq, im, nmodes, i
+    real(kind=q), allocatable :: phn(:,:)
+
+    lhop = .TRUE.
+    nmodes = olap%NMODES
+    iq = olap%kkqmap(cstat, nstat)
+
+    allocate(phn(nmodes,2))
+    phn = ABS(ks%PhQ(iq, :, :, tion)) ** 2
+
+    mloop: do im=1,nmodes
+      do i=1,2
+        if (phn(im, i) + ks%ph_prop(cstat, nstat, im, i) < 0) then
+          lhop = .FALSE.
+          exit mloop
+        end if
+      end do
+    end do mloop
+
+    if (lhop) then
+      do im=1,nmodes
+        do i=1,2
+          if (ks%ph_prop(cstat, nstat, im, i)>0) then
+            dQ(iq, im, i) = dQ(iq, im, i) + ks%PhQ(iq, im, i, tion) &
+                          * SQRT(ks%ph_prop(cstat, nstat, im, i)/phn(im, i))
+          else
+            dQ(iq, im, i) = dQ(iq, im, i) + ks%PhQ(iq, im, i, tion) &
+                          * SQRT(-ks%ph_prop(cstat, nstat, im, i)/phn(im, i))
+          end if
+        end do
+      end do
+    end if
 
   end subroutine
 
