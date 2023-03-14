@@ -63,7 +63,8 @@ module shotf
         do j=1, inp%NINIBS
 
           cstat = cstat_all(j)
-          call calcprop_EPC(tion, cstat, ks, inp, olap)
+        ! call calcprop_EPC(tion, cstat, ks, inp, olap)
+          call calcprop_OTF(tion, cstat, ks, inp, olap)
           call whichToHop(cstat, nstat, ks)
 
           if (nstat /= cstat .AND. occb(nstat)>0) cycle
@@ -90,6 +91,37 @@ module shotf
     end do
 
     ks%sh_pops = ks%sh_pops / inp%NTRAJ
+
+  end subroutine
+
+
+  subroutine calcprop_OTF(tion, cstat, ks, inp, olap)
+    implicit none
+
+    type(TDKS), intent(inout) :: ks
+    type(namdInfo), intent(in) :: inp
+    integer, intent(in) :: tion
+    integer, intent(in) :: cstat
+    type(overlap), intent(in) :: olap
+
+    integer :: iq, i
+    real(kind=q) :: Akk
+    complex(kind=q), allocatable :: epcoup(:)
+
+    allocate(epcoup(ks%ndim))
+    do i=1,ks%ndim
+      iq = olap%kkqmap(cstat, i)
+      epcoup(i) = SUM( olap%gij(cstat,i,:) * &
+                       SUM(ks%PhQ(iq,:,:,tion), dim=2) )
+    end do
+
+
+    Akk = CONJG(ks%psi_a(cstat, tion)) * ks%psi_a(cstat, tion)
+    ks%Bkm = -2. / hbar * AIMAG( CONJG(ks%psi_a(cstat, tion)) * &
+             ks%psi_a(:, tion) * epcoup(:) )
+
+    ks%sh_prop(cstat,:) = ks%Bkm / Akk * inp%POTIM
+    forall (i=1:ks%ndim, ks%sh_prop(cstat,i) < 0) ks%sh_prop(cstat,i) = 0
 
   end subroutine
 
