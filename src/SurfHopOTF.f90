@@ -36,15 +36,23 @@ module shotf
     call init_random_seed()
     ! call calcBftot(ks, inp)
     ks%sh_Bfactor = 1.0
+    lhop = .TRUE.
 
     do i=1, inp%NTRAJ
+
+      ks%psi_c = cero
+      ks%psi_p = cero
+      ks%psi_n = cero
 
       occb = 0
       do j=1, inp%NINIBS
         ibas = inp%BASSEL(inp%INIKPT(j), inp%INIBAND(j))
         cstat_all(j) = ibas
         occb(ibas) = 1
+        ks%psi_c(ibas) = uno
       end do
+
+      ks%psi_c = SQRT(ks%psi_c / REAL(inp%NINIBS))
 
       dQ = cero
 
@@ -53,18 +61,18 @@ module shotf
         Qtemp = ks%PhQ(:,:,:,tion)
         ks%PhQ(:,:,:,tion) = ks%PhQ(:,:,:,tion) + dQ
 
-      ! if (i==1) then
+        if (i==1) then
         ks%pop_a(:,tion) = CONJG(ks%psi_c) * ks%psi_c
         ks%norm(tion) = SUM(ks%pop_a(:,tion))
         ks%psi_a(:,tion) = ks%psi_c
         call CProp(tion, ks, inp, olap)
-      ! end if
+        end if
 
         do j=1, inp%NINIBS
 
           cstat = cstat_all(j)
-        ! call calcprop_EPC(tion, cstat, ks, inp, olap)
-          call calcprop_OTF(tion, cstat, ks, inp, olap)
+          call calcprop_EPC(tion, cstat, ks, inp, olap)
+        ! call calcprop_OTF(tion, cstat, ks, inp, olap)
           call whichToHop(cstat, nstat, ks)
 
           if (nstat /= cstat .AND. occb(nstat)>0) cycle
@@ -75,6 +83,7 @@ module shotf
           if (nstat == cstat) cycle
           iq = olap%kkqmap(cstat, nstat)
           if (iq<0) cycle
+          call calcPHprop(tion, cstat, nstat, ks, olap)
           call calcDQ(tion, cstat, nstat, dQ, ks, olap, lhop)
           if (lhop) then
             ks%ph_pops(iq, :, tion) &
@@ -122,6 +131,33 @@ module shotf
 
     ks%sh_prop(cstat,:) = ks%Bkm / Akk * inp%POTIM
     forall (i=1:ks%ndim, ks%sh_prop(cstat,i) < 0) ks%sh_prop(cstat,i) = 0
+
+  end subroutine
+
+
+  subroutine calcPHprop(tion, cstat, nstat, ks, olap)
+    implicit none
+    integer, intent(in) :: tion, cstat, nstat
+    type(TDKS), intent(inout)  :: ks
+    type(overlap), intent(in) :: olap
+
+    integer :: iq, im, nmodes
+    real(kind=q), allocatable :: eptemp(:,:)
+    real(kind=q) :: norm
+
+    nmodes = olap%NMODES
+    iq = olap%kkqmap(cstat, nstat)
+    allocate(eptemp(nmodes, 2))
+
+    do im=1,nmodes
+      eptemp(im,:) = ABS(olap%gij(cstat,nstat,im) &
+                         * ks%PhQ(iq,im,:,tion)) ** 2
+      ! eptemp(im,:) = ABS(olap%EPcoup(cstat,nstat,im,:,1) &
+      !                    * (ks%PhQ(iq,im,:,tion) ** 2))
+    end do
+    norm = SUM(eptemp)
+    ks%ph_prop(cstat,nstat,:,1) = -eptemp(:,1) / norm
+    ks%ph_prop(cstat,nstat,:,2) =  eptemp(:,2) / norm
 
   end subroutine
 
