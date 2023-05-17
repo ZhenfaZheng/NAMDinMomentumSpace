@@ -109,8 +109,8 @@ module hamil
             norm = SUM(eptemp)
             if (norm>0) then
             ! ks%ph_prop(i,j,:) = (eptemp(:,2) - eptemp(:,1)) / norm
-              ks%ph_prop(i,j,:,1) = -eptemp(:,1) / norm
-              ks%ph_prop(i,j,:,2) =  eptemp(:,2) / norm
+              ks%ph_prop(i,j,:,1) =  eptemp(:,1) / norm
+              ks%ph_prop(i,j,:,2) = -eptemp(:,2) / norm
             end if
           end do
         end do

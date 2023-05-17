@@ -618,6 +618,7 @@ module epcoup
       do jk=1, nk_tot
 
         iq = epc%kkqmap(ik+kst-1, jk)
+        ! iq = epc%kkqmap(jk, ik+kst-1)
         if (iq<0) cycle
 
         do im=1,nm
@@ -1354,7 +1355,7 @@ module epcoup
     olap%EPcoup = cero
 
     do ib=1,nb
-     do jb=ib,nb
+     do jb=1,nb
 
        dE = olap%Eig(ib,1) - olap%Eig(jb,1)
        iq = olap%kkqmap(ib,jb)
@@ -1362,6 +1363,7 @@ module epcoup
 
        do im=1,nm
          if (jb==ib) olap%gij(ib,ib,im)= ABS(olap%gij(ib,ib,im))
+         if (jb>ib) olap%gij(jb,ib,im)= CONJG(olap%gij(ib,ib,im))
          dE1 = dE - olap%Phfreq(iq,im) - 1.0E-8_q
          olap%EPcoup(ib,jb,im,1,1) = olap%gij(ib,jb,im) ** 2 &
            ! * (sin(dE1 * T0) / (dE1 * T0)) ** 2 * T0 ! * hbar / hbar
@@ -1372,7 +1374,7 @@ module epcoup
            * exp(-0.5 * (dE2/sigma)**2)
        end do ! im loop
 
-       olap%EPcoup(jb,ib,:,:,:) = CONJG(olap%EPcoup(ib,jb,:,:,:))
+       ! olap%EPcoup(jb,ib,:,:,:) = CONJG(olap%EPcoup(ib,jb,:,:,:))
 
      end do
     end do

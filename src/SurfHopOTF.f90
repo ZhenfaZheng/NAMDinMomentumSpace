@@ -75,20 +75,22 @@ module shotf
         ! call calcprop_OTF(tion, cstat, ks, inp, olap)
           call whichToHop(cstat, nstat, ks)
 
-          if (nstat /= cstat .AND. occb(nstat)>0) cycle
-          occb(cstat) = 0; occb(nstat) = 1
-          ks%sh_pops(nstat, tion) = ks%sh_pops(nstat, tion) + 1
-          cstat_all(j) = nstat
-
-          if (nstat == cstat) cycle
           iq = olap%kkqmap(cstat, nstat)
-          if (iq<0) cycle
-          call calcPHprop(tion, cstat, nstat, ks, olap)
-          call calcDQ(tion, cstat, nstat, dQ, ks, olap, lhop)
-          if (lhop) then
-            ks%ph_pops(iq, :, tion) &
-              = ks%ph_pops(iq, :, tion) &
-              + SUM(ks%ph_prop(cstat, nstat, :, :), dim=2)
+          if (occb(nstat)>0 .OR. iq<0) then
+            ks%sh_pops(cstat, tion) = ks%sh_pops(cstat, tion) + 1
+          else
+          ! call calcPHprop(tion, cstat, nstat, ks, olap)
+            call calcDQ(tion, cstat, nstat, dQ, ks, olap, lhop)
+            if (lhop) then
+              occb(cstat) = 0; occb(nstat) = 1
+              ks%sh_pops(nstat, tion) = ks%sh_pops(nstat, tion) + 1
+              cstat_all(j) = nstat
+              ks%ph_pops(iq, :, tion) &
+                = ks%ph_pops(iq, :, tion) &
+                + SUM(ks%ph_prop(cstat, nstat, :, :), dim=2)
+            else
+              ks%sh_pops(cstat, tion) = ks%sh_pops(cstat, tion) + 1
+            end if
           end if
 
         end do
@@ -196,7 +198,7 @@ module shotf
             dQ(iq, im, i) = dQ(iq, im, i) + ks%PhQ(iq, im, i, tion) &
                           * SQRT(ks%ph_prop(cstat, nstat, im, i)/phn(im, i))
           else
-            dQ(iq, im, i) = dQ(iq, im, i) + ks%PhQ(iq, im, i, tion) &
+            dQ(iq, im, i) = dQ(iq, im, i) - ks%PhQ(iq, im, i, tion) &
                           * SQRT(-ks%ph_prop(cstat, nstat, im, i)/phn(im, i))
           end if
         end do
