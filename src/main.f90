@@ -9,6 +9,7 @@ Program main
   use shotf
   use fileio
   use TimeProp
+  use mpi
 
   implicit none
 
@@ -18,15 +19,21 @@ Program main
   type(epCoupling) :: epc
 
   real(kind=q) :: start, fin
+  integer :: rank, ierr
   integer :: t1, t2, rate
   integer :: ns
 
   write(*,*)
-  write(*,*) "Hefei-NAMD (epc version 2.0.6, Apr 17, 2023)"
+  write(*,*) "Hefei-NAMD (epc version 2.1.0, May 18, 2023)"
+
+  call MPI_INIT(ierr)
+  call MPI_COMM_RANK(MPI_COMM_WORLD, rank, ierr)
+
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   ! First, get user inputs
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   call getUserInp(inp)
+  call MPI_BARRIER(MPI_COMM_WORLD, ierr)
   ! call printUserInp(inp)
   call system_clock(count_rate=rate)
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -46,7 +53,9 @@ Program main
     call TDCoupIJ(trim(inp%rundir), olap, olap_sec, inp)
   end if
   ! write(*,*) "T_coup: ", fin - start
+  call MPI_BARRIER(MPI_COMM_WORLD, ierr)
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  if (rank==0) then
   do ns=1, inp%NSAMPLE
     inp%NAMDTINI = inp%NAMDTINI_A(ns)
     inp%INIBAND  = inp%INIBAND_A(ns,:)
@@ -57,12 +66,12 @@ Program main
       ! initiate KS matrix
       call initTDKS(ks, inp, olap_sec)
     ! Time propagation
-    ! call Propagation(ks, inp, olap_sec)
+      call Propagation(ks, inp, olap_sec)
     end if
     ! Run surface hopping
     if (inp%LSHP) then
-    ! call runSH(ks, inp, olap_sec)
-      call runSHotf(ks, inp, olap_sec)
+      call runSH(ks, inp, olap_sec)
+    ! call runSHotf(ks, inp, olap_sec)
       call printSH(ks, inp)
       ! if (inp%LEPC) call phQ2R(inp, olap_sec, epc, ks%ph_pops)
       ! if (inp%LEPC) call saveXDAT(inp, olap_sec, epc)
@@ -71,5 +80,8 @@ Program main
     call system_clock(t2)
     write(*,'(A, F10.2)') "CPU Time [s]:", (t2-t1)/real(rate)
   end do
+  end if
+
+  call MPI_FINALIZE(ierr)
 
 end Program

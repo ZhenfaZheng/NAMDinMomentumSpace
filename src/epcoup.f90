@@ -4,6 +4,7 @@ module epcoup
   use fileio
   use couplings
   use hdf5
+  use mpi
 
   implicit none
 

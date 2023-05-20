@@ -2,8 +2,13 @@
 # defaults
 #-------------------------------------------------------------------------------
 #FC= gfortran
-FC= ifort -assume byterecl
-FFLAGS= -g -O2
+
+FC = ifort
+FFLAGS = -g -O2 -assume byterecl
+
+FC = mpiifort
+FFLAGS = -g -O3 -assume byterecl -mkl -fpp -traceback
+
 MAKE = make
 
 #path to HDF5 library
