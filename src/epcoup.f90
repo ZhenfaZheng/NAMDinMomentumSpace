@@ -618,8 +618,8 @@ module epcoup
 
       do jk=1, nk_tot
 
-        iq = epc%kkqmap(ik+kst-1, jk)
-        ! iq = epc%kkqmap(jk, ik+kst-1)
+        iq = epc%kkqmap(jk, ik+kst-1)
+        ! kpts[jk] = kpts[ik] + qpts[iq]
         if (iq<0) cycle
 
         do im=1,nm
@@ -631,8 +631,11 @@ module epcoup
 
               ibas = nb*(ik+kst-2)+ib
               jbas = nb*(jk-1)+jb
-              olap%kkqmap(ibas, jbas) = iq
-              olap%gij(ibas, jbas, im) = eptemp(ib, jb, im, iq)
+              olap%kkqmap(jbas, ibas) = iq
+              olap%gij(jbas, ibas, im) = eptemp(jb, ib, im, iq)
+              ! ibas ~ initial state; jbas ~ final state
+              ! gij(jbas, ibas, im) = < psi_{jb,jk} | d_{iq,im} V | psi_{ib,ik} >
+              ! kpts[jk] = kpts[ik] + qpts[iq]
 
             end do ! ib loop
           end do ! jb loop
@@ -730,12 +733,16 @@ module epcoup
 
             jbas = inp%BASSEL(jk,jb)
             if (jbas==-1) cycle
-            iq = olap_sec%kkqmap(ibas, jbas)
+            iq = olap_sec%kkqmap(jbas, ibas)
+            ! kpts[jk] = kpts[ik] + qpts[iq]
             if (iq<0) cycle
 
             do im=1,nm
               if (olap_sec%Phfreq(iq,im)<inp%PHCUT) cycle
-              olap_sec%gij(ibas, jbas, im) = eptemp(ib, jb, im, iq)
+              olap_sec%gij(jbas, ibas, im) = eptemp(jb, ib, im, iq)
+              ! ibas ~ initial state; jbas ~ final state
+              ! gij(jbas, ibas, im) = < psi_{jb,jk} | d_{iq,im} V | psi_{ib,ik} >
+              ! kpts[jk] = kpts[ik] + qpts[iq]
             end do ! im loop
 
           end do ! jb loop
@@ -1181,12 +1188,13 @@ module epcoup
     do ik=1,epc%nkpts
       do jk=1,epc%nkpts
         do iq=1,epc%nqpts
-          dkq = epc%kpts(ik,:) - epc%kpts(jk,:) - epc%qpts(iq,:)
+          dkq = epc%kpts(jk,:) - epc%kpts(ik,:) - epc%qpts(iq,:)
           do iax=1,3
             dkq(iax) = ABS(dkq(iax)-NINT(dkq(iax)))
           end do
           if (SUM(dkq)<norm) then
-              epc%kkqmap(ik,jk) = iq
+              epc%kkqmap(jk,ik) = iq
+              ! kpts[jk] = kpts[ik] + qpts[iq]
               exit
           end if
         end do
@@ -1229,12 +1237,13 @@ module epcoup
           cycle
         end if
         do iq=1,epc%nqpts
-          dkq = epc%kpts(ik,:) - epc%kpts(jk,:) - epc%qpts(iq,:)
+          dkq = epc%kpts(jk,:) - epc%kpts(ik,:) - epc%qpts(iq,:)
           do iax=1,3
             dkq(iax) = ABS(dkq(iax)-NINT(dkq(iax)))
           end do
           if (SUM(dkq)<norm) then
-            olap_sec%kkqmap(ibas,jbas) = iq
+            olap_sec%kkqmap(jbas,ibas) = iq
+            ! kpts[jk] = kpts[ik] + qpts[iq]
             exit
           end if
         end do
@@ -1364,7 +1373,7 @@ module epcoup
 
        do im=1,nm
          if (jb==ib) olap%gij(ib,ib,im)= ABS(olap%gij(ib,ib,im))
-         if (jb>ib) olap%gij(jb,ib,im)= CONJG(olap%gij(ib,ib,im))
+         if (jb>ib) olap%gij(jb,ib,im)= CONJG(olap%gij(ib,jb,im))
          dE1 = dE - olap%Phfreq(iq,im) - 1.0E-8_q
          olap%EPcoup(ib,jb,im,1,1) = olap%gij(ib,jb,im) ** 2 &
            ! * (sin(dE1 * T0) / (dE1 * T0)) ** 2 * T0 ! * hbar / hbar
