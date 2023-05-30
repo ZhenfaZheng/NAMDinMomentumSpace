@@ -59,6 +59,8 @@ module epcoup
     call initOlap(olap_sec, inp, epc%nqpts, inp%NBASIS)
     call epcToOlapSec(inp, epc, olap_sec)
 
+    call mpi_split_bas(inp)
+
     write(*,*) "Mapping k & k' points with q point."
     call kqMatchSec(inp, epc, olap_sec)
     write(*,*) "Reading e-ph matrix elements."
@@ -1856,6 +1858,65 @@ module epcoup
     close(unit=34)
 
   end subroutine
+
+
+  subroutine mpi_split_bas(inp)
+
+    implicit none
+    type(namdInfo), intent(inout) :: inp
+
+    integer :: rank, nproc, ierr
+    integer :: ik, ib, ibas, nbas, nbas_p
+    integer, allocatable :: ists(:), iends(:)
+    integer :: ist, iend ! local start and end index
+
+    CALL MPI_COMM_RANK(MPI_COMM_WORLD, rank, ierr)
+    CALL MPI_COMM_SIZE(MPI_COMM_WORLD, nproc, ierr)
+
+    nbas = inp%NBASIS
+    allocate(ists(nproc), iends(nproc))
+    CALL mpi_split_procs(nbas, nproc, ists, iends)
+
+    ist = ists(rank+1)
+    iend = iends(rank+1)
+    nbas_p = iend - ist + 1
+    allocate(inp%BASLIST_P(nbas_p, 3))
+
+    inp%BASSEL_P = -1
+    inp%BASLIST_P = inp%BASLIST(ist:iend,:)
+    do ibas = ist, iend
+      ik = inp%BASLIST(ibas, 1)
+      ib = inp%BASLIST(ibas, 2)
+      inp%BASSEL_P(ik, ib) = ibas - ist + 1
+    end do
+
+  end subroutine
+
+
+  subroutine mpi_split_procs(num, nproc, ists, iends)
+
+    implicit none
+    integer, intent(in) :: num, nproc
+    integer, intent(out) :: ists(nproc), iends(nproc)
+
+    integer :: base, rest
+    integer :: i
+
+    base = num / nproc
+    rest = MOD(num, nproc)
+
+    do i = 1, nproc
+      if(i <= rest) then
+         ists(i) = (i - 1) * (base + 1) + 1
+         iends(i) = ists(i) + base
+      else
+         ists(i) = (i - 1) * base + merge(rest, 0, base>0) + 1
+         iends(i) = ists(i) + base - 1
+      end if
+    enddo
+
+  end subroutine mpi_split_procs
+
 
 
 end module epcoup

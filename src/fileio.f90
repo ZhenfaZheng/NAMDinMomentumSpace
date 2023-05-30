@@ -64,6 +64,9 @@ module fileio
     integer, allocatable, dimension(:,:) :: BASSEL, BASLIST
     ! selected basises whose energies are between EMIN ~ EMAX, in the range
     ! BMIN ~ BMAX and KMIN ~ KMAX.
+    integer, allocatable, dimension(:,:) :: BASSEL_P, BASLIST_P
+    ! basises for different MPI processes.
+
     real(kind=q) :: EMIN, EMAX
     real(kind=q) :: SIGMA    ! the width of energy conservation in eV.
                              ! standard divation of guassian function.
@@ -195,6 +198,7 @@ module fileio
       if ( kmax == 0 ) kmax = nkpoints
 
       allocate(inp%BASSEL(nkpoints,nbands))
+      allocate(inp%BASSEL_P(nkpoints,nbands))
       allocate(inp%NAMDTINI_A(nsample))
       allocate(inp%INIKPT_A(nsample, ninibs))
       allocate(inp%INIBAND_A(nsample, ninibs))
