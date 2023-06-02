@@ -25,7 +25,10 @@ accompying the source code:
 
 > Z. Zheng, Y. Shi, J.J. Zhou, O. V. Prezhdo, Q. Zheng, J. Zhao. *"Ab initio
 real-time quantum dynamics of charge carriers in momentum space"*.
-[arXiv:2210.00529 (2022)](https://doi.org/10.48550/arXiv.2210.00529)
+[Nat Comput Sci (2023)](https://doi.org/10.48550/arXiv.2210.0052://doi.org/10.1038/s43588-023-00456-9)
+
+For electron-phonon coupling calculation, we use the package [Perturbo](https://perturbo-code.github.io), please refer to:
+[Comput. Phys. Commun. 264, 107970, (2021)](https://doi.org/10.1016/j.cpc.2021.107970)
 
 When using results from this program in your publications, please cite the
 paper given above and acknowledge the use of the code.
