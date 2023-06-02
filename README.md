@@ -23,11 +23,15 @@ developed by [Qijing Zheng](http://staff.ustc.edu.cn/~zqj), et al.
 For theoretical details on the code, we refer the users to the manuscript
 accompying the source code:
 
-> Z. Zheng, Y. Shi, J.J. Zhou, O. V. Prezhdo, Q. Zheng, J. Zhao. *"Ab initio
+> Z. Zheng, Y. Shi, J. J. Zhou, O. V. Prezhdo, Q. Zheng, J. Zhao. *"Ab initio
 real-time quantum dynamics of charge carriers in momentum space"*.
 [Nat Comput Sci (2023)](https://doi.org/10.48550/arXiv.2210.0052://doi.org/10.1038/s43588-023-00456-9)
 
 For electron-phonon coupling calculation, we use the package [Perturbo](https://perturbo-code.github.io), please refer to:
+
+> J. J. Zhou, J. Park, I. T. Lu, I. Maliyov, X. Tong, M. Bernardi,
+“Perturbo: a software package for ab initio electron-phonon interactions,
+charge transport and ultrafast dynamics”.
 [Comput. Phys. Commun. 264, 107970, (2021)](https://doi.org/10.1016/j.cpc.2021.107970)
 
 When using results from this program in your publications, please cite the
