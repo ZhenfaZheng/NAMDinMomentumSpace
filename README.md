@@ -27,7 +27,7 @@ accompying the source code:
 real-time quantum dynamics of charge carriers in momentum space"*.
 [Nat Comput Sci (2023)](https://doi.org/10.48550/arXiv.2210.0052://doi.org/10.1038/s43588-023-00456-9)
 
-For electron-phonon coupling calculation, we use the package [Perturbo](https://perturbo-code.github.io), please refer to:
+For EPC calculation, we use the package [Perturbo](https://perturbo-code.github.io), please refer to:
 
 > J. J. Zhou, J. Park, I. T. Lu, I. Maliyov, X. Tong, M. Bernardi,
 “Perturbo: a software package for ab initio electron-phonon interactions,
