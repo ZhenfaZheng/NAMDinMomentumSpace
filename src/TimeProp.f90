@@ -17,6 +17,19 @@ module TimeProp
     integer :: i, j
     real(kind=q) :: edt
     real(kind=q) :: start, fin
+    integer :: rank, ierr
+    integer :: ist, iend, nbas, nbas_p
+
+    complex(kind=8), allocatable, dimension(:) :: psi_n_local, psi_n_all
+
+    CALL MPI_COMM_RANK(MPI_COMM_WORLD, rank, ierr)
+    ist = inp%ISTS(rank+1)
+    iend = inp%IENDS(rank+1)
+
+    nbas   = inp%NBASIS
+    nbas_p = inp%NBASIS_P
+    allocate(psi_n_all(nbas))
+    allocate(psi_n_local(nbas_p))
 
     Nt = inp%NAMDTIME / inp%POTIM
     edt = inp%POTIM / inp%NELM
@@ -48,11 +61,16 @@ module TimeProp
           ! This is the very first step of the time propagation
           ! use first order difference
           ! [c,n,p] meas current, next, previous respectively
-          ks%psi_n = ks%psi_c - imgUnit * edt * ks%hpsi / hbar
+          psi_n_local = ks%psi_c(ist:iend) - imgUnit * edt * ks%hpsi / hbar
         else
           ! use second order difference
-          ks%psi_n = ks%psi_p - 2 * imgUnit * edt * ks%hpsi / hbar
+          psi_n_local = ks%psi_p(ist:iend) - 2 * imgUnit * edt * ks%hpsi / hbar
         end if
+        call MPI_BARRIER(MPI_COMM_WORLD, ierr)
+        CALL MPI_ALLgather(psi_n_local, nbas_p, MPI_DOUBLE_COMPLEX, &
+                           psi_n_all,   nbas_p, MPI_DOUBLE_COMPLEX, &
+                           MPI_COMM_WORLD, ierr)
+        ks%psi_n = psi_n_all
         ks%psi_p = ks%psi_c
         ks%psi_c = ks%psi_n
       end do

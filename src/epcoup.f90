@@ -56,10 +56,10 @@ module epcoup
 
     call selBasis(inp, epc)
     if (inp%LSORT) call sortBasis(inp, epc)
+    call mpi_split_bas(inp)
+
     call initOlap(olap_sec, inp, epc%nqpts, inp%NBASIS)
     call epcToOlapSec(inp, epc, olap_sec)
-
-    call mpi_split_bas(inp)
 
     write(*,*) "Mapping k & k' points with q point."
     call kqMatchSec(inp, epc, olap_sec)
@@ -79,7 +79,7 @@ module epcoup
     write(*,*) "Calculating e-ph couplings."
     if (inp%LARGEBS) then
       call calcEPC(olap_sec, inp)
-      call writeTXT_LBS(olap_sec)
+      ! call writeTXT_LBS(olap_sec)
       ! call writeTXT_LBS_Mode(olap_sec)
       ! call writeKKQMap(olap_sec)
     else
@@ -134,8 +134,9 @@ module epcoup
     type(overlap), intent(inout) :: olap
     type(namdInfo), intent(in) :: inp
     integer, intent(in) :: nq, nb
-    integer :: nmodes, nsw
+    integer :: nb_p, nmodes, nsw
 
+    nb_p = inp%NBASIS_P
     nmodes = inp%NMODES
     nsw = inp%NSW
 
@@ -148,7 +149,7 @@ module epcoup
     olap%NQ = nq
 
     allocate(olap%Eig(nb, nsw-1))
-    allocate(olap%gij(nb, nb, nmodes))
+    allocate(olap%gij(nb_p, nb, nmodes))
     allocate(olap%Phfreq(nq, nmodes))
     allocate(olap%PhQ(nq, nmodes, 2, nsw-1))
     allocate(olap%kkqmap(nb,nb))
@@ -733,7 +734,7 @@ module epcoup
         do jk=1, nk_tot
           do jb=1,nb
 
-            jbas = inp%BASSEL(jk,jb)
+            jbas = inp%BASSEL_P(jk,jb)
             if (jbas==-1) cycle
             iq = olap_sec%kkqmap(jbas, ibas)
             ! kpts[jk] = kpts[ik] + qpts[iq]
@@ -1343,12 +1344,16 @@ module epcoup
 
     type(overlap), intent(inout) :: olap
     type(namdInfo), intent(in) :: inp
-    integer :: nb, nm
+
+    integer :: rank, ierr
+    integer :: ist, iend
+    integer :: nb, nb_p, nm
     integer :: ib, jb, im, iq
     real(kind=q) :: dE, dE1, dE2
     real(kind=q) :: kbT, sigma, T0
     complex(kind=q) :: idwt
 
+    nb_p = inp%NBASIS_P
     nb  = olap%NBANDS
     nm  = olap%NMODES
     ! kbT = inp%TEMP * BOLKEV
@@ -1363,10 +1368,14 @@ module epcoup
       sigma = inp%SIGMA
     end if
 
-    allocate(olap%EPcoup(nb, nb, nm, 2, 1))
+    allocate(olap%EPcoup(nb_p, nb, nm, 2, 1))
     olap%EPcoup = cero
 
-    do ib=1,nb
+    CALL MPI_COMM_RANK(MPI_COMM_WORLD, rank, ierr)
+    ist = inp%ISTS(rank+1)
+    iend = inp%IENDS(rank+1)
+
+    do ib=ist, iend
      do jb=1,nb
 
        dE = olap%Eig(ib,1) - olap%Eig(jb,1)
@@ -1374,14 +1383,14 @@ module epcoup
        if (iq<0) cycle
 
        do im=1,nm
-         if (jb==ib) olap%gij(ib,ib,im)= ABS(olap%gij(ib,ib,im))
-         if (jb>ib) olap%gij(jb,ib,im)= CONJG(olap%gij(ib,jb,im))
+         if (jb==ib) olap%gij(ib-ist+1,ib,im)= ABS(olap%gij(ib-ist+1,ib,im))
+         ! if (jb>ib) olap%gij(jb,ib,im)= CONJG(olap%gij(ib,jb,im))
          dE1 = dE - olap%Phfreq(iq,im) - 1.0E-8_q
-         olap%EPcoup(ib,jb,im,1,1) = olap%gij(ib,jb,im) ** 2 &
+         olap%EPcoup(ib-ist+1,jb,im,1,1) = olap%gij(ib-ist+1,jb,im) ** 2 &
            ! * (sin(dE1 * T0) / (dE1 * T0)) ** 2 * T0 ! * hbar / hbar
            * exp(-0.5 * (dE1/sigma)**2)
          dE2 = dE + olap%Phfreq(iq,im) + 1.0E-8_q
-         olap%EPcoup(ib,jb,im,2,1) = olap%gij(ib,jb,im) ** 2 &
+         olap%EPcoup(ib-ist+1,jb,im,2,1) = olap%gij(ib-ist+1,jb,im) ** 2 &
            ! * (sin(dE2 * T0) / (dE2 * T0)) ** 2 * T0
            * exp(-0.5 * (dE2/sigma)**2)
        end do ! im loop
@@ -1875,11 +1884,14 @@ module epcoup
 
     nbas = inp%NBASIS
     allocate(ists(nproc), iends(nproc))
+    allocate(inp%ISTS(nproc), inp%IENDS(nproc))
     CALL mpi_split_procs(nbas, nproc, ists, iends)
+    inp%ISTS = ists; inp%IENDS = iends
 
     ist = ists(rank+1)
     iend = iends(rank+1)
     nbas_p = iend - ist + 1
+    inp%NBASIS_P = nbas_p
     allocate(inp%BASLIST_P(nbas_p, 3))
 
     inp%BASSEL_P = -1

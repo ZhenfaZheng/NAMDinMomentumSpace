@@ -24,7 +24,7 @@ Program main
   integer :: ns
 
   write(*,*)
-  write(*,*) "Hefei-NAMD (epc version 2.1.2, May 31, 2023)"
+  write(*,*) "Hefei-NAMD (epc version 2.1.3, Jun 06, 2023)"
 
   call MPI_INIT(ierr)
   call MPI_COMM_RANK(MPI_COMM_WORLD, rank, ierr)
@@ -55,12 +55,12 @@ Program main
   ! write(*,*) "T_coup: ", fin - start
   call MPI_BARRIER(MPI_COMM_WORLD, ierr)
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-  if (rank==0) then
+  ! if (rank==0) then
   do ns=1, inp%NSAMPLE
     inp%NAMDTINI = inp%NAMDTINI_A(ns)
     inp%INIBAND  = inp%INIBAND_A(ns,:)
     inp%INIKPT  = inp%INIKPT_A(ns,:)
-    call printUserInp(inp)
+    if (rank==0) call printUserInp(inp)
     call system_clock(t1)
     if (inp%LCPROP .OR. ns==1) then
       ! initiate KS matrix
@@ -72,15 +72,15 @@ Program main
     if (inp%LSHP) then
       call runSH(ks, inp, olap_sec)
     ! call runSHotf(ks, inp, olap_sec)
-      call printSH(ks, inp)
+      if (rank==0) call printSH(ks, inp)
       ! if (inp%LEPC) call phQ2R(inp, olap_sec, epc, ks%ph_pops)
       ! if (inp%LEPC) call saveXDAT(inp, olap_sec, epc)
-      if (inp%LEPC) call printPHPROP(ks, inp, olap_sec, ns)
+      ! if (inp%LEPC) call printPHPROP(ks, inp, olap_sec, ns)
     end if
     call system_clock(t2)
     write(*,'(A, F10.2)') "CPU Time [s]:", (t2-t1)/real(rate)
   end do
-  end if
+  ! end if
 
   call MPI_FINALIZE(ierr)
 

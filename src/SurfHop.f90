@@ -3,6 +3,7 @@ module shop
   use fileio
   use hamil
   use couplings
+  use epcoup
   implicit none
 
   contains
@@ -18,10 +19,28 @@ module shop
     integer, allocatable :: cstat_all(:,:), occb(:,:), occbtot(:)
     integer :: cstat, nstat
 
+    real, allocatable :: sh_prop_p(:,:), sh_prop_all(:,:), sh_pops_p(:)
+    integer, allocatable :: ists_tj(:), iends_tj(:)
+    integer :: rank, nproc, ierr
+    integer :: ist, iend, nbas_p
+
     ks%sh_pops = 0
     ks%sh_prop = 0
     nbas = ks%ndim
     Nt = inp%NAMDTIME / inp%POTIM
+
+    CALL MPI_COMM_RANK(MPI_COMM_WORLD, rank, ierr)
+    CALL MPI_COMM_SIZE(MPI_COMM_WORLD, nproc, ierr)
+    ist = inp%ISTS(rank+1)
+    iend = inp%IENDS(rank+1)
+    nbas_p = inp%NBASIS_P
+
+    allocate(ists_tj(nproc), iends_tj(nproc))
+    CALL mpi_split_procs(inp%NTRAJ, nproc, ists_tj, iends_tj)
+
+    allocate(sh_prop_p(nbas_p, nbas))
+    allocate(sh_prop_all(nbas, nbas))
+    allocate(sh_pops_p(nbas))
 
     allocate(cstat_all(inp%NTRAJ, inp%NINIBS))
     allocate(occb(inp%NTRAJ, inp%NBASIS))
@@ -47,12 +66,20 @@ module shop
 
       do tion=1, Nt
 
-        do ibas=1,nbas
+        do ibas=ist,iend
           if (occbtot(ibas)==0) cycle
-          call calcprop_EPC(tion, ibas, ks, inp, olap)
+          call calcprop_EPC_mpi(tion, ibas, ks, inp, olap, sh_prop_p)
         end do
+        call MPI_BARRIER(MPI_COMM_WORLD, ierr)
+        CALL MPI_ALLgather(sh_prop_p, nbas_p, MPI_REAL, &
+                           sh_prop_all,   nbas_p, MPI_REAL, &
+                           MPI_COMM_WORLD, ierr)
+        ks%sh_prop = sh_prop_all
 
-        do i=1, inp%NTRAJ
+        sh_pops_p = 0
+
+        ! do i=1, inp%NTRAJ
+        do i=ists_tj(rank+1), iends_tj(rank+1)
           do j=1, inp%NINIBS
 
             cstat = cstat_all(i,j)
@@ -61,7 +88,8 @@ module shop
             if (nstat /= cstat .AND. occb(i,nstat)>0) cycle
             occb(i,cstat) = 0; occb(i,nstat) = 1
             occbtot(cstat) = 0; occbtot(nstat) = 1
-            ks%sh_pops(nstat, tion) = ks%sh_pops(nstat, tion) + 1
+            ! ks%sh_pops(nstat, tion) = ks%sh_pops(nstat, tion) + 1
+            sh_pops_p(nstat) = sh_pops_p(nstat) + 1
             cstat_all(i,j) = nstat
 
             if (nstat == cstat) cycle
@@ -74,6 +102,10 @@ module shop
 
           end do
         end do
+
+        call MPI_BARRIER(MPI_COMM_WORLD, ierr)
+        call MPI_Reduce(sh_pops_p, ks%sh_pops(:,tion), nbas, MPI_INTEGER, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
+
 
       end do
       ks%sh_pops = ks%sh_pops / inp%NTRAJ
@@ -209,6 +241,42 @@ module shop
     forall (i=1:ks%ndim, ks%sh_prop(cstat,i) < 0) ks%sh_prop(cstat,i) = 0
 
   end subroutine
+
+
+  subroutine calcprop_EPC_mpi(tion, cstat, ks, inp, olap, sh_prop_p)
+    implicit none
+
+    type(TDKS), intent(inout) :: ks
+    type(namdInfo), intent(in) :: inp
+    integer, intent(in) :: tion
+    integer, intent(in) :: cstat
+    type(overlap), intent(in) :: olap
+    real, intent(inout) :: sh_prop_p(:,:)
+
+    real(kind=q) :: Akk, norm
+    complex(kind=q), allocatable :: epcoup(:) ! , eptemp(:,:)
+    integer :: i, iq
+    integer :: rank, ierr
+    integer :: ist
+
+    CALL MPI_COMM_RANK(MPI_COMM_WORLD, rank, ierr)
+    ist = inp%ISTS(rank+1)
+
+    allocate(epcoup(ks%ndim))
+    do i=1,ks%ndim
+      iq = olap%kkqmap(cstat, i)
+      epcoup(i) = SUM(olap%EPcoup(cstat-ist+1,i,:,:,1) * (ks%PhQ(iq,:,:,tion) ** 2))
+    end do
+
+    Akk = CONJG(ks%psi_a(cstat, tion)) * ks%psi_a(cstat, tion)
+    ks%Bkm = -2. / hbar * AIMAG( CONJG(ks%psi_a(cstat, tion)) * &
+             ks%psi_a(:, tion) * epcoup(:) )
+
+    sh_prop_p(cstat-ist+1,:) = ks%Bkm / Akk * inp%POTIM * ks%sh_Bfactor(cstat,:)
+    forall (i=1:ks%ndim, sh_prop_p(cstat-ist+1,i) < 0) sh_prop_p(cstat-ist+1,i) = 0
+
+  end subroutine
+
 
   ! Calculate Boltzmann factors for SH probability correction.
   subroutine calcBfactor(ks, inp, cstat, tion)

@@ -7,6 +7,7 @@ module fileio
     integer :: BMIN
     integer :: BMAX
     integer :: NBASIS      ! No. of adiabatic states as basis
+    integer :: NBASIS_P    ! No. of adiabatic states as basis for mpi proc
     integer :: NBANDS      ! No. of band of the system
     integer :: NINIBS      ! No. of inititial basises
     integer :: NSW         ! No. of MD steps
@@ -66,6 +67,7 @@ module fileio
     ! BMIN ~ BMAX and KMIN ~ KMAX.
     integer, allocatable, dimension(:,:) :: BASSEL_P, BASLIST_P
     ! basises for different MPI processes.
+    integer, allocatable, dimension(:) :: ISTS, IENDS
 
     real(kind=q) :: EMIN, EMAX
     real(kind=q) :: SIGMA    ! the width of energy conservation in eV.
@@ -271,6 +273,7 @@ module fileio
       inp%BMIN     = bmin
       inp%BMAX     = bmax
       inp%NBASIS   = bmax - bmin + 1
+      inp%NBASIS_P = bmax - bmin + 1
       inp%NSW      = nsw
       inp%NBANDS   = nbands
       inp%NINIBS   = ninibs

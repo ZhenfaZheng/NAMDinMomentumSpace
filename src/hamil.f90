@@ -60,10 +60,13 @@ module hamil
     real(kind=q), allocatable, dimension(:,:) :: eptemp
     integer :: i, j, ib, iq, im, t, nsteps, N, Nt, nmodes, nqs
     integer :: initstep
+    integer :: rank, ierr
+    integer :: ist, iend, N_p
 
     ! memory allocation
 
     N = inp%NBASIS
+    N_p = inp%NBASIS_P
     ks%ndim = inp%NBASIS
     Nt = inp%NAMDTIME / inp%POTIM
 
@@ -71,14 +74,14 @@ module hamil
       allocate(ks%psi_c(N))
       allocate(ks%psi_p(N))
       allocate(ks%psi_n(N))
-      allocate(ks%hpsi(N))
+      allocate(ks%hpsi(N_p))
       allocate(ks%psi_a(N, Nt))
       allocate(ks%pop_a(N, Nt))
       allocate(ks%norm(Nt))
 
-      allocate(ks%ham_c(N,N))
-      allocate(ks%ham_p(N,N))
-      allocate(ks%ham_n(N,N))
+      allocate(ks%ham_c(N_p,N))
+      allocate(ks%ham_p(N_p,N))
+      allocate(ks%ham_n(N_p,N))
 
       allocate(ks%eigKs(N, Nt))
 
@@ -101,11 +104,16 @@ module hamil
 
         ks%ph_pops = 0.0; ks%ph_prop = 0.0
         allocate(eptemp(nmodes, 2))
-        do i=1,N
+
+        CALL MPI_COMM_RANK(MPI_COMM_WORLD, rank, ierr)
+        ist = inp%ISTS(rank+1)
+        iend = inp%IENDS(rank+1)
+
+        do i=ist, iend
           do j=1,N
             iq = olap%kkqmap(i,j)
             ! eptemp = ABS(olap%EPcoup(i,j,:,:,1) * olap%PhQ(iq,:,:,1)) ** 2
-            eptemp = ABS(olap%EPcoup(i,j,:,:,1) * (olap%PhQ(iq,:,:,1) ** 2))
+            eptemp = ABS(olap%EPcoup(i-ist+1,j,:,:,1) * (olap%PhQ(iq,:,:,1) ** 2))
             norm = SUM(eptemp)
             if (norm>0) then
             ! ks%ph_prop(i,j,:) = (eptemp(:,2) - eptemp(:,1)) / norm
@@ -226,16 +234,24 @@ module hamil
     type(overlap), intent(in) :: olap
 
     integer :: ib, jb, iq
+    integer :: rank, ierr
+    integer :: ist, iend
+
+    CALL MPI_COMM_RANK(MPI_COMM_WORLD, rank, ierr)
+    ist = inp%ISTS(rank+1)
+    iend = inp%IENDS(rank+1)
 
     ks%ham_p = ks%ham_n
-    do ib=1,ks%ndim
-      do jb=ib,ks%ndim
+    do ib=ist, iend
+      ! do jb=ib,ks%ndim
+      do jb=1,ks%ndim
         iq = olap%kkqmap(ib,jb)
-        ks%ham_n(ib,jb) = SUM( olap%gij(ib,jb,:) * &
+        if (iq<0) cycle
+        ks%ham_n(ib-ist+1,jb) = SUM( olap%gij(ib-ist+1,jb,:) * &
             SUM(ks%PhQ(iq,:,:,tion), dim=2) )
-        ks%ham_n(jb,ib) = CONJG(ks%ham_n(ib,jb))
+        ! ks%ham_n(jb,ib) = CONJG(ks%ham_n(ib,jb))
       end do
-      ks%ham_n(ib,ib) = ks%ham_n(ib,ib) + ks%eigKs(ib,1)
+      ks%ham_n(ib-ist+1,ib) = ks%ham_n(ib-ist+1,ib) + ks%eigKs(ib,1)
     end do
 
   end subroutine
