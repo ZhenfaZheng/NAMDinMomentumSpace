@@ -65,6 +65,7 @@ module epcoup
     call kqMatchSec(inp, epc, olap_sec)
     write(*,*) "Reading e-ph matrix elements."
     call readEPHmatSec(inp, epc, olap_sec)
+    call HemitGij(inp, olap_sec)
 
     if (inp%EPCTYPE==1) then
       write(*,*) "Calculating TD phonon normal modes."
@@ -665,6 +666,7 @@ module epcoup
 
     integer :: hdferror
     integer :: nq, nb, nm
+    integer :: jrank, jst, ierr
     integer :: ipart, kst, kend, nk, nk_tot
     integer :: ib, jb, ik, jk, im, iq, it, ibas, jbas
     integer(hid_t) :: file_id, gr_id, dset_id
@@ -706,6 +708,9 @@ module epcoup
     allocate(eptemp_r(nb, nb, nm, nq))
     allocate(eptemp_i(nb, nb, nm, nq))
 
+    call MPI_COMM_RANK(MPI_COMM_WORLD, jrank, ierr)
+    jst = inp%ISTS(jrank+1)
+
     do ik=kst, kend
 
       if ( SUM(inp%BASSEL(ik,:)) == -nb ) cycle
@@ -742,7 +747,7 @@ module epcoup
 
             do im=1,nm
               if (olap_sec%Phfreq(iq,im)<inp%PHCUT) cycle
-              olap_sec%gij(jbas, ibas, im) = eptemp(jb, ib, im, iq)
+              olap_sec%gij(jbas-jst+1, ibas, im) = eptemp(jb, ib, im, iq)
               ! ibas ~ initial state; jbas ~ final state
               ! gij(jbas, ibas, im) = < psi_{jb,jk} | d_{iq,im} V | psi_{ib,ik} >
               ! kpts[jk] = kpts[ik] + qpts[iq]
@@ -758,6 +763,106 @@ module epcoup
     call h5gclose_f(gr_id, hdferror)
 
     call h5fclose_f(file_id, hdferror)
+
+  end subroutine
+
+
+  subroutine HemitGij(inp, olap)
+    implicit none
+
+    type(namdInfo), intent(in) :: inp
+    type(overlap), intent(inout) :: olap
+
+    integer :: crank, irank, jrank, xrank, yrank, nrank, ierr, tag
+    integer :: ist, iend, jst, jend, xst, xend, yst, yend
+    integer :: ibas, jbas, nbas, nbas_p, im, nmodes
+    complex(kind=q), allocatable :: gtemp(:,:), gtemp2(:,:), gij(:), gji(:), gabs(:), theta(:)
+
+    nbas = inp%NBASIS
+    nbas_p = inp%NBASIS_P
+    nmodes = olap%NMODES
+    allocate(gij(nmodes), gji(nmodes))
+    allocate(gtemp(nbas, nmodes))
+    allocate(gtemp2(nbas, nmodes))
+
+    call MPI_COMM_RANK(MPI_COMM_WORLD, irank, ierr)
+    call MPI_COMM_SIZE(MPI_COMM_WORLD, nrank, ierr)
+
+    do jrank = 0, nrank-1
+
+      jst = inp%ISTS(jrank+1)
+      jend = inp%IENDS(jrank+1)
+
+      do jbas = jst, jend
+
+        if (irank == jrank) then
+          gtemp = olap%gij(jbas-jst+1, :, :)
+        end if
+
+        do im=1,nmodes
+          call MPI_Bcast(gtemp(:,im), nbas, MPI_DOUBLE_COMPLEX, jrank, MPI_COMM_WORLD, ierr)
+        end do
+        call MPI_BARRIER(MPI_COMM_WORLD, ierr)
+
+        ist = inp%ISTS(irank+1)
+        iend = inp%IENDS(irank+1)
+
+        do ibas = ist, iend
+          if (ibas<jbas) cycle
+          gji = gtemp(ibas, :)
+          gij = olap%gij(ibas-ist+1, jbas, :)
+          ! here hermit gij and gji
+          if (ibas == jbas) then
+            gij = ABS(gij); gji = ABS(gij)
+          else
+            gji = CONJG(gij)
+          end if
+          olap%gij(ibas-ist+1, jbas, :) = gij
+          gtemp(ibas,:) = gji
+          print *, 'current at', irank, 'ij is', ibas, jbas, 'gij', gij(5)
+        end do
+
+        call MPI_BARRIER(MPI_COMM_WORLD, ierr)
+
+        do im=1,nmodes
+          if ((jrank+1) > (nrank-1)) cycle
+          do xrank = jrank+1, nrank-1
+            if (irank == xrank) then
+              tag = xrank
+              call MPI_SEND(gtemp(ist:iend, im), nbas_p, MPI_DOUBLE_COMPLEX, &
+                            jrank, tag, MPI_COMM_WORLD, ierr)
+              ! print *, 'Send', xrank, 'to', jrank
+            else if (irank == jrank) then
+              tag = xrank
+              xst = inp%ISTS(xrank+1)
+              xend = inp%IENDS(xrank+1)
+              call MPI_RECV(gtemp(xst:xend, im), xend-xst+1, MPI_DOUBLE_COMPLEX, &
+                            xrank, tag, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
+              ! print *, 'Recv', irank, 'from', xrank
+            end if
+            call MPI_BARRIER(MPI_COMM_WORLD, ierr)
+          end do
+        end do
+
+        ! do im=1,nmodes
+        !   call MPI_Gather(gtemp(ist:iend, im), nbas_p, MPI_DOUBLE_COMPLEX, &
+        !                 gtemp2(1:nbas,im), nbas_p, MPI_DOUBLE_COMPLEX, 0, &
+        !                 MPI_COMM_WORLD, ierr)
+        ! end do
+        !   if (irank == 0) then
+        !       print *, jbas, gtemp2(:, 5)
+        !   end if
+        ! call MPI_BARRIER(MPI_COMM_WORLD, ierr)
+        if (irank==jrank) then
+          olap%gij(jbas-jst+1,jbas:nbas, :) = gtemp(jbas:nbas, :)
+          print *, 'current at', irank, 'jbas is', jbas
+          print *, 'gji', olap%gij(jbas-jst+1, :, 5)
+        end if
+
+      end do
+
+    end do
+
 
   end subroutine
 
@@ -1345,7 +1450,7 @@ module epcoup
     type(overlap), intent(inout) :: olap
     type(namdInfo), intent(in) :: inp
 
-    integer :: rank, ierr
+    integer :: irank, ierr
     integer :: ist, iend
     integer :: nb, nb_p, nm
     integer :: ib, jb, im, iq
@@ -1371,9 +1476,9 @@ module epcoup
     allocate(olap%EPcoup(nb_p, nb, nm, 2, 1))
     olap%EPcoup = cero
 
-    CALL MPI_COMM_RANK(MPI_COMM_WORLD, rank, ierr)
-    ist = inp%ISTS(rank+1)
-    iend = inp%IENDS(rank+1)
+    CALL MPI_COMM_RANK(MPI_COMM_WORLD, irank, ierr)
+    ist = inp%ISTS(irank+1)
+    iend = inp%IENDS(irank+1)
 
     do ib=ist, iend
      do jb=1,nb
@@ -1874,22 +1979,22 @@ module epcoup
     implicit none
     type(namdInfo), intent(inout) :: inp
 
-    integer :: rank, nproc, ierr
+    integer :: irank, nrank, ierr
     integer :: ik, ib, ibas, nbas, nbas_p
     integer, allocatable :: ists(:), iends(:)
     integer :: ist, iend ! local start and end index
 
-    CALL MPI_COMM_RANK(MPI_COMM_WORLD, rank, ierr)
-    CALL MPI_COMM_SIZE(MPI_COMM_WORLD, nproc, ierr)
+    CALL MPI_COMM_RANK(MPI_COMM_WORLD, irank, ierr)
+    CALL MPI_COMM_SIZE(MPI_COMM_WORLD, nrank, ierr)
 
     nbas = inp%NBASIS
-    allocate(ists(nproc), iends(nproc))
-    allocate(inp%ISTS(nproc), inp%IENDS(nproc))
-    CALL mpi_split_procs(nbas, nproc, ists, iends)
+    allocate(ists(nrank), iends(nrank))
+    allocate(inp%ISTS(nrank), inp%IENDS(nrank))
+    CALL mpi_split_procs(nbas, nrank, ists, iends)
     inp%ISTS = ists; inp%IENDS = iends
 
-    ist = ists(rank+1)
-    iend = iends(rank+1)
+    ist = ists(irank+1)
+    iend = iends(irank+1)
     nbas_p = iend - ist + 1
     inp%NBASIS_P = nbas_p
     allocate(inp%BASLIST_P(nbas_p, 3))
@@ -1899,25 +2004,25 @@ module epcoup
     do ibas = ist, iend
       ik = inp%BASLIST(ibas, 1)
       ib = inp%BASLIST(ibas, 2)
-      inp%BASSEL_P(ik, ib) = ibas - ist + 1
+      inp%BASSEL_P(ik, ib) = ibas
     end do
 
   end subroutine
 
 
-  subroutine mpi_split_procs(num, nproc, ists, iends)
+  subroutine mpi_split_procs(num, nrank, ists, iends)
 
     implicit none
-    integer, intent(in) :: num, nproc
-    integer, intent(out) :: ists(nproc), iends(nproc)
+    integer, intent(in) :: num, nrank
+    integer, intent(out) :: ists(nrank), iends(nrank)
 
     integer :: base, rest
     integer :: i
 
-    base = num / nproc
-    rest = MOD(num, nproc)
+    base = num / nrank
+    rest = MOD(num, nrank)
 
-    do i = 1, nproc
+    do i = 1, nrank
       if(i <= rest) then
          ists(i) = (i - 1) * (base + 1) + 1
          iends(i) = ists(i) + base

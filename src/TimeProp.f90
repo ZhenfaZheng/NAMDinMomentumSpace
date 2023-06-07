@@ -17,14 +17,14 @@ module TimeProp
     integer :: i, j
     real(kind=q) :: edt
     real(kind=q) :: start, fin
-    integer :: rank, ierr
+    integer :: irank, ierr
     integer :: ist, iend, nbas, nbas_p
 
     complex(kind=8), allocatable, dimension(:) :: psi_n_local, psi_n_all
 
-    CALL MPI_COMM_RANK(MPI_COMM_WORLD, rank, ierr)
-    ist = inp%ISTS(rank+1)
-    iend = inp%IENDS(rank+1)
+    CALL MPI_COMM_RANK(MPI_COMM_WORLD, irank, ierr)
+    ist = inp%ISTS(irank+1)
+    iend = inp%IENDS(irank+1)
 
     nbas   = inp%NBASIS
     nbas_p = inp%NBASIS_P

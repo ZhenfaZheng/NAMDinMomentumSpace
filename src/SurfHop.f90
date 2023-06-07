@@ -21,7 +21,7 @@ module shop
 
     real, allocatable :: sh_prop_p(:,:), sh_prop_all(:,:), sh_pops_p(:)
     integer, allocatable :: ists_tj(:), iends_tj(:)
-    integer :: rank, nproc, ierr
+    integer :: irank, nrank, ierr
     integer :: ist, iend, nbas_p
 
     ks%sh_pops = 0
@@ -29,14 +29,14 @@ module shop
     nbas = ks%ndim
     Nt = inp%NAMDTIME / inp%POTIM
 
-    CALL MPI_COMM_RANK(MPI_COMM_WORLD, rank, ierr)
-    CALL MPI_COMM_SIZE(MPI_COMM_WORLD, nproc, ierr)
-    ist = inp%ISTS(rank+1)
-    iend = inp%IENDS(rank+1)
+    CALL MPI_COMM_RANK(MPI_COMM_WORLD, irank, ierr)
+    CALL MPI_COMM_SIZE(MPI_COMM_WORLD, nrank, ierr)
+    ist = inp%ISTS(irank+1)
+    iend = inp%IENDS(irank+1)
     nbas_p = inp%NBASIS_P
 
-    allocate(ists_tj(nproc), iends_tj(nproc))
-    CALL mpi_split_procs(inp%NTRAJ, nproc, ists_tj, iends_tj)
+    allocate(ists_tj(nrank), iends_tj(nrank))
+    CALL mpi_split_procs(inp%NTRAJ, nrank, ists_tj, iends_tj)
 
     allocate(sh_prop_p(nbas_p, nbas))
     allocate(sh_prop_all(nbas, nbas))
@@ -79,7 +79,7 @@ module shop
         sh_pops_p = 0
 
         ! do i=1, inp%NTRAJ
-        do i=ists_tj(rank+1), iends_tj(rank+1)
+        do i=ists_tj(irank+1), iends_tj(irank+1)
           do j=1, inp%NINIBS
 
             cstat = cstat_all(i,j)
@@ -256,11 +256,11 @@ module shop
     real(kind=q) :: Akk, norm
     complex(kind=q), allocatable :: epcoup(:) ! , eptemp(:,:)
     integer :: i, iq
-    integer :: rank, ierr
+    integer :: irank, ierr
     integer :: ist
 
-    CALL MPI_COMM_RANK(MPI_COMM_WORLD, rank, ierr)
-    ist = inp%ISTS(rank+1)
+    CALL MPI_COMM_RANK(MPI_COMM_WORLD, irank, ierr)
+    ist = inp%ISTS(irank+1)
 
     allocate(epcoup(ks%ndim))
     do i=1,ks%ndim

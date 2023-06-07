@@ -60,7 +60,7 @@ module hamil
     real(kind=q), allocatable, dimension(:,:) :: eptemp
     integer :: i, j, ib, iq, im, t, nsteps, N, Nt, nmodes, nqs
     integer :: initstep
-    integer :: rank, ierr
+    integer :: irank, ierr
     integer :: ist, iend, N_p
 
     ! memory allocation
@@ -105,9 +105,9 @@ module hamil
         ks%ph_pops = 0.0; ks%ph_prop = 0.0
         allocate(eptemp(nmodes, 2))
 
-        CALL MPI_COMM_RANK(MPI_COMM_WORLD, rank, ierr)
-        ist = inp%ISTS(rank+1)
-        iend = inp%IENDS(rank+1)
+        CALL MPI_COMM_RANK(MPI_COMM_WORLD, irank, ierr)
+        ist = inp%ISTS(irank+1)
+        iend = inp%IENDS(irank+1)
 
         do i=ist, iend
           do j=1,N
@@ -234,12 +234,12 @@ module hamil
     type(overlap), intent(in) :: olap
 
     integer :: ib, jb, iq
-    integer :: rank, ierr
+    integer :: irank, ierr
     integer :: ist, iend
 
-    CALL MPI_COMM_RANK(MPI_COMM_WORLD, rank, ierr)
-    ist = inp%ISTS(rank+1)
-    iend = inp%IENDS(rank+1)
+    CALL MPI_COMM_RANK(MPI_COMM_WORLD, irank, ierr)
+    ist = inp%ISTS(irank+1)
+    iend = inp%IENDS(irank+1)
 
     ks%ham_p = ks%ham_n
     do ib=ist, iend
