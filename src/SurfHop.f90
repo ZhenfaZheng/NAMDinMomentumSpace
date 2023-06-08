@@ -19,7 +19,8 @@ module shop
     integer, allocatable :: cstat_all(:,:), occb(:,:), occbtot(:)
     integer :: cstat, nstat
 
-    real, allocatable :: sh_prop_p(:,:), sh_prop_all(:,:), sh_pops_p(:)
+    real(kind=q), allocatable :: sh_prop_p(:,:)
+    real(kind=q), allocatable :: sh_pops_p(:)
     integer, allocatable :: ists_tj(:), iends_tj(:)
     integer :: irank, nrank, ierr
     integer :: ist, iend, nbas_p
@@ -39,7 +40,6 @@ module shop
     CALL mpi_split_procs(inp%NTRAJ, nrank, ists_tj, iends_tj)
 
     allocate(sh_prop_p(nbas_p, nbas))
-    allocate(sh_prop_all(nbas, nbas))
     allocate(sh_pops_p(nbas))
 
     allocate(cstat_all(inp%NTRAJ, inp%NINIBS))
@@ -71,10 +71,9 @@ module shop
           call calcprop_EPC_mpi(tion, ibas, ks, inp, olap, sh_prop_p)
         end do
         call MPI_BARRIER(MPI_COMM_WORLD, ierr)
-        CALL MPI_ALLgather(sh_prop_p, nbas_p, MPI_REAL, &
-                           sh_prop_all,   nbas_p, MPI_REAL, &
+        CALL MPI_ALLgather(sh_prop_p, nbas_p, MPI_DOUBLE_PRECISION, &
+                           ks%sh_prop,   nbas_p, MPI_DOUBLE_PRECISION, &
                            MPI_COMM_WORLD, ierr)
-        ks%sh_prop = sh_prop_all
 
         sh_pops_p = 0
 
@@ -104,8 +103,8 @@ module shop
         end do
 
         call MPI_BARRIER(MPI_COMM_WORLD, ierr)
-        call MPI_Reduce(sh_pops_p, ks%sh_pops(:,tion), nbas, MPI_INTEGER, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
-
+        call MPI_Reduce(sh_pops_p, ks%sh_pops(:,tion), nbas, &
+                 MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
 
       end do
       ks%sh_pops = ks%sh_pops / inp%NTRAJ
@@ -251,7 +250,7 @@ module shop
     integer, intent(in) :: tion
     integer, intent(in) :: cstat
     type(overlap), intent(in) :: olap
-    real, intent(inout) :: sh_prop_p(:,:)
+    real(kind=q), intent(inout) :: sh_prop_p(:,:)
 
     real(kind=q) :: Akk, norm
     complex(kind=q), allocatable :: epcoup(:) ! , eptemp(:,:)

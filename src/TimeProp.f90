@@ -20,7 +20,7 @@ module TimeProp
     integer :: irank, ierr
     integer :: ist, iend, nbas, nbas_p
 
-    complex(kind=8), allocatable, dimension(:) :: psi_n_local, psi_n_all
+    complex(kind=q), allocatable :: psi_n_local(:)
 
     CALL MPI_COMM_RANK(MPI_COMM_WORLD, irank, ierr)
     ist = inp%ISTS(irank+1)
@@ -28,7 +28,6 @@ module TimeProp
 
     nbas   = inp%NBASIS
     nbas_p = inp%NBASIS_P
-    allocate(psi_n_all(nbas))
     allocate(psi_n_local(nbas_p))
 
     Nt = inp%NAMDTIME / inp%POTIM
@@ -68,9 +67,8 @@ module TimeProp
         end if
         call MPI_BARRIER(MPI_COMM_WORLD, ierr)
         CALL MPI_ALLgather(psi_n_local, nbas_p, MPI_DOUBLE_COMPLEX, &
-                           psi_n_all,   nbas_p, MPI_DOUBLE_COMPLEX, &
+                           ks%psi_n,   nbas_p, MPI_DOUBLE_COMPLEX, &
                            MPI_COMM_WORLD, ierr)
-        ks%psi_n = psi_n_all
         ks%psi_p = ks%psi_c
         ks%psi_c = ks%psi_n
       end do

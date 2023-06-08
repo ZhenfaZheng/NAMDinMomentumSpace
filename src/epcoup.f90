@@ -819,7 +819,7 @@ module epcoup
           end if
           olap%gij(ibas-ist+1, jbas, :) = gij
           gtemp(ibas,:) = gji
-          print *, 'current at', irank, 'ij is', ibas, jbas, 'gij', gij(5)
+          ! print *, 'current at', irank, 'ij is', ibas, jbas, 'gij', gij(5)
         end do
 
         call MPI_BARRIER(MPI_COMM_WORLD, ierr)
@@ -831,32 +831,21 @@ module epcoup
               tag = xrank
               call MPI_SEND(gtemp(ist:iend, im), nbas_p, MPI_DOUBLE_COMPLEX, &
                             jrank, tag, MPI_COMM_WORLD, ierr)
-              ! print *, 'Send', xrank, 'to', jrank
             else if (irank == jrank) then
               tag = xrank
               xst = inp%ISTS(xrank+1)
               xend = inp%IENDS(xrank+1)
               call MPI_RECV(gtemp(xst:xend, im), xend-xst+1, MPI_DOUBLE_COMPLEX, &
                             xrank, tag, MPI_COMM_WORLD, MPI_STATUS_IGNORE, ierr)
-              ! print *, 'Recv', irank, 'from', xrank
             end if
             call MPI_BARRIER(MPI_COMM_WORLD, ierr)
           end do
         end do
 
-        ! do im=1,nmodes
-        !   call MPI_Gather(gtemp(ist:iend, im), nbas_p, MPI_DOUBLE_COMPLEX, &
-        !                 gtemp2(1:nbas,im), nbas_p, MPI_DOUBLE_COMPLEX, 0, &
-        !                 MPI_COMM_WORLD, ierr)
-        ! end do
-        !   if (irank == 0) then
-        !       print *, jbas, gtemp2(:, 5)
-        !   end if
-        ! call MPI_BARRIER(MPI_COMM_WORLD, ierr)
         if (irank==jrank) then
           olap%gij(jbas-jst+1,jbas:nbas, :) = gtemp(jbas:nbas, :)
-          print *, 'current at', irank, 'jbas is', jbas
-          print *, 'gji', olap%gij(jbas-jst+1, :, 5)
+          ! print *, 'current at', irank, 'jbas is', jbas
+          ! print *, 'gji', olap%gij(jbas-jst+1, :, 5)
         end if
 
       end do

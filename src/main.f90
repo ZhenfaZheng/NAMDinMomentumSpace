@@ -24,7 +24,7 @@ Program main
   integer :: ns
 
   write(*,*)
-  write(*,*) "Hefei-NAMD (epc version 2.1.3, Jun 06, 2023)"
+  write(*,*) "Hefei-NAMD (epc version 2.1.5, Jun 09, 2023)"
 
   call MPI_INIT(ierr)
   call MPI_COMM_RANK(MPI_COMM_WORLD, irank, ierr)
