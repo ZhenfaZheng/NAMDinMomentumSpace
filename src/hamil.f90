@@ -29,6 +29,7 @@ module hamil
     complex(kind=q), allocatable, dimension(:,:,:) :: NAcoup
 
     complex(kind=q), allocatable, dimension(:,:,:) :: EPcoup
+    complex(kind=q), allocatable, dimension(:,:,:) :: PhQtemp
     complex(kind=q), allocatable, dimension(:,:,:,:) :: PhQ
 
     ! surface hopping related
@@ -49,12 +50,13 @@ module hamil
 
   contains
 
-  subroutine initTDKS(ks, inp, olap)
+  subroutine initTDKS(ks, inp, olap, epc)
     implicit none
 
     type(TDKS), intent(inout)  :: ks
     type(overlap), intent(in)  :: olap
     type(namdInfo), intent(in) :: inp
+    type(epCoupling), intent(in)  :: epc
 
     real(kind=q) :: norm
     real(kind=q), allocatable, dimension(:,:) :: eptemp
@@ -98,7 +100,8 @@ module hamil
       else
 
         nqs = olap%NQ; nmodes = olap%NMODES
-        allocate(ks%PhQ(nqs, nmodes, 2, Nt))
+        allocate(ks%PhQtemp(nqs, nmodes, 2))
+        ! allocate(ks%PhQ(nqs, nmodes, 2, Nt))
         allocate(ks%ph_pops(nqs, nmodes, Nt))
         allocate(ks%ph_prop(N, N, nmodes, 2))
 
@@ -112,8 +115,8 @@ module hamil
         do i=ist, iend
           do j=1,N
             iq = olap%kkqmap(i,j)
-            ! eptemp = ABS(olap%EPcoup(i,j,:,:,1) * olap%PhQ(iq,:,:,1)) ** 2
-            eptemp = ABS(olap%EPcoup(i-ist+1,j,:,:,1) * (olap%PhQ(iq,:,:,1) ** 2))
+            ! eptemp = ABS(olap%EPcoup(i,j,:,:,1) * epc%PhQ(iq,:,:)) ** 2
+            eptemp = ABS(olap%EPcoup(i-ist+1,j,:,:,1) * (epc%PhQ(iq,:,:) ** 2))
             norm = SUM(eptemp)
             if (norm>0) then
             ! ks%ph_prop(i,j,:) = (eptemp(:,2) - eptemp(:,1)) / norm
@@ -157,8 +160,8 @@ module hamil
       do t=1, Nt
         i = MOD(initstep+t, nsteps) + 1
         ks%eigKs(:,t) = olap%Eig(:,i)
-        ks%PhQ(:,:,:,t) = olap%PhQ(:,:,:,i)
       end do
+      ks%PhQtemp = epc%PhQ * (epc%eiwdt ** (initstep + 1))
 
     else
 
@@ -206,32 +209,34 @@ module hamil
   end subroutine
 
 
-  subroutine make_hamil_EPC(tion, tele, ks, inp, olap)
+  subroutine make_hamil_EPC(tion, tele, ks, inp, olap, epc)
     implicit none
 
     type(TDKS), intent(inout) :: ks
     type(namdInfo), intent(in) :: inp
     integer, intent(in) :: tion, tele
     type(overlap), intent(in) :: olap
+    type(epCoupling), intent(in) :: epc
 
     integer :: ib, jb, iq
     complex(kind=q), allocatable :: tempQ(:,:,:)
 
-    if (tion==1 .AND. tele==1) call calc_hamil_EPC(tion, ks, inp, olap)
-    if (tele==1) call calc_hamil_EPC(tion+1, ks, inp, olap)
+    if (tion==1 .AND. tele==1) call calc_hamil_EPC(tion, ks, inp, olap, epc)
+    if (tele==1) call calc_hamil_EPC(tion+1, ks, inp, olap, epc)
 
     ks%ham_c = ks%ham_p + (ks%ham_n - ks%ham_p) * TELE / inp%NELM
 
   end subroutine
 
 
-  subroutine calc_hamil_EPC(tion, ks, inp, olap)
+  subroutine calc_hamil_EPC(tion, ks, inp, olap, epc)
     implicit none
 
     type(TDKS), intent(inout) :: ks
     type(namdInfo), intent(in) :: inp
     integer, intent(in) :: TION
     type(overlap), intent(in) :: olap
+    type(epCoupling), intent(in) :: epc
 
     integer :: ib, jb, iq
     integer :: irank, ierr
@@ -241,6 +246,8 @@ module hamil
     ist = inp%ISTS(irank+1)
     iend = inp%IENDS(irank+1)
 
+    ks%PhQtemp = ks%PhQtemp * epc%eiwdt
+
     ks%ham_p = ks%ham_n
     do ib=ist, iend
       ! do jb=ib,ks%ndim
@@ -248,7 +255,7 @@ module hamil
         iq = olap%kkqmap(ib,jb)
         if (iq<0) cycle
         ks%ham_n(ib-ist+1,jb) = SUM( olap%gij(ib-ist+1,jb,:) * &
-            SUM(ks%PhQ(iq,:,:,tion), dim=2) )
+            SUM(ks%PhQtemp(iq,:,:), dim=2) )
         ! ks%ham_n(jb,ib) = CONJG(ks%ham_n(ib,jb))
       end do
       ks%ham_n(ib-ist+1,ib) = ks%ham_n(ib-ist+1,ib) + ks%eigKs(ib,1)

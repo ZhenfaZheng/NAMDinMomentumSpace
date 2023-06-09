@@ -24,7 +24,7 @@ Program main
   integer :: ns
 
   write(*,*)
-  write(*,*) "Hefei-NAMD (epc version 2.1.5, Jun 09, 2023)"
+  write(*,*) "Hefei-NAMD (epc version 2.1.6, Jun 10, 2023)"
 
   call MPI_INIT(ierr)
   call MPI_COMM_RANK(MPI_COMM_WORLD, irank, ierr)
@@ -64,14 +64,14 @@ Program main
     call system_clock(t1)
     if (inp%LCPROP .OR. ns==1) then
       ! initiate KS matrix
-      call initTDKS(ks, inp, olap_sec)
+      call initTDKS(ks, inp, olap_sec, epc)
     ! Time propagation
-      call Propagation(ks, inp, olap_sec)
+      call Propagation(ks, inp, olap_sec, epc)
     end if
     ! Run surface hopping
     if (inp%LSHP) then
-      call runSH(ks, inp, olap_sec)
-    ! call runSHotf(ks, inp, olap_sec)
+      call runSH(ks, inp, olap_sec, epc)
+    ! call runSHotf(ks, inp, olap_sec, epc)
       if (irank==0) call printSH(ks, inp)
       ! if (inp%LEPC) call phQ2R(inp, olap_sec, epc, ks%ph_pops)
       ! if (inp%LEPC) call saveXDAT(inp, olap_sec, epc)

@@ -7,11 +7,12 @@ module TimeProp
 
   contains 
 
-  subroutine Propagation(ks, inp, olap)
+  subroutine Propagation(ks, inp, olap, epc)
     implicit none
     type(TDKS), intent(inout)  :: ks
     type(namdInfo), intent(in) :: inp
     type(overlap), intent(in) :: olap
+    type(epCoupling), intent(in) :: epc
 
     integer :: tion, tele, Nt
     integer :: i, j
@@ -48,7 +49,7 @@ module TimeProp
       do tele = 1, inp%NELM-1
         ! construct hamiltonian matrix
         if (inp%LEPC) then
-          call make_hamil_EPC(tion, tele, ks, inp, olap)
+          call make_hamil_EPC(tion, tele, ks, inp, olap, epc)
         else
           call make_hamil(tion, tele, ks, inp)
         end if

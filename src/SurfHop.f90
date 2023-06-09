@@ -9,12 +9,13 @@ module shop
   contains
 
   ! calculate surface hopping probabilities
-  subroutine runSH(ks, inp, olap)
+  subroutine runSH(ks, inp, olap, epc)
     implicit none
 
     type(TDKS), intent(inout) :: ks
     type(namdInfo), intent(in) :: inp
     type(overlap), intent(in) :: olap
+    type(epCoupling), intent(in) :: epc
     integer :: i, j, ibas, nbas, tion, Nt, iq
     integer, allocatable :: cstat_all(:,:), occb(:,:), occbtot(:)
     integer :: cstat, nstat
@@ -63,12 +64,13 @@ module shop
       ! ks%ph_pops = 0
       ! ks%ph_prop = 0
       call calcBftot(ks, inp)
+      ks%PhQtemp = epc%PhQ * (epc%eiwdt ** (inp%NAMDTINI / inp%POTIM - 1))
 
       do tion=1, Nt
 
         do ibas=ist,iend
           if (occbtot(ibas)==0) cycle
-          call calcprop_EPC_mpi(tion, ibas, ks, inp, olap, sh_prop_p)
+          call calcprop_EPC_mpi(tion, ibas, ks, inp, olap, epc, sh_prop_p)
         end do
         call MPI_BARRIER(MPI_COMM_WORLD, ierr)
         CALL MPI_ALLgather(sh_prop_p, nbas_p, MPI_DOUBLE_PRECISION, &
@@ -208,7 +210,7 @@ module shop
 
   end subroutine
 
-  subroutine calcprop_EPC(tion, cstat, ks, inp, olap)
+  subroutine calcprop_EPC(tion, cstat, ks, inp, olap, epc)
     implicit none
 
     type(TDKS), intent(inout) :: ks
@@ -216,16 +218,19 @@ module shop
     integer, intent(in) :: tion
     integer, intent(in) :: cstat
     type(overlap), intent(in) :: olap
+    type(epCoupling), intent(in) :: epc
 
     real(kind=q) :: Akk, norm
     complex(kind=q), allocatable :: epcoup(:) ! , eptemp(:,:)
     integer :: i, iq
 
+    ks%PhQtemp = ks%PhQtemp * epc%eiwdt
+
     allocate(epcoup(ks%ndim))
     ! allocate(epcoup(ks%ndim), eptemp(inp%NMODES, 2))
     do i=1,ks%ndim
       iq = olap%kkqmap(cstat, i)
-      epcoup(i) = SUM(olap%EPcoup(cstat,i,:,:,1) * (ks%PhQ(iq,:,:,tion) ** 2))
+      epcoup(i) = SUM(olap%EPcoup(cstat,i,:,:,1) * (ks%PhQtemp(iq,:,:) ** 2))
       ! eptemp = olap%EPcoup(cstat,i,:,:,1) * ks%PhQ(iq,:,:,tion)
       ! ks%ph_prop(cstat, i, :, :) = ABS(eptemp) ** 2
       ! norm = SUM(ks%ph_prop(cstat, i, :, :))
@@ -242,7 +247,7 @@ module shop
   end subroutine
 
 
-  subroutine calcprop_EPC_mpi(tion, cstat, ks, inp, olap, sh_prop_p)
+  subroutine calcprop_EPC_mpi(tion, cstat, ks, inp, olap, epc, sh_prop_p)
     implicit none
 
     type(TDKS), intent(inout) :: ks
@@ -250,6 +255,7 @@ module shop
     integer, intent(in) :: tion
     integer, intent(in) :: cstat
     type(overlap), intent(in) :: olap
+    type(epCoupling), intent(in) :: epc
     real(kind=q), intent(inout) :: sh_prop_p(:,:)
 
     real(kind=q) :: Akk, norm
@@ -261,10 +267,12 @@ module shop
     CALL MPI_COMM_RANK(MPI_COMM_WORLD, irank, ierr)
     ist = inp%ISTS(irank+1)
 
+    ks%PhQtemp = ks%PhQtemp * epc%eiwdt
+
     allocate(epcoup(ks%ndim))
     do i=1,ks%ndim
       iq = olap%kkqmap(cstat, i)
-      epcoup(i) = SUM(olap%EPcoup(cstat-ist+1,i,:,:,1) * (ks%PhQ(iq,:,:,tion) ** 2))
+      epcoup(i) = SUM(olap%EPcoup(cstat-ist+1,i,:,:,1) * (ks%PhQtemp(iq,:,:) ** 2))
     end do
 
     Akk = CONJG(ks%psi_a(cstat, tion)) * ks%psi_a(cstat, tion)

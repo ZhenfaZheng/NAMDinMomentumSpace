@@ -8,13 +8,14 @@ module shotf
 
   contains
 
-  subroutine runSHotf(ks, inp, olap)
+  subroutine runSHotf(ks, inp, olap, epc)
   ! Surface Hopping Simulation without CPA (On-The-Fly type)
     implicit none
 
     type(TDKS), intent(inout) :: ks
     type(namdInfo), intent(in) :: inp
     type(overlap), intent(in) :: olap
+    type(epCoupling), intent(in) :: epc
 
     integer :: cstat, nstat
     integer, allocatable :: cstat_all(:), occb(:)
@@ -65,13 +66,13 @@ module shotf
         ks%pop_a(:,tion) = CONJG(ks%psi_c) * ks%psi_c
         ks%norm(tion) = SUM(ks%pop_a(:,tion))
         ks%psi_a(:,tion) = ks%psi_c
-        call CProp(tion, ks, inp, olap)
+        call CProp(tion, ks, inp, olap, epc)
         end if
 
         do j=1, inp%NINIBS
 
           cstat = cstat_all(j)
-          call calcprop_EPC(tion, cstat, ks, inp, olap)
+          call calcprop_EPC(tion, cstat, ks, inp, olap, epc)
         ! call calcprop_OTF(tion, cstat, ks, inp, olap)
           call whichToHop(cstat, nstat, ks)
 
@@ -208,12 +209,13 @@ module shotf
   end subroutine
 
 
-  subroutine CProp(tion, ks, inp, olap)
+  subroutine CProp(tion, ks, inp, olap, epc)
     implicit none
     integer, intent(in) :: tion
     type(TDKS), intent(inout)  :: ks
     type(namdInfo), intent(in) :: inp
     type(overlap), intent(in) :: olap
+    type(epCoupling), intent(in) :: epc
 
     integer :: tele
     real(kind=q) :: edt
@@ -223,7 +225,7 @@ module shotf
     do tele = 1, inp%NELM-1
       ! construct hamiltonian matrix
       if (inp%LEPC) then
-        call make_hamil_EPC(tion, tele, ks, inp, olap)
+        call make_hamil_EPC(tion, tele, ks, inp, olap, epc)
       else
         call make_hamil(tion, tele, ks, inp)
       end if

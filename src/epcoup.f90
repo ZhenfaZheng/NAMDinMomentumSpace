@@ -22,6 +22,8 @@ module epcoup
     real(kind=q), allocatable, dimension(:,:) :: kpts, qpts
     real(kind=q), allocatable, dimension(:,:) :: elen, phfreq
     real(kind=q), allocatable, dimension(:,:) :: cellep, cellmd
+    real(kind=q), allocatable, dimension(:,:,:) :: PhQ
+    complex(kind=q), allocatable, dimension(:,:,:) :: eiwdt
     complex(kind=q), allocatable, dimension(:,:,:,:) :: phmodes
   end type
 
@@ -69,13 +71,13 @@ module epcoup
 
     if (inp%EPCTYPE==1) then
       write(*,*) "Calculating TD phonon normal modes."
-      call calcPhQ(olap_sec, inp)
+      call calcPhQ(olap_sec, inp, epc)
     else
       write(*,*) "Decomposing phonon modes from MD traj."
       call phDecomp(inp, olap_sec, epc)
     end if
 
-    call savePhQ(olap_sec)
+    ! call savePhQ(olap_sec)
 
     write(*,*) "Calculating e-ph couplings."
     if (inp%LARGEBS) then
@@ -125,6 +127,8 @@ module epcoup
     allocate(epc%elen(nk, nb))
     allocate(epc%qpts(nq, 3))
     allocate(epc%phfreq(nq, nm))
+    allocate(epc%PhQ(nq, nm, 2))
+    allocate(epc%eiwdt(nq, nm, 2))
     allocate(epc%phmodes(nq, nm, nat, 3))
 
   end subroutine
@@ -152,11 +156,11 @@ module epcoup
     allocate(olap%Eig(nb, nsw-1))
     allocate(olap%gij(nb_p, nb, nmodes))
     allocate(olap%Phfreq(nq, nmodes))
-    allocate(olap%PhQ(nq, nmodes, 2, nsw-1))
+    ! allocate(olap%PhQ(nq, nmodes, 2, nsw-1))
     allocate(olap%kkqmap(nb,nb))
 
     olap%gij = cero
-    olap%PhQ = cero
+    ! olap%PhQ = cero
     olap%Phfreq = 0.0_q
     olap%Eig = 0.0_q
     olap%kkqmap = -1
@@ -1350,15 +1354,16 @@ module epcoup
   end subroutine
 
 
-  subroutine calcPhQ(olap, inp)
+  subroutine calcPhQ(olap, inp, epc)
     implicit none
 
     type(overlap), intent(inout) :: olap
     type(namdInfo), intent(in) :: inp
+    type(epCoupling), intent(inout) :: epc
 
     integer :: iq, nq, im, nmodes, it, nsw
     real(kind=q) :: kbT, phn, phQtemp
-    complex(kind=q) :: iw, iwtemp
+    complex(kind=q) :: iwdt, iwtemp
 
     nq = olap%NQ
     nmodes = olap%NMODES
@@ -1371,13 +1376,11 @@ module epcoup
       do im=1, nmodes
         if (olap%Phfreq(iq,im)<inp%PHCUT) cycle
         phn = 1.0 / ( exp(olap%Phfreq(iq,im)/kbT) - 1.0 )
-        iw = iwtemp * olap%Phfreq(iq,im)
-        olap%PhQ(iq,im,:,:) = SQRT(phn+0.5)
-        phQtemp = SQRT(phn+0.5)
-        do it=1, nsw-1
-          olap%PhQ(iq,im,1,it) = phQtemp * exp(-iw*it)
-          olap%PhQ(iq,im,2,it) = phQtemp * exp(iw*it)
-        end do
+        ! Here epc%PhQ = Q_qv / l_qv = sqrt(n_qv + 0.5)
+        epc%PhQ(iq, im, :) = SQRT(phn+0.5)
+        iwdt = iwtemp * olap%Phfreq(iq,im)
+        epc%eiwdt(iq, im, 1) = exp(-iwdt)
+        epc%eiwdt(iq, im, 2) = exp( iwdt)
       end do
     end do
 
