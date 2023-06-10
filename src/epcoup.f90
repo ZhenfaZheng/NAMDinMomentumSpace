@@ -71,6 +71,7 @@ module epcoup
 
     if (inp%EPCTYPE==1) then
       write(*,*) "Calculating TD phonon normal modes."
+      call symPhfreq(inp, epc)
       call calcPhQ(olap_sec, inp, epc)
     else
       write(*,*) "Decomposing phonon modes from MD traj."
@@ -175,7 +176,6 @@ module epcoup
 
     if ( allocated(epc%Rp) ) deallocate(epc%Rp)
     if ( allocated(epc%atmap) ) deallocate(epc%atmap)
-    if ( allocated(epc%kkqmap) ) deallocate(epc%kkqmap)
     if ( allocated(epc%kpts) ) deallocate(epc%kpts)
     if ( allocated(epc%qpts) ) deallocate(epc%qpts)
     if ( allocated(epc%elen) ) deallocate(epc%elen)
@@ -1351,6 +1351,9 @@ module epcoup
       end do
     end do
 
+    allocate(epc%kkqmap(nbas, nbas))
+    epc%kkqmap = olap_sec%kkqmap
+
   end subroutine
 
 
@@ -1381,6 +1384,32 @@ module epcoup
         iwdt = iwtemp * olap%Phfreq(iq,im)
         epc%eiwdt(iq, im, 1) = exp(-iwdt)
         epc%eiwdt(iq, im, 2) = exp( iwdt)
+      end do
+    end do
+
+  end subroutine
+
+
+  subroutine symPhfreq(inp, epc)
+    implicit none
+
+    type(namdInfo), intent(in) :: inp
+    type(epCoupling), intent(inout) :: epc
+
+    integer :: ibas, jbas, nbas, iq, jq
+
+    nbas = inp%NBASIS
+
+    if (nbas<2) return
+
+    do ibas = 1, nbas-1
+      do jbas = ibas+1, nbas
+        iq = epc%kkqmap(ibas, jbas)
+        if (iq<0) cycle
+        jq = epc%kkqmap(jbas, ibas)
+        if (jq<0) cycle
+        epc%Phfreq(iq,:) = ( epc%Phfreq(iq,:) + epc%Phfreq(jq,:) ) / 2.0
+        epc%Phfreq(jq,:) = epc%Phfreq(iq,:)
       end do
     end do
 
