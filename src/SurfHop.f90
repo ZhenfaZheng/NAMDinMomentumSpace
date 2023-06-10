@@ -16,7 +16,7 @@ module shop
     type(namdInfo), intent(in) :: inp
     type(overlap), intent(in) :: olap
     type(epCoupling), intent(in) :: epc
-    integer :: i, j, ibas, nbas, tion, Nt, iq
+    integer :: i, j, ibas, jbas, nbas, tion, Nt, iq
     integer, allocatable :: cstat_all(:,:), occb(:,:), occbtot(:)
     integer :: cstat, nstat
 
@@ -73,9 +73,11 @@ module shop
           call calcprop_EPC_mpi(tion, ibas, ks, inp, olap, epc, sh_prop_p)
         end do
         call MPI_BARRIER(MPI_COMM_WORLD, ierr)
-        CALL MPI_ALLgather(sh_prop_p, nbas_p, MPI_DOUBLE_PRECISION, &
-                           ks%sh_prop,   nbas_p, MPI_DOUBLE_PRECISION, &
+        do jbas = 1, nbas
+        CALL MPI_ALLgather(sh_prop_p(:,jbas), nbas_p, MPI_DOUBLE_PRECISION, &
+                           ks%sh_prop(:,jbas),   nbas_p, MPI_DOUBLE_PRECISION, &
                            MPI_COMM_WORLD, ierr)
+        end do
 
         sh_pops_p = 0
 
