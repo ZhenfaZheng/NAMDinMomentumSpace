@@ -68,16 +68,25 @@ module shop
 
       do tion=1, Nt
 
+        ks%PhQtemp = ks%PhQtemp * epc%eiwdt
+
         do ibas=ist,iend
           if (occbtot(ibas)==0) cycle
           call calcprop_EPC_mpi(tion, ibas, ks, inp, olap, epc, sh_prop_p)
         end do
         call MPI_BARRIER(MPI_COMM_WORLD, ierr)
+        call MPI_BARRIER(MPI_COMM_WORLD, ierr)
         do jbas = 1, nbas
-        CALL MPI_ALLgather(sh_prop_p(:,jbas), nbas_p, MPI_DOUBLE_PRECISION, &
-                           ks%sh_prop(:,jbas),   nbas_p, MPI_DOUBLE_PRECISION, &
-                           MPI_COMM_WORLD, ierr)
+        ! CALL MPI_ALLgather(sh_prop_p(:,jbas), nbas_p, MPI_DOUBLE_PRECISION, &
+        !                     ks%sh_prop(:,jbas), nbas_p, MPI_DOUBLE_PRECISION, &
+        !                     MPI_COMM_WORLD, ierr)
+        CALL MPI_ALLgatherv(sh_prop_p(:,jbas), nbas_p, MPI_DOUBLE_PRECISION, &
+                            ks%sh_prop(:,jbas), inp%IENDS-inp%ISTS+1, inp%ISTS-inp%ISTS(1), MPI_DOUBLE_PRECISION, &
+                            MPI_COMM_WORLD, ierr)
+        call MPI_BARRIER(MPI_COMM_WORLD, ierr)
         end do
+        ! if (tion==100 .and. irank==2) print '(4(G10.2))', ks%sh_prop
+        call MPI_BARRIER(MPI_COMM_WORLD, ierr)
 
         sh_pops_p = 0
 
@@ -226,8 +235,6 @@ module shop
     complex(kind=q), allocatable :: epcoup(:) ! , eptemp(:,:)
     integer :: i, iq
 
-    ks%PhQtemp = ks%PhQtemp * epc%eiwdt
-
     allocate(epcoup(ks%ndim))
     ! allocate(epcoup(ks%ndim), eptemp(inp%NMODES, 2))
     do i=1,ks%ndim
@@ -268,8 +275,6 @@ module shop
 
     CALL MPI_COMM_RANK(MPI_COMM_WORLD, irank, ierr)
     ist = inp%ISTS(irank+1)
-
-    ks%PhQtemp = ks%PhQtemp * epc%eiwdt
 
     allocate(epcoup(ks%ndim))
     do i=1,ks%ndim

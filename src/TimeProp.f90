@@ -67,8 +67,11 @@ module TimeProp
           psi_n_local = ks%psi_p(ist:iend) - 2 * imgUnit * edt * ks%hpsi / hbar
         end if
         call MPI_BARRIER(MPI_COMM_WORLD, ierr)
-        CALL MPI_ALLgather(psi_n_local, nbas_p, MPI_DOUBLE_COMPLEX, &
-                           ks%psi_n,   nbas_p, MPI_DOUBLE_COMPLEX, &
+        ! CALL MPI_ALLgather(psi_n_local, nbas_p, MPI_DOUBLE_COMPLEX, &
+        !                    ks%psi_n,   nbas_p, MPI_DOUBLE_COMPLEX, &
+        !                    MPI_COMM_WORLD, ierr)
+        CALL MPI_ALLgatherv(psi_n_local, nbas_p, MPI_DOUBLE_COMPLEX, &
+                           ks%psi_n, inp%IENDS-inp%ISTS+1, inp%ISTS-inp%ISTS(1), MPI_DOUBLE_COMPLEX, &
                            MPI_COMM_WORLD, ierr)
         ks%psi_p = ks%psi_c
         ks%psi_c = ks%psi_n
