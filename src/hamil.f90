@@ -246,7 +246,7 @@ module hamil
     ist = inp%ISTS(irank+1)
     iend = inp%IENDS(irank+1)
 
-    ks%PhQtemp = ks%PhQtemp * epc%eiwdt
+    ! ks%PhQtemp = ks%PhQtemp * epc%eiwdt
 
     ks%ham_p = ks%ham_n
     do ib=ist, iend

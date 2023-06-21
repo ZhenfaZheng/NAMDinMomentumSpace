@@ -4,9 +4,122 @@ module shop
   use hamil
   use couplings
   use epcoup
+  use TimeProp
   implicit none
 
   contains
+
+  subroutine runSH_EPC(ks, inp, olap, epc)
+    implicit none
+    type(TDKS), intent(inout) :: ks
+    type(namdInfo), intent(in) :: inp
+    type(overlap), intent(in) :: olap
+    type(epCoupling), intent(in) :: epc
+
+    integer :: nbas, Nt, ninibs
+    integer :: irank, nrank, ierr
+    integer :: ist, iend, nbas_p
+    integer :: ist_tj, iend_tj, ntj_p
+    integer :: i, j, ibas, jbas, tion, iq, cstat, nstat
+    integer, allocatable :: ists_tj(:), iends_tj(:)
+    integer, allocatable :: sendcounts(:), displs(:)
+    integer, allocatable :: cstat_all(:,:), occb(:,:)
+    real(kind=q), allocatable :: sh_prop_p(:,:), sh_pops_p(:)
+
+    CALL MPI_COMM_RANK(MPI_COMM_WORLD, irank, ierr)
+    CALL MPI_COMM_SIZE(MPI_COMM_WORLD, nrank, ierr)
+
+    ist = inp%ISTS(irank+1)
+    iend = inp%IENDS(irank+1)
+    nbas_p = inp%NBASIS_P
+
+    allocate(sendcounts(nrank), displs(nrank))
+    sendcounts = inp%IENDS - inp%ISTS + 1
+    displs = inp%ISTS - inp%ISTS(1)
+
+    allocate(ists_tj(nrank), iends_tj(nrank))
+    CALL mpi_split_procs(inp%NTRAJ, nrank, ists_tj, iends_tj)
+    ist_tj = ists_tj(irank+1)
+    iend_tj = iends_tj(irank+1)
+    ntj_p = iend_tj - ist_tj + 1
+
+    nbas = inp%NBASIS
+    ninibs = inp%NINIBS
+    Nt = inp%NAMDTIME / inp%POTIM
+
+    ks%sh_pops = 0 ! sh_pops(nbas, 1)
+    ks%sh_prop = 0 ! sh_prop(nbas, nbas), sh_prop_p(nbas_p, nbas)
+
+    allocate(sh_prop_p(nbas_p, nbas))
+    allocate(sh_pops_p(nbas))
+
+    allocate(cstat_all(ntj_p, ninibs))
+    allocate(occb(ntj_p, nbas))
+
+    occb = 0
+    do i=1, ninibs
+      ibas = inp%BASSEL(inp%INIKPT(i), inp%INIBAND(i))
+      cstat_all(:,i) = ibas
+      occb(:,ibas) = 1
+    end do
+
+    call init_random_seed()
+
+    call calcBftot(ks, inp)
+    ks%PhQtemp = epc%PhQ * (epc%eiwdt ** (inp%NAMDTINI / inp%POTIM - 1))
+
+    do tion=1, Nt
+
+      ks%PhQtemp = ks%PhQtemp * epc%eiwdt
+      call CProp_mpi(tion, ks, inp, olap, epc)
+
+      do ibas=ist,iend
+        call calcprop_EPC_mpi(tion, ibas, ks, inp, olap, epc, sh_prop_p)
+      end do
+      call MPI_BARRIER(MPI_COMM_WORLD, ierr)
+      do jbas = 1, nbas
+        CALL MPI_ALLgatherv(sh_prop_p(:,jbas), nbas_p, MPI_DOUBLE_PRECISION, &
+                 ks%sh_prop(:,jbas), sendcounts, displs, MPI_DOUBLE_PRECISION, &
+                 MPI_COMM_WORLD, ierr)
+      end do
+      call MPI_BARRIER(MPI_COMM_WORLD, ierr)
+
+      sh_pops_p = 0
+
+      ! do i=1, inp%NTRAJ
+      do i=ists_tj(irank+1), iends_tj(irank+1)
+        do j=1, inp%NINIBS
+
+          cstat = cstat_all(i,j)
+          call whichToHop(cstat, nstat, ks)
+
+          if (nstat /= cstat .AND. occb(i,nstat)>0) cycle
+          occb(i,cstat) = 0; occb(i,nstat) = 1
+          ! ks%sh_pops(nstat, tion) = ks%sh_pops(nstat, tion) + 1
+          sh_pops_p(nstat) = sh_pops_p(nstat) + 1
+          cstat_all(i,j) = nstat
+
+          if (nstat == cstat) cycle
+          iq = olap%kkqmap(cstat, nstat)
+          if (iq>0) then
+            ks%ph_pops(iq, :, tion) &
+              = ks%ph_pops(iq, :, tion) &
+              + SUM(ks%ph_prop(cstat,nstat,:,:), dim=2)
+          end if
+
+        end do
+      end do
+
+      call MPI_BARRIER(MPI_COMM_WORLD, ierr)
+      call MPI_Reduce(sh_pops_p, ks%sh_pops(:,tion), nbas, &
+               MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
+
+    end do
+
+    ks%sh_pops = ks%sh_pops / inp%NTRAJ
+    ! ks%ph_pops = ks%ph_pops / inp%NTRAJ
+
+  end subroutine
 
   ! calculate surface hopping probabilities
   subroutine runSH(ks, inp, olap, epc)
@@ -282,9 +395,9 @@ module shop
       epcoup(i) = SUM(olap%EPcoup(cstat-ist+1,i,:,:,1) * (ks%PhQtemp(iq,:,:) ** 2))
     end do
 
-    Akk = CONJG(ks%psi_a(cstat, tion)) * ks%psi_a(cstat, tion)
-    ks%Bkm = -2. / hbar * AIMAG( CONJG(ks%psi_a(cstat, tion)) * &
-             ks%psi_a(:, tion) * epcoup(:) )
+    Akk = CONJG(ks%psi_c(cstat)) * ks%psi_c(cstat)
+    ks%Bkm = -2. / hbar * AIMAG( CONJG(ks%psi_c(cstat)) * &
+             ks%psi_c * epcoup )
 
     sh_prop_p(cstat-ist+1,:) = ks%Bkm / Akk * inp%POTIM * ks%sh_Bfactor(cstat,:)
     forall (i=1:ks%ndim, sh_prop_p(cstat-ist+1,i) < 0) sh_prop_p(cstat-ist+1,i) = 0
