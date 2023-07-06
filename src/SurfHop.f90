@@ -111,12 +111,18 @@ module shop
       end do
 
       call MPI_BARRIER(MPI_COMM_WORLD, ierr)
-      call MPI_Reduce(sh_pops_p, ks%sh_pops(:,tion), nbas, &
+      call MPI_Reduce(sh_pops_p, ks%sh_pops(:,1), nbas, &
                MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
+
+      if (irank==0) then
+        ks%sh_pops(:,1) = ks%sh_pops(:,1) / inp%NTRAJ
+        if (tion==1) call initPOPfils(inp)
+        call outputPOP(tion, ks, inp)
+      end if
 
     end do
 
-    ks%sh_pops = ks%sh_pops / inp%NTRAJ
+    ! ks%sh_pops = ks%sh_pops / inp%NTRAJ
     ! ks%ph_pops = ks%ph_pops / inp%NTRAJ
 
   end subroutine
@@ -656,5 +662,117 @@ module shop
 
   end subroutine
 
+
+  subroutine outputInp(io, inp)
+    implicit none
+    integer, intent(in) :: io
+    type(namdInfo), intent(in) :: inp
+
+    write(io,'(A,A12,A3,I6)')     '#', 'BMIN',     ' = ', inp%BMIN
+    write(io,'(A,A12,A3,I6)')     '#', 'BMAX',     ' = ', inp%BMAX
+    write(io,'(A,A12,A3,I6)')     '#', 'KMIN',     ' = ', inp%KMIN
+    write(io,'(A,A12,A3,I6)')     '#', 'KMAX',     ' = ', inp%KMAX
+    if (inp%EMIN > -1.0E5_q) &
+      write(io,'(A,A12,A3,F6.2)') '#', 'EMIN',     ' = ', inp%EMIN
+    if (inp%EMAX <  1.0E5_q) &
+      write(io,'(A,A12,A3,F6.2)') '#', 'EMAX',     ' = ', inp%EMAX
+
+    write(io,'(A,A12,A3,I6)')     '#', 'NBASIS',   ' = ', inp%NBASIS
+    write(io,'(A,A12,A3,I6)')     '#', 'NBANDS',   ' = ', inp%NBANDS
+    write(io,'(A,A12,A3,I6)')     '#', 'NKPOINTS', ' = ', inp%NKPOINTS
+
+    write(io,'(A,A12,A3,I6)')     '#', 'NSW',      ' = ', inp%NSW
+    write(io,'(A,A12,A3,F6.1)')   '#', 'POTIM',    ' = ', inp%POTIM
+    write(io,'(A,A12,A3,F6.1)')   '#', 'TEMP',     ' = ', inp%TEMP
+    write(io,'(A,A12,A3,I6)')     '#', 'NAMDTINI', ' = ', inp%NAMDTINI
+    write(io,'(A,A12,A3,I6)')     '#', 'NAMDTIME', ' = ', inp%NAMDTIME
+    write(io,'(A,A12,A3,I6)')     '#', 'NTRAJ',    ' = ', inp%NTRAJ
+    write(io,'(A,A12,A3,I6)')     '#', 'NELM',     ' = ', inp%NELM
+
+    write(io,'(A,A12,A3,L6)')     '#', 'LEPC',     ' = ', inp%LEPC
+    write(io,'(A,A12,A3,L6)')     '#', 'LARGEBS',  ' = ', inp%LARGEBS
+    write(io,'(A,A12,A3,I6)')     '#', 'EPCTYPE',  ' = ', inp%EPCTYPE
+    write(io,'(A,A12,A3,L6)')     '#', 'LBASSEL',  ' = ', inp%LBASSEL
+    write(io,'(A,A12,A3,L6)')     '#', 'LSORT',    ' = ', inp%LSORT
+    write(io,'(A,A12,A3,L6)')     '#', 'LCPTXT',   ' = ', inp%LCPTXT
+    write(io,'(A,A12,A3,L6)')     '#', 'LHOLE',    ' = ', inp%LHOLE
+
+    if (inp%EPCTYPE==2) &
+      write(io,'(A,A12,A3,A)') '#', 'MDFIL', ' = ', TRIM(ADJUSTL(inp%FILMD))
+    write(io,'(A,A12,A3,A)') '#', 'EPMFIL', ' = ', TRIM(ADJUSTL(inp%FILEPM))
+
+  end subroutine
+
+
+  subroutine initPOPfils(inp)
+    implicit none
+    type(namdInfo), intent(in) :: inp
+
+    integer :: io, ierr
+    character(len=48) :: buf
+    character(len=256) :: filename
+
+    write(buf, *) inp%NAMDTINI
+
+    do io = 24, 25
+
+      if (io==24) then
+        filename = 'SHPROP.' // trim(adjustl(buf))
+      else
+        filename = 'PSICT.' // trim(adjustl(buf))
+      end if
+
+      open(unit=io, file=filename, status='unknown', &
+           action='write', iostat=ierr)
+
+      if (ierr /= 0) then
+        write(*,*) trim(filename) // " file I/O error!"
+        stop
+      end if
+
+      call outputInp(io, inp)
+
+    end do
+
+  end subroutine
+
+
+  subroutine outputPOP(tion, ks, inp)
+    implicit none
+    integer, intent(in) :: tion
+    type(TDKS), intent(in) :: ks
+    type(namdInfo), intent(in) :: inp
+
+    integer :: i, ierr, io
+    real(kind=q), allocatable :: pop(:)
+    character(len=48) :: buf
+    character(len=256) :: filename
+
+    allocate(pop(ks%ndim))
+    write(buf, *) inp%NAMDTINI
+
+    do io=24,25
+
+      if (io==24) then
+        filename = 'SHPROP.' // trim(adjustl(buf))
+        pop = ks%sh_pops(:,1)
+      else
+        filename = 'PSICT.' // trim(adjustl(buf))
+        pop = ABS(ks%psi_c) ** 2
+      end if
+
+      open(unit=io, file=filename, status='old', &
+           position='append', action='write', iostat=ierr)
+      if (ierr /= 0) then
+        write(*,*) trim(filename) // " file I/O error!"
+        stop
+      end if
+
+      write(unit=io, fmt='(*(G20.10))') tion * inp%POTIM, &
+        SUM(ks%eigKs(:,1) * pop) / inp%NINIBS, (pop(i), i=1, ks%ndim)
+
+    end do
+
+  end subroutine
 
 end module

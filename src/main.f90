@@ -24,7 +24,7 @@ Program main
   integer :: ns
 
   write(*,*)
-  write(*,*) "Hefei-NAMD (epc version 2.1.9, Jun 21, 2023)"
+  write(*,*) "Hefei-NAMD (epc version 2.1.10, Jul 06, 2023)"
 
   call MPI_INIT(ierr)
   call MPI_COMM_RANK(MPI_COMM_WORLD, irank, ierr)
@@ -70,9 +70,10 @@ Program main
     end if
     ! Run surface hopping
     if (inp%LSHP) then
-      call runSH(ks, inp, olap_sec, epc)
+    ! call runSH(ks, inp, olap_sec, epc)
+      call runSH_EPC(ks, inp, olap_sec, epc)
     ! call runSHotf(ks, inp, olap_sec, epc)
-      if (irank==0) call printSH(ks, inp)
+      ! if (irank==0) call printSH(ks, inp)
       ! if (inp%LEPC) call phQ2R(inp, olap_sec, epc, ks%ph_pops)
       ! if (inp%LEPC) call saveXDAT(inp, olap_sec, epc)
       ! if (inp%LEPC) call printPHPROP(ks, inp, olap_sec, ns)

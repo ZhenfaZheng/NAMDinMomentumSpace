@@ -77,8 +77,8 @@ module hamil
       allocate(ks%psi_p(N))
       allocate(ks%psi_n(N))
       allocate(ks%hpsi(N_p))
-      allocate(ks%psi_a(N, Nt))
-      allocate(ks%pop_a(N, Nt))
+      ! allocate(ks%psi_a(N, Nt))
+      ! allocate(ks%pop_a(N, Nt))
       allocate(ks%norm(Nt))
 
       allocate(ks%ham_c(N_p,N))
@@ -88,7 +88,7 @@ module hamil
       allocate(ks%eigKs(N, Nt))
 
 
-      allocate(ks%sh_pops(N, Nt))
+      allocate(ks%sh_pops(N, 1))
       allocate(ks%sh_prop(N,N))
       allocate(ks%sh_Bfactor(N,N))
       allocate(ks%Bkm(N))
