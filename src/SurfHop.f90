@@ -87,7 +87,8 @@ module shop
       sh_pops_p = 0
 
       ! do i=1, inp%NTRAJ
-      do i=ists_tj(irank+1), iends_tj(irank+1)
+      ! do i=ists_tj(irank+1), iends_tj(irank+1)
+      do i=1, ntj_p
         do j=1, inp%NINIBS
 
           cstat = cstat_all(i,j)
@@ -732,6 +733,8 @@ module shop
 
       call outputInp(io, inp)
 
+      close(io)
+
     end do
 
   end subroutine
@@ -770,6 +773,8 @@ module shop
 
       write(unit=io, fmt='(*(G20.10))') tion * inp%POTIM, &
         SUM(ks%eigKs(:,1) * pop) / inp%NINIBS, (pop(i), i=1, ks%ndim)
+
+      close(io)
 
     end do
 
