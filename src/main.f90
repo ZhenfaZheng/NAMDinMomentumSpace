@@ -66,7 +66,7 @@ Program main
       ! initiate KS matrix
       call initTDKS(ks, inp, olap_sec, epc)
     ! Time propagation
-      call Propagation(ks, inp, olap_sec, epc)
+    ! call Propagation(ks, inp, olap_sec, epc)
     end if
     ! Run surface hopping
     if (inp%LSHP) then
