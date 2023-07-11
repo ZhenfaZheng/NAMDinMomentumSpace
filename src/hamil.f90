@@ -28,7 +28,6 @@ module hamil
     ! Non-adiabatic couplings
     complex(kind=q), allocatable, dimension(:,:,:) :: NAcoup
 
-    complex(kind=q), allocatable, dimension(:,:,:) :: EPcoup
     complex(kind=q), allocatable, dimension(:,:,:) :: PhQtemp
     complex(kind=q), allocatable, dimension(:,:,:,:) :: PhQ
 
@@ -115,8 +114,7 @@ module hamil
         do i=ist, iend
           do j=1,N
             iq = olap%kkqmap(i,j)
-            ! eptemp = ABS(olap%EPcoup(i,j,:,:,1) * epc%PhQ(iq,:,:)) ** 2
-            eptemp = ABS(olap%EPcoup(i-ist+1,j,:,:,1) * (epc%PhQ(iq,:,:) ** 2))
+            eptemp = epc%epcec(i-ist+1,j,:,:)
             norm = SUM(eptemp)
             if (norm>0) then
             ! ks%ph_prop(i,j,:) = (eptemp(:,2) - eptemp(:,1)) / norm
@@ -254,7 +252,7 @@ module hamil
       do jb=1,ks%ndim
         iq = olap%kkqmap(ib,jb)
         if (iq<0) cycle
-        ks%ham_n(ib-ist+1,jb) = SUM( olap%gij(ib-ist+1,jb,:) * &
+        ks%ham_n(ib-ist+1,jb) = SUM( epc%gij(ib-ist+1,jb,:) * &
             SUM(ks%PhQtemp(iq,:,:), dim=2) )
         ! ks%ham_n(jb,ib) = CONJG(ks%ham_n(ib,jb))
       end do

@@ -25,6 +25,8 @@ module epcoup
     real(kind=q), allocatable, dimension(:,:,:) :: PhQ
     complex(kind=q), allocatable, dimension(:,:,:) :: eiwdt
     complex(kind=q), allocatable, dimension(:,:,:,:) :: phmodes
+    real(kind=q), allocatable, dimension(:,:,:,:) :: epcec
+    complex(kind=q), allocatable, dimension(:,:,:) :: gij
   end type
 
   contains
@@ -67,7 +69,7 @@ module epcoup
     call kqMatchSec(inp, epc, olap_sec)
     write(*,*) "Reading e-ph matrix elements."
     call readEPHmatSec(inp, epc, olap_sec)
-    call HemitGij(inp, olap_sec)
+    call HemitGij(inp, epc)
 
     if (inp%EPCTYPE==1) then
       write(*,*) "Calculating TD phonon normal modes."
@@ -81,17 +83,17 @@ module epcoup
     ! call savePhQ(olap_sec)
 
     write(*,*) "Calculating e-ph couplings."
-    if (inp%LARGEBS) then
-      call calcEPC(olap_sec, inp)
+  ! if (inp%LARGEBS) then
+      call calcEPC(olap_sec, epc, inp)
       ! call writeTXT_LBS(olap_sec)
       ! call writeTXT_LBS_Mode(olap_sec)
       ! call writeKKQMap(olap_sec)
-    else
-      call calcNAC(olap_sec, inp)
-      call writeTXT(olap_sec)
-      deallocate(olap_sec%Dij, olap_sec%EPcoup)
-      call calcEPC(olap_sec, inp)
-    end if
+  ! else
+  !   call calcNAC(olap_sec, inp)
+  !   call writeTXT(olap_sec)
+  !   deallocate(olap_sec%Dij, olap_sec%EPcoup)
+  !   call calcEPC(olap_sec, epc, inp)
+  ! end if
 
   ! call releaseEPC(epc)
 
@@ -109,7 +111,7 @@ module epcoup
     type(namdInfo), intent(inout) :: inp
     type(epCoupling), intent(inout) :: epc
 
-    integer :: nk, nq, nb, nm, nat
+    integer :: nk, nq, nb, nm, nat, nbas, nbas_p
 
     nk  = SUM(epc%nkpts_ps) ; epc%nkpts = nk
     if (inp%NKPOINTS .NE. epc%nkpts) then
@@ -121,6 +123,8 @@ module epcoup
     nb  = epc%nbands
     nm  = epc%nmodes
     nat = epc%natepc
+    nbas   = inp%NBASIS
+    nbas_p = inp%NBASIS_P
 
     allocate(epc%mass(nat))
     allocate(epc%cellep(nat+3,3))
@@ -131,6 +135,11 @@ module epcoup
     allocate(epc%PhQ(nq, nm, 2))
     allocate(epc%eiwdt(nq, nm, 2))
     allocate(epc%phmodes(nq, nm, nat, 3))
+    allocate(epc%gij(nbas_p, nbas, nm))
+    allocate(epc%epcec(nbas_p, nbas, nm, 2))
+
+    epc%gij = cero
+    epc%epcec = 0.0_q
 
   end subroutine
 
@@ -640,7 +649,8 @@ module epcoup
               ibas = nb*(ik+kst-2)+ib
               jbas = nb*(jk-1)+jb
               olap%kkqmap(jbas, ibas) = iq
-              olap%gij(jbas, ibas, im) = eptemp(jb, ib, im, iq)
+              ! olap%gij(jbas, ibas, im) = eptemp(jb, ib, im, iq)
+              epc%gij(jbas, ibas, im) = eptemp(jb, ib, im, iq)
               ! ibas ~ initial state; jbas ~ final state
               ! gij(jbas, ibas, im) = < psi_{jb,jk} | d_{iq,im} V | psi_{ib,ik} >
               ! kpts[jk] = kpts[ik] + qpts[iq]
@@ -751,7 +761,8 @@ module epcoup
 
             do im=1,nm
               if (olap_sec%Phfreq(iq,im)<inp%PHCUT) cycle
-              olap_sec%gij(jbas-jst+1, ibas, im) = eptemp(jb, ib, im, iq)
+              ! olap_sec%gij(jbas-jst+1, ibas, im) = eptemp(jb, ib, im, iq)
+              epc%gij(jbas-jst+1, ibas, im) = eptemp(jb, ib, im, iq)
               ! ibas ~ initial state; jbas ~ final state
               ! gij(jbas, ibas, im) = < psi_{jb,jk} | d_{iq,im} V | psi_{ib,ik} >
               ! kpts[jk] = kpts[ik] + qpts[iq]
@@ -771,11 +782,11 @@ module epcoup
   end subroutine
 
 
-  subroutine HemitGij(inp, olap)
+  subroutine HemitGij(inp, epc)
     implicit none
 
     type(namdInfo), intent(in) :: inp
-    type(overlap), intent(inout) :: olap
+    type(epCoupling), intent(inout) :: epc
 
     integer :: crank, irank, jrank, xrank, yrank, nrank, ierr, tag
     integer :: ist, iend, jst, jend, xst, xend, yst, yend
@@ -784,7 +795,7 @@ module epcoup
 
     nbas = inp%NBASIS
     nbas_p = inp%NBASIS_P
-    nmodes = olap%NMODES
+    nmodes = epc%nmodes
     allocate(gij(nmodes), gji(nmodes))
     allocate(gtemp(nbas, nmodes))
     allocate(gtemp2(nbas, nmodes))
@@ -800,7 +811,7 @@ module epcoup
       do jbas = jst, jend
 
         if (irank == jrank) then
-          gtemp = olap%gij(jbas-jst+1, :, :)
+          gtemp = epc%gij(jbas-jst+1, :, :)
         end if
 
         do im=1,nmodes
@@ -814,14 +825,14 @@ module epcoup
         do ibas = ist, iend
           if (ibas<jbas) cycle
           gji = gtemp(ibas, :)
-          gij = olap%gij(ibas-ist+1, jbas, :)
+          gij = epc%gij(ibas-ist+1, jbas, :)
           ! here hermit gij and gji
           if (ibas == jbas) then
             gij = ABS(gij); gji = ABS(gij)
           else
             gji = CONJG(gij)
           end if
-          olap%gij(ibas-ist+1, jbas, :) = gij
+          epc%gij(ibas-ist+1, jbas, :) = gij
           gtemp(ibas,:) = gji
           ! print *, 'current at', irank, 'ij is', ibas, jbas, 'gij', gij(5)
         end do
@@ -847,9 +858,9 @@ module epcoup
         end do
 
         if (irank==jrank) then
-          olap%gij(jbas-jst+1,jbas:nbas, :) = gtemp(jbas:nbas, :)
+          epc%gij(jbas-jst+1,jbas:nbas, :) = gtemp(jbas:nbas, :)
           ! print *, 'current at', irank, 'jbas is', jbas
-          ! print *, 'gji', olap%gij(jbas-jst+1, :, 5)
+          ! print *, 'gji', epc%gij(jbas-jst+1, :, 5)
         end if
 
       end do
@@ -1416,59 +1427,12 @@ module epcoup
   end subroutine
 
 
-  subroutine calcEPC_Old(olap, inp)
+  subroutine calcEPC(olap, epc, inp)
   ! EPC calculations for large basis set.
     implicit none
 
     type(overlap), intent(inout) :: olap
-    type(namdInfo), intent(in) :: inp
-    integer :: nb, nm
-    integer :: ib, jb, im, iq
-    real(kind=q) :: dE, dE1, dE2
-    real(kind=q) :: kbT
-    complex(kind=q) :: idwt
-
-    nb  = olap%NBANDS
-    nm  = olap%NMODES
-    kbT = inp%TEMP * BOLKEV
-    idwt = imgUnit / kbT * TPI
-
-    allocate(olap%EPcoup(nb, nb, nm, 2, 1))
-    olap%EPcoup = cero
-
-    do ib=1,nb
-     do jb=ib,nb
-
-       dE = olap%Eig(ib,1) - olap%Eig(jb,1)
-       iq = olap%kkqmap(ib,jb)
-       if (iq<0) cycle
-
-       do im=1,nm
-         if (jb==ib) olap%gij(ib,ib,im)= ABS(olap%gij(ib,ib,im))
-         dE1 = dE - olap%Phfreq(iq,im) - 1.0E-8_q
-         olap%EPcoup(ib,jb,im,1,1) = olap%gij(ib,jb,im) * &
-           ( exp(idwt * dE1) - 1.0 ) / ( idwt * dE1 )
-         dE2 = dE + olap%Phfreq(iq,im) + 1.0E-8_q
-         olap%EPcoup(ib,jb,im,2,1) = olap%gij(ib,jb,im) * &
-           ( exp(idwt * dE2) - 1.0 ) / ( idwt * dE2 )
-       end do ! im loop
-
-       ! olap%gij(jb,ib,:) = CONJG(olap%gij(ib,jb,:))
-       olap%EPcoup(jb,ib,:,:,:) = CONJG(olap%EPcoup(ib,jb,:,:,:))
-
-     end do
-    end do
-    olap%gij = olap%gij / SQRT(olap%Np)
-    olap%EPcoup = olap%EPcoup / SQRT(olap%Np)
-
-  end subroutine
-
-
-  subroutine calcEPC(olap, inp)
-  ! EPC calculations for large basis set.
-    implicit none
-
-    type(overlap), intent(inout) :: olap
+    type(epCoupling), intent(inout) :: epc
     type(namdInfo), intent(in) :: inp
 
     integer :: irank, ierr
@@ -1494,9 +1458,6 @@ module epcoup
       sigma = inp%SIGMA
     end if
 
-    allocate(olap%EPcoup(nb_p, nb, nm, 2, 1))
-    olap%EPcoup = cero
-
     CALL MPI_COMM_RANK(MPI_COMM_WORLD, irank, ierr)
     ist = inp%ISTS(irank+1)
     iend = inp%IENDS(irank+1)
@@ -1509,25 +1470,20 @@ module epcoup
        if (iq<0) cycle
 
        do im=1,nm
-         if (jb==ib) olap%gij(ib-ist+1,ib,im)= ABS(olap%gij(ib-ist+1,ib,im))
-         ! if (jb>ib) olap%gij(jb,ib,im)= CONJG(olap%gij(ib,jb,im))
          dE1 = dE - olap%Phfreq(iq,im) - 1.0E-8_q
-         olap%EPcoup(ib-ist+1,jb,im,1,1) = olap%gij(ib-ist+1,jb,im) ** 2 &
-           ! * (sin(dE1 * T0) / (dE1 * T0)) ** 2 * T0 ! * hbar / hbar
-           * exp(-0.5 * (dE1/sigma)**2)
+         epc%epcec(ib-ist+1,jb,im,1) &
+           = ( ABS(epc%gij(ib-ist+1,jb,im)) * ABS(epc%PhQ(iq, im, 1)) ) ** 2 &
+             * exp(-0.5 * (dE1/sigma)**2)
          dE2 = dE + olap%Phfreq(iq,im) + 1.0E-8_q
-         olap%EPcoup(ib-ist+1,jb,im,2,1) = olap%gij(ib-ist+1,jb,im) ** 2 &
-           ! * (sin(dE2 * T0) / (dE2 * T0)) ** 2 * T0
-           * exp(-0.5 * (dE2/sigma)**2)
+         epc%epcec(ib-ist+1,jb,im,2) &
+           = ( ABS(epc%gij(ib-ist+1,jb,im)) * ABS(epc%PhQ(iq, im, 1)) ) ** 2 &
+             * exp(-0.5 * (dE2/sigma)**2)
        end do ! im loop
-
-       ! olap%EPcoup(jb,ib,:,:,:) = CONJG(olap%EPcoup(ib,jb,:,:,:))
 
      end do
     end do
-    olap%gij = olap%gij / SQRT(olap%Np)
-    ! olap%EPcoup = olap%EPcoup / olap%Np
-    olap%EPcoup = olap%EPcoup / olap%Np * SQRT(TPI) / sigma
+    epc%gij = epc%gij / SQRT(olap%Np)
+    epc%epcec = epc%epcec/ olap%Np * SQRT(TPI) / sigma
 
   end subroutine
 

@@ -352,15 +352,14 @@ module shop
     type(epCoupling), intent(in) :: epc
 
     real(kind=q) :: Akk, norm
-    complex(kind=q), allocatable :: epcoup(:) ! , eptemp(:,:)
+    real(kind=q), allocatable :: epcoup(:) ! , eptemp(:,:)
     integer :: i, iq
 
     allocate(epcoup(ks%ndim))
     ! allocate(epcoup(ks%ndim), eptemp(inp%NMODES, 2))
     do i=1,ks%ndim
       iq = olap%kkqmap(cstat, i)
-      epcoup(i) = SUM(olap%EPcoup(cstat,i,:,:,1) * (ks%PhQtemp(iq,:,:) ** 2))
-      ! eptemp = olap%EPcoup(cstat,i,:,:,1) * ks%PhQ(iq,:,:,tion)
+      epcoup(i) = SUM(epc%epcec(cstat,i,:,:))
       ! ks%ph_prop(cstat, i, :, :) = ABS(eptemp) ** 2
       ! norm = SUM(ks%ph_prop(cstat, i, :, :))
       ! if (norm>0) ks%ph_prop(cstat, i, :, :) = ks%ph_prop(cstat, i, :, :) / norm
@@ -388,7 +387,7 @@ module shop
     real(kind=q), intent(inout) :: sh_prop_p(:,:)
 
     real(kind=q) :: Akk, norm
-    complex(kind=q), allocatable :: epcoup(:) ! , eptemp(:,:)
+    real(kind=q), allocatable :: epcoup(:)
     integer :: i, iq
     integer :: irank, ierr
     integer :: ist
@@ -398,8 +397,7 @@ module shop
 
     allocate(epcoup(ks%ndim))
     do i=1,ks%ndim
-      iq = olap%kkqmap(cstat, i)
-      epcoup(i) = SUM(olap%EPcoup(cstat-ist+1,i,:,:,1) * (ks%PhQtemp(iq,:,:) ** 2))
+      epcoup(i) = SUM(epc%epcec(cstat-ist+1,i,:,:))
     end do
 
     Akk = CONJG(ks%psi_c(cstat)) * ks%psi_c(cstat)
