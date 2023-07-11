@@ -157,7 +157,7 @@ module hamil
 
       do t=1, Nt
         i = MOD(initstep+t, nsteps) + 1
-        ks%eigKs(:,t) = olap%Eig(:,i)
+        ks%eigKs(:,t) = epc%eig(:)
       end do
       ks%PhQtemp = epc%PhQ * (epc%eiwdt ** (initstep + 1))
 

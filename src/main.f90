@@ -23,11 +23,11 @@ Program main
   integer :: t1, t2, rate
   integer :: ns
 
-  write(*,*)
-  write(*,*) "Hefei-NAMD (epc version 2.1.11, Jul 06, 2023)"
-
   call MPI_INIT(ierr)
   call MPI_COMM_RANK(MPI_COMM_WORLD, irank, ierr)
+
+  if (irank==0) write(*,*)
+  if (irank==0) write(*,*) "Hefei-NAMD (epc version 2.1.12, Jul 11, 2023)"
 
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   ! First, get user inputs
@@ -79,7 +79,7 @@ Program main
       ! if (inp%LEPC) call printPHPROP(ks, inp, olap_sec, ns)
     end if
     call system_clock(t2)
-    write(*,'(A, F10.2)') "CPU Time [s]:", (t2-t1)/real(rate)
+    if (irank==0) write(*,'(A, F10.2)') "CPU Time [s]:", (t2-t1)/real(rate)
   end do
   ! end if
 

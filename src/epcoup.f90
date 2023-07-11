@@ -17,7 +17,7 @@ module epcoup
     !! number of lattice vector of each atom in MD cell, Rp(natmd,3)
     integer, allocatable, dimension(:,:) :: kkqmap
     !! map ik & jk of electronic states to q of phonon modes.
-    real(kind=q), allocatable, dimension(:) :: mass
+    real(kind=q), allocatable, dimension(:) :: mass, eig
     real(kind=q), allocatable, dimension(:,:,:) :: displ
     real(kind=q), allocatable, dimension(:,:) :: kpts, qpts
     real(kind=q), allocatable, dimension(:,:) :: elen, phfreq
@@ -41,48 +41,55 @@ module epcoup
     type(overlap), intent(inout) :: olap_sec
 
     integer :: nmodes, nb, nsw
+    integer :: irank, nrank, ierr
     logical :: lcoup
 
-    write(*,*)
-    write(*,'(A)') &
+    call MPI_COMM_RANK(MPI_COMM_WORLD, irank, ierr)
+    call MPI_COMM_SIZE(MPI_COMM_WORLD, nrank, ierr)
+
+
+    if (irank==0) write(*,*)
+    if (irank==0) write(*,'(A)') &
       "------------------------------------------------------------"
 
     if (inp%EPCTYPE==1) then
-      write(*,*) "TypeI e-ph coupling calculation."
+      if (irank==0) write(*,*) "TypeI e-ph coupling calculation."
     else
-      write(*,*) "TypeII e-ph coupling calculation."
+      if (irank==0) write(*,*) "TypeII e-ph coupling calculation."
     end if
 
-    write(*,*) "Reading el & ph information."
+    if (irank==0) write(*,*) "Reading el & ph information."
     call readBasicInfo(inp, epc)
     call initEPC(inp, epc)
     call readEPHinfo(inp, epc)
 
     call selBasis(inp, epc)
     if (inp%LSORT) call sortBasis(inp, epc)
+    call elen2eig(inp, epc)
+    if (irank==0) call outputBAS(inp, epc)
     call mpi_split_bas(inp)
 
     call initOlap(olap_sec, inp, epc%nqpts, inp%NBASIS)
     call epcToOlapSec(inp, epc, olap_sec)
 
-    write(*,*) "Mapping k & k' points with q point."
+    if (irank==0) write(*,*) "Mapping k & k' points with q point."
     call kqMatchSec(inp, epc, olap_sec)
-    write(*,*) "Reading e-ph matrix elements."
+    if (irank==0) write(*,*) "Reading e-ph matrix elements."
     call readEPHmatSec(inp, epc, olap_sec)
     call HemitGij(inp, epc)
 
     if (inp%EPCTYPE==1) then
-      write(*,*) "Calculating TD phonon normal modes."
+      if (irank==0) write(*,*) "Calculating TD phonon normal modes."
       call symPhfreq(inp, epc)
       call calcPhQ(olap_sec, inp, epc)
     else
-      write(*,*) "Decomposing phonon modes from MD traj."
+      if (irank==0) write(*,*) "Decomposing phonon modes from MD traj."
       call phDecomp(inp, olap_sec, epc)
     end if
 
     ! call savePhQ(olap_sec)
 
-    write(*,*) "Calculating e-ph couplings."
+    if (irank==0) write(*,*) "Calculating e-ph couplings."
   ! if (inp%LARGEBS) then
       call calcEPC(olap_sec, epc, inp)
       ! call writeTXT_LBS(olap_sec)
@@ -97,10 +104,11 @@ module epcoup
 
   ! call releaseEPC(epc)
 
-    write(*,*) "Done!"
-    write(*,'(A)') &
+    call MPI_BARRIER(MPI_COMM_WORLD, ierr)
+    if (irank==0) write(*,*) "Done!"
+    if (irank==0) write(*,'(A)') &
       "------------------------------------------------------------"
-    write(*,*)
+    if (irank==0) write(*,*)
 
   end subroutine
 
@@ -257,10 +265,6 @@ module epcoup
 
     allocate(inp%BASLIST(inp%NBASIS, 3))
 
-    open(unit=39, file='BASSEL', status='unknown', action='write')
-
-    write(unit=39, fmt='(I18)') inp%NBASIS
-
     ibas = 0
     do ik=inp%KMIN, inp%KMAX
       do ib=inp%BMIN, inp%BMAX
@@ -268,12 +272,9 @@ module epcoup
           ibas = ibas + 1
           inp%BASLIST(ibas, 1) = ik
           inp%BASLIST(ibas, 2) = ib
-          write(unit=39, fmt='(2I12)') ik, ib
         end if
       end do
     end do
-
-    close(unit=39)
 
     !! For array element inp%BASSEL(ik,ib),
     !! 0 represent ik,ib state isn't selected as basis;
@@ -310,15 +311,52 @@ module epcoup
       end do
     end do
 
-    open(unit=39, file='BASSEL', status='unknown', action='write')
-    write(unit=39, fmt='(I18)') inp%NBASIS
-
     do ibas=1,nbas
       ik = inp%BASLIST(ibas,1)
       ib = inp%BASLIST(ibas,2)
       inp%BASSEL(ik, ib) = ibas
-      write(unit=39, fmt='(2I12)') ik, ib
     end do
+
+  end subroutine
+
+
+  subroutine elen2eig(inp, epc)
+    implicit none
+
+    type(namdInfo), intent(in) :: inp
+    type(epCoupling), intent(inout) :: epc
+    integer :: ibas, nbas, ik, ib
+
+    nbas = inp%NBASIS
+    allocate(epc%eig(nbas))
+
+    do ibas=1,nbas
+      ik = inp%BASLIST(ibas,1)
+      ib = inp%BASLIST(ibas,2)
+      epc%eig(ibas) = epc%elen(ik, ib)
+    end do
+
+  end subroutine
+
+
+  subroutine outputBAS(inp, epc)
+    implicit none
+
+    type(namdInfo), intent(in) :: inp
+    type(epCoupling), intent(in) :: epc
+    integer :: ibas, nbas, ik, ib
+
+    nbas = inp%NBASIS
+
+    open(unit=39, file='BASSEL', status='unknown', action='write')
+    write(unit=39, fmt='(I18)') nbas
+
+    do ibas=1,nbas
+      ik = inp%BASLIST(ibas,1)
+      ib = inp%BASLIST(ibas,2)
+      write(unit=39, fmt='(2I12, F20.8)') ik, ib, epc%eig(ibas)
+    end do
+
     close(unit=39)
 
   end subroutine
@@ -1465,7 +1503,7 @@ module epcoup
     do ib=ist, iend
      do jb=1,nb
 
-       dE = olap%Eig(ib,1) - olap%Eig(jb,1)
+       dE = epc%eig(ib) - epc%eig(jb)
        iq = olap%kkqmap(ib,jb)
        if (iq<0) cycle
 
