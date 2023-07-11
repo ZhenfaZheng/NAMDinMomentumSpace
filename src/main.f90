@@ -27,7 +27,7 @@ Program main
   call MPI_COMM_RANK(MPI_COMM_WORLD, irank, ierr)
 
   if (irank==0) write(*,*)
-  if (irank==0) write(*,*) "Hefei-NAMD (epc version 2.1.12, Jul 11, 2023)"
+  if (irank==0) write(*,*) "Hefei-NAMD (epc version 2.1.13, Jul 11, 2023)"
 
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   ! First, get user inputs

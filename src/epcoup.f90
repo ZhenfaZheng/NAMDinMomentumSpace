@@ -47,7 +47,6 @@ module epcoup
     call MPI_COMM_RANK(MPI_COMM_WORLD, irank, ierr)
     call MPI_COMM_SIZE(MPI_COMM_WORLD, nrank, ierr)
 
-
     if (irank==0) write(*,*)
     if (irank==0) write(*,'(A)') &
       "------------------------------------------------------------"
@@ -92,6 +91,8 @@ module epcoup
     if (irank==0) write(*,*) "Calculating e-ph couplings."
   ! if (inp%LARGEBS) then
       call calcEPC(olap_sec, epc, inp)
+      call writeEPELTXT(inp, epc)
+      call writeEPPHTXT(inp, epc, olap_sec)
       ! call writeTXT_LBS(olap_sec)
       ! call writeTXT_LBS_Mode(olap_sec)
       ! call writeKKQMap(olap_sec)
@@ -1782,6 +1783,105 @@ module epcoup
     close(unit=31)
 
   end subroutine
+
+  subroutine writeEPELTXT(inp, epc)
+    implicit none
+
+    type(namdInfo), intent(in) :: inp
+    type(epCoupling), intent(in) :: epc
+
+    integer :: irank, jrank, nrank, ierr
+    integer :: ibas, jbas, nbas, nbas_p
+
+    call MPI_COMM_RANK(MPI_COMM_WORLD, irank, ierr)
+    call MPI_COMM_SIZE(MPI_COMM_WORLD, nrank, ierr)
+
+    nbas   = inp%NBASIS
+    nbas_p = inp%NBASIS_P
+
+    ! if (irank==0) then
+    !   open(unit=34, file='EPECTXT', status='unknown', action='write')
+    !   close(unit=34)
+    ! end if
+    ! call MPI_BARRIER(MPI_COMM_WORLD, ierr)
+
+    do jrank = 0, nrank-1
+
+      if (irank==jrank) then
+
+        if (irank==0) then
+          open(unit=34, file='EPELTXT', status='unknown', action='write')
+        else
+          open(unit=34, file='EPELTXT', status='old', position='append', action='write')
+        end if
+
+        do ibas = 1, nbas_p
+          write(unit=34, fmt='(*(f15.9))') &
+              ( SUM(epc%epcec(ibas,jbas,:,:)), jbas=1,nbas )
+        end do
+
+        close(unit=34)
+
+      end if
+
+      call MPI_BARRIER(MPI_COMM_WORLD, ierr)
+
+    end do
+
+  end subroutine
+
+
+  subroutine writeEPPHTXT(inp, epc, olap)
+    implicit none
+
+    type(namdInfo), intent(in) :: inp
+    type(epCoupling), intent(in) :: epc
+    type(overlap), intent(in) :: olap
+
+    integer :: irank, ierr
+    integer :: ibas, jbas, nbas
+    integer :: iq, nqs, im, nmodes
+    integer :: ist, iend
+    real(kind=q), allocatable :: epcph(:,:), epcph_tot(:,:)
+
+    call MPI_COMM_RANK(MPI_COMM_WORLD, irank, ierr)
+
+    nbas   = inp%NBASIS
+    nqs    = epc%nqpts
+    nmodes = epc%nmodes
+
+    ist = inp%ISTS(irank+1)
+    iend = inp%IENDS(irank+1)
+
+    allocate(epcph(nqs, nmodes))
+    if (irank==0) allocate(epcph_tot(nqs, nmodes))
+    if (irank==0) epcph_tot = 0.0_q
+    epcph = 0.0_q
+
+    do ibas=ist, iend
+      do jbas=1, nbas
+        iq = olap%kkqmap(ibas,jbas)
+        if (iq<0) cycle
+        epcph(iq,:) = epcph(iq,:) + SUM( epc%epcec(ibas-ist+1, jbas, :, :), DIM=2 )
+      end do
+    end do
+
+    call MPI_BARRIER(MPI_COMM_WORLD, ierr)
+    do im = 1, nmodes
+      call MPI_Reduce(epcph(:,im), epcph_tot(:,im), nqs, &
+           MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
+    end do
+
+    if (irank==0) then
+      open(unit=35, file='EPPHTXT', status='unknown', action='write')
+      do iq=1,nqs
+        write(unit=35, fmt='(*(f15.9))') (epcph_tot(iq,im), im=1,nmodes)
+      end do
+      close(unit=35)
+    end if
+
+  end subroutine
+
 
   subroutine writeTXT_LBS(olap)
     implicit none
