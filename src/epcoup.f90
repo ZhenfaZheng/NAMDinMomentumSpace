@@ -64,9 +64,10 @@ module epcoup
 
     call selBasis(inp, epc)
     if (inp%LSORT) call sortBasis(inp, epc)
-    call elen2eig(inp, epc)
     if (irank==0) call outputBAS(inp, epc)
+
     call mpi_split_bas(inp)
+    call initEPC2(inp, epc)
 
     call initOlap(olap_sec, inp, epc%nqpts, inp%NBASIS)
     call epcToOlapSec(inp, epc, olap_sec)
@@ -120,7 +121,7 @@ module epcoup
     type(namdInfo), intent(inout) :: inp
     type(epCoupling), intent(inout) :: epc
 
-    integer :: nk, nq, nb, nm, nat, nbas, nbas_p
+    integer :: nk, nq, nb, nm, nat
 
     nk  = SUM(epc%nkpts_ps) ; epc%nkpts = nk
     if (inp%NKPOINTS .NE. epc%nkpts) then
@@ -132,8 +133,6 @@ module epcoup
     nb  = epc%nbands
     nm  = epc%nmodes
     nat = epc%natepc
-    nbas   = inp%NBASIS
-    nbas_p = inp%NBASIS_P
 
     allocate(epc%mass(nat))
     allocate(epc%cellep(nat+3,3))
@@ -144,11 +143,33 @@ module epcoup
     allocate(epc%PhQ(nq, nm, 2))
     allocate(epc%eiwdt(nq, nm, 2))
     allocate(epc%phmodes(nq, nm, nat, 3))
-    allocate(epc%gij(nbas_p, nbas, nm))
-    allocate(epc%epcec(nbas_p, nbas, nm, 2))
+
+  end subroutine
+
+
+  subroutine initEPC2(inp, epc)
+    implicit none
+
+    type(namdInfo), intent(in) :: inp
+    type(epCoupling), intent(inout) :: epc
+    integer :: ibas, nbas, nbas_p, nmodes, ik, ib
+
+    nbas = inp%NBASIS
+    nbas_p = inp%NBASIS_P
+    nmodes = epc%nmodes
+
+    allocate(epc%eig(nbas))
+    allocate(epc%gij(nbas_p, nbas, nmodes))
+    allocate(epc%epcec(nbas_p, nbas, nmodes, 2))
 
     epc%gij = cero
     epc%epcec = 0.0_q
+
+    do ibas=1,nbas
+      ik = inp%BASLIST(ibas,1)
+      ib = inp%BASLIST(ibas,2)
+      epc%eig(ibas) = epc%elen(ik, ib)
+    end do
 
   end subroutine
 
@@ -355,7 +376,7 @@ module epcoup
     do ibas=1,nbas
       ik = inp%BASLIST(ibas,1)
       ib = inp%BASLIST(ibas,2)
-      write(unit=39, fmt='(2I12, F20.8)') ik, ib, epc%eig(ibas)
+      write(unit=39, fmt='(2I12, F20.8)') ik, ib, epc%elen(ik,ib)
     end do
 
     close(unit=39)
@@ -1817,7 +1838,7 @@ module epcoup
 
         do ibas = 1, nbas_p
           write(unit=34, fmt='(*(f15.9))') &
-              ( SUM(epc%epcec(ibas,jbas,:,:)), jbas=1,nbas )
+               ( SUM(epc%epcec(ibas,jbas,:,:)), jbas=1,nbas )
         end do
 
         close(unit=34)
@@ -2149,6 +2170,24 @@ module epcoup
 
   end subroutine mpi_split_procs
 
+
+  subroutine testMat(mat, N)
+    implicit none
+
+    complex(kind=q), intent(in) :: mat(:,:)
+    integer, intent(in) :: N
+
+    integer :: ii, jj
+
+    do ii = 1, N
+      do jj = ii, N
+        ! print '(*(I6))', ii, jj
+        ! print '(*(F12.6))', mat(ii,jj), mat(jj,ii)
+        print '(*(F12.6))', ABS(mat(ii,jj))-ABS(mat(jj,ii))
+      end do
+    end do
+    print *
+  end subroutine
 
 
 end module epcoup

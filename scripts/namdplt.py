@@ -44,8 +44,8 @@ def main():
     b1, b2, b3 = pn.calc_rec_vec(a1, a2, a3)
 
     filbassel='BASSEL'
-    bassel  = np.loadtxt(filbassel, dtype=int, skiprows=1)
-    b_index = bassel[:, 1] - 1
+    bassel  = np.loadtxt(filbassel, skiprows=1)
+    b_index = np.array(bassel[:, 1], dtype=int) - 1
 
     en, kpts = pn.ek_selected(inp=inp) # en & kpts selected
     Enk = pn.get_Enk(kpath, B=[b1, b2, b3], inp=inp) # total Enk
@@ -74,9 +74,16 @@ def main():
     #######################################################################
 
     if ((1 in which_plt) or (11 in which_plt)):
-        coup = pn.read_couple(filcoup='EPECTXT', inp=inp)
-        coup = coup * 1000.0 # change unit to meV
-        coup_av = np.average(np.abs(coup), axis=0)
+
+        if os.path.isfile('EPECTXT'):
+            coup = pn.read_couple(filcoup='EPECTXT', inp=inp)
+            coup = coup * 1000.0 # change unit to meV
+            coup_av = np.average(np.abs(coup), axis=0)
+        elif os.path.isfile('EPELTXT'):
+            coup_av = np.loadtxt('EPELTXT') * 1000.0
+        else:
+            print("\nERROR: EPELTXT file is not found!")
+
     if (1 in which_plt):
         plot_couple(coup_av, figname='COUPLE.png')
     if (11 in which_plt):
