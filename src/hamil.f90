@@ -113,7 +113,7 @@ module hamil
 
         do i=ist, iend
           do j=1,N
-            iq = olap%kkqmap(i,j)
+            iq = epc%kkqmap(i,j)
             eptemp = epc%epcec(i-ist+1,j,:,:)
             norm = SUM(eptemp)
             if (norm>0) then
@@ -247,10 +247,11 @@ module hamil
     ! ks%PhQtemp = ks%PhQtemp * epc%eiwdt
 
     ks%ham_p = ks%ham_n
+    ks%ham_n = cero
     do ib=ist, iend
       ! do jb=ib,ks%ndim
       do jb=1,ks%ndim
-        iq = olap%kkqmap(ib,jb)
+        iq = epc%kkqmap(ib,jb)
         if (iq<0) cycle
         ks%ham_n(ib-ist+1,jb) = SUM( epc%gij(ib-ist+1,jb,:) * &
             SUM(ks%PhQtemp(iq,:,:), dim=2) )
