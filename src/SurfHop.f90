@@ -16,15 +16,16 @@ module shop
     type(overlap), intent(in) :: olap
     type(epCoupling), intent(in) :: epc
 
-    integer :: nbas, Nt, ninibs
     integer :: irank, nrank, ierr
     integer :: ist, iend, nbas_p
     integer :: ist_tj, iend_tj, ntj_p
-    integer :: i, j, ibas, jbas, tion, iq, cstat, nstat
+    integer :: nbas, Nt, ninibs, nqs, nmodes
+    integer :: i, j, ibas, jbas, tion, iq, im, cstat, nstat
     integer, allocatable :: ists_tj(:), iends_tj(:)
     integer, allocatable :: sendcounts(:), displs(:)
     integer, allocatable :: cstat_all(:,:), occb(:,:)
     real(kind=q), allocatable :: sh_prop_p(:,:), sh_pops_p(:)
+    real(kind=q), allocatable :: ph_pops_p(:,:), ph_pops_t(:,:)
 
     CALL MPI_COMM_RANK(MPI_COMM_WORLD, irank, ierr)
     CALL MPI_COMM_SIZE(MPI_COMM_WORLD, nrank, ierr)
@@ -45,6 +46,8 @@ module shop
 
     nbas = inp%NBASIS
     ninibs = inp%NINIBS
+    nqs = epc%nqpts
+    nmodes = epc%nmodes
     Nt = inp%NAMDTIME / inp%POTIM
 
     ks%sh_pops = 0 ! sh_pops(nbas, 1)
@@ -52,6 +55,8 @@ module shop
 
     allocate(sh_prop_p(nbas_p, nbas))
     allocate(sh_pops_p(nbas))
+    allocate(ph_pops_p(nqs, nmodes))
+    if (irank==0) allocate(ph_pops_t(nqs, nmodes))
 
     allocate(cstat_all(ntj_p, ninibs))
     allocate(occb(ntj_p, nbas))
@@ -85,6 +90,7 @@ module shop
       call MPI_BARRIER(MPI_COMM_WORLD, ierr)
 
       sh_pops_p = 0
+      ph_pops_p = 0
 
       ! do i=1, inp%NTRAJ
       ! do i=ists_tj(irank+1), iends_tj(irank+1)
@@ -101,11 +107,9 @@ module shop
           cstat_all(i,j) = nstat
 
           if (nstat == cstat) cycle
-          iq = olap%kkqmap(cstat, nstat)
+          iq = epc%kkqmap(cstat, nstat)
           if (iq>0) then
-            ks%ph_pops(iq, :, tion) &
-              = ks%ph_pops(iq, :, tion) &
-              + SUM(ks%ph_prop(cstat,nstat,:,:), dim=2)
+            ph_pops_p(iq,:) = ph_pops_p(iq,:) + SUM(ks%ph_prop(cstat,nstat,:,:), dim=2)
           end if
 
         end do
@@ -115,6 +119,13 @@ module shop
       call MPI_Reduce(sh_pops_p, ks%sh_pops(:,1), nbas, &
                MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
 
+      do im=1, nmodes
+        call MPI_Reduce(ph_pops_p(:,im), ph_pops_t(:,im), nqs, &
+               MPI_DOUBLE_PRECISION, MPI_SUM, 0, MPI_COMM_WORLD, ierr)
+      end do
+      call MPI_BARRIER(MPI_COMM_WORLD, ierr)
+      if (irank==0) ks%ph_pops(:,:,tion) = ks%ph_pops(:,:,tion) + ph_pops_t(:,:)
+
       if (irank==0) then
         ks%sh_pops(:,1) = ks%sh_pops(:,1) / inp%NTRAJ
         if (tion==1) call initPOPfils(inp)
@@ -122,9 +133,6 @@ module shop
       end if
 
     end do
-
-    ! ks%sh_pops = ks%sh_pops / inp%NTRAJ
-    ! ks%ph_pops = ks%ph_pops / inp%NTRAJ
 
   end subroutine
 
@@ -559,11 +567,11 @@ module shop
 
   end subroutine
 
-  subroutine printPHPROP(ks, inp, olap, isample)
+  subroutine printPHPROP(ks, inp, epc, isample)
     implicit none
     type(TDKS), intent(in) :: ks
     type(namdInfo), intent(in) :: inp
-    type(overlap), intent(in) :: olap
+    type(epCoupling), intent(in) :: epc
     integer, intent(in) :: isample
 
     real(kind=q), allocatable, dimension(:,:) :: pops
@@ -604,40 +612,7 @@ module shop
       end if
 
       io = 26
-      write(io,'(A,A12,A3,I6)')     '#', 'BMIN',     ' = ', inp%BMIN
-      write(io,'(A,A12,A3,I6)')     '#', 'BMAX',     ' = ', inp%BMAX
-      write(io,'(A,A12,A3,I6)')     '#', 'KMIN',     ' = ', inp%KMIN
-      write(io,'(A,A12,A3,I6)')     '#', 'KMAX',     ' = ', inp%KMAX
-      if (inp%EMIN > -1.0E5_q) &
-        write(io,'(A,A12,A3,F6.2)') '#', 'EMIN',     ' = ', inp%EMIN
-      if (inp%EMAX <  1.0E5_q) &
-        write(io,'(A,A12,A3,F6.2)') '#', 'EMAX',     ' = ', inp%EMAX
-
-      write(io,'(A,A12,A3,I6)')     '#', 'NBASIS',   ' = ', inp%NBASIS
-      write(io,'(A,A12,A3,I6)')     '#', 'NBANDS',   ' = ', inp%NBANDS
-      write(io,'(A,A12,A3,I6)')     '#', 'NKPOINTS', ' = ', inp%NKPOINTS
-      ! write(io,'(A,A12,A3,I6)')     '#', 'INIBAND',  ' = ', inp%INIBAND
-      ! write(io,'(A,A12,A3,I6)')     '#', 'INIKPT',   ' = ', inp%INIKPT
-
-      write(io,'(A,A12,A3,I6)')     '#', 'NSW',      ' = ', inp%NSW
-      write(io,'(A,A12,A3,F6.1)')   '#', 'POTIM',    ' = ', inp%POTIM
-      write(io,'(A,A12,A3,F6.1)')   '#', 'TEMP',     ' = ', inp%TEMP
-      write(io,'(A,A12,A3,I6)')     '#', 'NAMDTINI', ' = ', inp%NAMDTINI
-      write(io,'(A,A12,A3,I6)')     '#', 'NAMDTIME', ' = ', inp%NAMDTIME
-      write(io,'(A,A12,A3,I6)')     '#', 'NTRAJ',    ' = ', inp%NTRAJ
-      write(io,'(A,A12,A3,I6)')     '#', 'NELM',     ' = ', inp%NELM
-
-      write(io,'(A,A12,A3,L6)')     '#', 'LEPC',     ' = ', inp%LEPC
-      write(io,'(A,A12,A3,L6)')     '#', 'LARGEBS',  ' = ', inp%LARGEBS
-      write(io,'(A,A12,A3,I6)')     '#', 'EPCTYPE',  ' = ', inp%EPCTYPE
-      write(io,'(A,A12,A3,L6)')     '#', 'LBASSEL',  ' = ', inp%LBASSEL
-      write(io,'(A,A12,A3,L6)')     '#', 'LSORT',    ' = ', inp%LSORT
-      write(io,'(A,A12,A3,L6)')     '#', 'LCPTXT',   ' = ', inp%LCPTXT
-      write(io,'(A,A12,A3,L6)')     '#', 'LHOLE',    ' = ', inp%LHOLE
-
-      if (inp%EPCTYPE==2) &
-        write(io,'(A,A12,A3,A)') '#', 'MDFIL', ' = ', TRIM(ADJUSTL(inp%FILMD))
-      write(io,'(A,A12,A3,A)') '#', 'EPMFIL', ' = ', TRIM(ADJUSTL(inp%FILEPM))
+      call outputInp(io, inp)
 
       pops = ks%ph_pops(:,im,:) / Navg
 
@@ -650,7 +625,7 @@ module shop
         ! prevent output error for small value
         pops(:,tion) = pops(:,tion) + 1.0E-30
         write(unit=26, fmt='(*(G20.10))') &
-            tion * inp%POTIM, SUM( olap%Phfreq(:,im) * pops(:,tion) ), &
+            tion * inp%POTIM, SUM( epc%phfreq(:,im) * pops(:,tion) ), &
             (pops(i,tion), i=1, inp%NQPOINTS)
       end do
 

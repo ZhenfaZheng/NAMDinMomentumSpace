@@ -27,7 +27,7 @@ Program main
   call MPI_COMM_RANK(MPI_COMM_WORLD, irank, ierr)
 
   if (irank==0) write(*,*)
-  if (irank==0) write(*,*) "Hefei-NAMD (epc version 2.1.15, Jul 13, 2023)"
+  if (irank==0) write(*,*) "Hefei-NAMD (epc version 2.1.16, Jul 13, 2023)"
 
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   ! First, get user inputs
@@ -76,7 +76,7 @@ Program main
       ! if (irank==0) call printSH(ks, inp)
       ! if (inp%LEPC) call phQ2R(inp, olap_sec, epc, ks%ph_pops)
       ! if (inp%LEPC) call saveXDAT(inp, olap_sec, epc)
-      ! if (inp%LEPC) call printPHPROP(ks, inp, olap_sec, ns)
+      if ((irank==0) .and. inp%LEPC) call printPHPROP(ks, inp, epc, ns)
     end if
     call system_clock(t2)
     if (irank==0) write(*,'(A, F10.2)') "CPU Time [s]:", (t2-t1)/real(rate)

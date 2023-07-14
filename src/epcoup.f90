@@ -1533,11 +1533,11 @@ module epcoup
        if (iq<0) cycle
 
        do im=1,nm
-         dE1 = dE - epc%phfreq(iq,im) - 1.0E-8_q
+         dE1 = dE - epc%phfreq(iq,im)! - 1.0E-8_q
          epc%epcec(ib-ist+1,jb,im,1) &
            = ( ABS(epc%gij(ib-ist+1,jb,im)) * ABS(epc%PhQ(iq, im, 1)) ) ** 2 &
              * exp(-0.5 * (dE1/sigma)**2)
-         dE2 = dE + epc%phfreq(iq,im) + 1.0E-8_q
+         dE2 = dE + epc%phfreq(iq,im)! + 1.0E-8_q
          epc%epcec(ib-ist+1,jb,im,2) &
            = ( ABS(epc%gij(ib-ist+1,jb,im)) * ABS(epc%PhQ(iq, im, 1)) ) ** 2 &
              * exp(-0.5 * (dE2/sigma)**2)

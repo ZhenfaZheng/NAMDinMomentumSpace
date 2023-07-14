@@ -64,6 +64,8 @@ module hamil
     integer :: irank, ierr
     integer :: ist, iend, N_p
 
+    CALL MPI_COMM_RANK(MPI_COMM_WORLD, irank, ierr)
+
     ! memory allocation
 
     N = inp%NBASIS
@@ -101,13 +103,15 @@ module hamil
         nqs = olap%NQ; nmodes = olap%NMODES
         allocate(ks%PhQtemp(nqs, nmodes, 2))
         ! allocate(ks%PhQ(nqs, nmodes, 2, Nt))
-        allocate(ks%ph_pops(nqs, nmodes, Nt))
         allocate(ks%ph_prop(N, N, nmodes, 2))
+        ks%ph_prop = 0.0
+        if (irank==0) then
+          allocate(ks%ph_pops(nqs, nmodes, Nt))
+          ks%ph_pops = 0.0
+        end if
 
-        ks%ph_pops = 0.0; ks%ph_prop = 0.0
         allocate(eptemp(nmodes, 2))
 
-        CALL MPI_COMM_RANK(MPI_COMM_WORLD, irank, ierr)
         ist = inp%ISTS(irank+1)
         iend = inp%IENDS(irank+1)
 
