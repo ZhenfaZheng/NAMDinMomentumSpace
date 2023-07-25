@@ -182,11 +182,9 @@ mpirun -np 16 ./namd-epc # Here, 16 is the number of processes as an example
 
 After Hefei-NAMD-EPC calculation, we obtain files as bellow:
 
-BASSEL (Belected basises in NAMD simulation)
+BASSEL (Selected basises in NAMD simulation)
 
-EIGTXT (Eigen energy of each basis)
-
-EPTXT, EPECTXT, EPPHTXT (*e-ph* couplings)
+EPELTXT, EPPHTXT (*e-ph* couplings)
 
 PHPROP.\${imode} (Evolution of phonon number for each mode)
 
