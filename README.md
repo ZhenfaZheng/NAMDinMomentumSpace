@@ -9,6 +9,8 @@
 - [Installation Guide](#installation-guide)
 - [Tutorials of Runing Hefei-NAMD-EPC](#tutorials-of-runing-hefei-namd-epc)
 
+**注意：目前版本在声子反馈部分还有问题，请随时关注版本更新，或者使用python版本
+的程序：[NAMD-EPC tyy version](https://github.com/vtzf/NAMD-EPC-Cython)**
 
 # Overview
 
@@ -68,7 +70,7 @@ vim Makefile
 Modify the two flags "IFLAGS" and "LFLAGS"
 ```
 IFLAGS = -I/\${path-to-your-hdf5-dir}/include
-LFLAGS = -I/\${path-to-your-hdf5-dir}/include -lhdf5 -lhdf5_fortran
+LFLAGS = -I/\${path-to-your-hdf5-dir}/lib -lhdf5 -lhdf5_fortran
 ```
 After modifying the "Makefile", compile the Hefei-NAMD-EPC
 ```
@@ -121,36 +123,37 @@ cd ..
 Then, generate "inp" file, below is an example
 ```
 &NAMDPARA
-  BMIN       = 1
-  BMAX       = 2
-  KMIN       = 1
-  KMAX       = 40
-  EMIN       = -4.6
-  EMAX       = -1.5
-  NBANDS     = 2
-  NKPOINTS   = 81
-  NINIBS     = 1
-  Np         = 81
+  BMIN       = 1       ! minimum band index
+  BMAX       = 2       ! maximum band index
+  KMIN       = 1       ! minimum k-point index
+  KMAX       = 40      ! maximum k-point index
+  EMIN       = -4.6    ! minimum energy, in unit of eV
+  EMAX       = -1.5    ! maximum energy, in unit of eV
+  NBANDS     = 2       ! number of bands
+  NKPOINTS   = 81      ! number of k-points
+  NINIBS     = 1       ! number of initial states
+  Np         = 81      ! number of unit cells corresponding to the k-grid
 
-  NSW        = 1200
-  POTIM      = 1.0
-  TEMP       = 300
+  NSW        = 1200    ! number of time steps for the MD trajctory
+  POTIM      = 1.0     ! time step for the MD trajctory, in unit of fs
+  TEMP       = 300     ! MD temperature
 
-  NSAMPLE    = 6
-  NAMDTIME   = 1000
-  NELM       = 1000
-  NTRAJ      = 10000
-  LHOLE      = .F.
-  LCPEXT     = .F.
+  NSAMPLE    = 6       ! number of samples with different initial conditions
+  NAMDTIME   = 1000    ! time of NAMD, in unit of fs
+  NELM       = 1000    ! number of steps of electron wave propagation each POTIM
+  NTRAJ      = 10000   ! number of surface hopping trajectories for each sample
+  LHOLE      = .F.     ! hole or electron surface hopping LCPEXT     = .F.     ! whether to read TXT files or not (not available for epc version)
 
-  LEPC       = .T.
-  LBASSEL    = .F.
-  LARGEBS    = .T.
-  LSORT      = .T.
-  EPCTYPE    = 1
-  NPARTS     = 1
-  EPMDIR     = './'
-  EPMPREF    = 'graphene'
+  LEPC       = .T.     ! whether to use e-p matrix as NA couplings
+  LBASSEL    = .F.     ! whether to read BASSEL file. If not, will generate it. 
+                       ! if ture, will ignore parameters: BMIN, BMAX, KMIN, KMAX, EMIN, EMAX.
+  LSORT      = .T.     ! whether ot sort states in order of energy
+  SIGMA      = 0.025   ! energy broadening
+  EPCTYPE    = 1       ! 1: calculate EPC from average phonon populations.
+                       ! 2: calculate EPC by norm mode decompositon form MD traj
+  NPARTS     = 1       ! number of parts of ephmat information
+  EPMDIR     = './'    ! directory of ephmat.h5 files
+  EPMPREF    = 'graphene'    ! prefix of ephmat.h5 files
 /
 ```
 
@@ -172,7 +175,7 @@ $\mathbf{k}$ and band indices of initial electronic state.
 
 Copy executable file "namd-epc" to your work diretory, then execute
 ```
-./namd-epc
+mpirun -np 16 ./namd-epc # Here, 16 is the number of processes as an example
 ```
 
 ## 4. Output files

@@ -1,2 +1,5 @@
 
 This is a patch for PERTURBO to output e-ph coupling related informations.
+
+The calc_ephmat_for_pert2.0.f90 is the patch suitable for QE 7.0 and Perturbo
+2.0 version.
