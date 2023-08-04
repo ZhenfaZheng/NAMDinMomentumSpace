@@ -140,9 +140,10 @@ def ek_selected(filephmat='', filbassel='BASSEL', inp=None):
     else:
         en_tot, kpts_tot = read_ektot(inp)
 
-    bassel  = np.loadtxt(filbassel, dtype=int, skiprows=1) - 1
-    en = en_tot[bassel[:,0], bassel[:,1]]
-    kpts = kpts_tot[bassel[:,0]]
+    bassel  = np.loadtxt(filbassel, skiprows=1)
+    b_index = np.array(bassel[:, 1], dtype=int) - 1
+    en = en_tot[b_index[:,0], b_index[:,1]]
+    kpts = kpts_tot[b_index[:,0]]
 
     return en, kpts
 
