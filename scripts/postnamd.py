@@ -204,7 +204,7 @@ def read_ephmath5(filname, igroup=-1, idset=-1, dset=""):
 
         group_list = ['el_ph_band_info', 'g_ephmat_total_meV']
         dset_list  = [
-            'informations', 'k_list', 'q_list', 'el_band_eV', # 0~3
+            'information', 'k_list', 'q_list', 'el_band_eV', # 0~3
             'ph_disp_meV', 'phmod_ev_r', 'phmod_ev_i',        # 4~6
             'lattice_vec_angstrom', 'atom_pos', 'mass_a.u.']  # 7~9
         if igroup==0:
