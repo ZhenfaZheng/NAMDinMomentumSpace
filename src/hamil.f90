@@ -59,12 +59,15 @@ module hamil
 
     real(kind=q) :: norm
     real(kind=q), allocatable, dimension(:,:) :: eptemp
+    real(kind=q), allocatable, dimension(:,:,:,:) :: ph_prop_p
     integer :: i, j, ib, iq, im, t, nsteps, N, Nt, nmodes, nqs
+    integer, allocatable :: sendcounts(:), displs(:)
     integer :: initstep
-    integer :: irank, ierr
+    integer :: irank, nrank, ierr
     integer :: ist, iend, N_p
 
     CALL MPI_COMM_RANK(MPI_COMM_WORLD, irank, ierr)
+    CALL MPI_COMM_SIZE(MPI_COMM_WORLD, nrank, ierr)
 
     ! memory allocation
 
@@ -104,6 +107,7 @@ module hamil
         allocate(ks%PhQtemp(nqs, nmodes, 2))
         ! allocate(ks%PhQ(nqs, nmodes, 2, Nt))
         allocate(ks%ph_prop(N, N, nmodes, 2))
+        allocate(ph_prop_p(N_p, N, nmodes, 2))
         ks%ph_prop = 0.0
         if (irank==0) then
           allocate(ks%ph_pops(nqs, nmodes, Nt))
@@ -122,11 +126,29 @@ module hamil
             norm = SUM(eptemp)
             if (norm>0) then
             ! ks%ph_prop(i,j,:) = (eptemp(:,2) - eptemp(:,1)) / norm
-              ks%ph_prop(i,j,:,1) =  eptemp(:,1) / norm
-              ks%ph_prop(i,j,:,2) = -eptemp(:,2) / norm
+            ! ks%ph_prop(i,j,:,1) =  eptemp(:,1) / norm
+            ! ks%ph_prop(i,j,:,2) = -eptemp(:,2) / norm
+              ph_prop_p(i-ist+1,j,:,1) =  eptemp(:,1) / norm
+              ph_prop_p(i-ist+1,j,:,2) = -eptemp(:,2) / norm
             end if
           end do
         end do
+
+        call MPI_BARRIER(MPI_COMM_WORLD, ierr)
+        allocate(sendcounts(nrank), displs(nrank))
+        sendcounts = inp%IENDS - inp%ISTS + 1
+        displs = inp%ISTS - inp%ISTS(1)
+
+        do j=1,N
+        do im=1,nmodes
+        do i=1,2
+          CALL MPI_ALLgatherv(ph_prop_p(:,j,im,i), N_p, MPI_DOUBLE_PRECISION, &
+                 ks%ph_prop(:,j,im,i), sendcounts, displs, MPI_DOUBLE_PRECISION, &
+                 MPI_COMM_WORLD, ierr)
+        end do
+        end do
+        end do
+        call MPI_BARRIER(MPI_COMM_WORLD, ierr)
 
       end if
 
