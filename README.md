@@ -12,6 +12,9 @@
 **注意：目前版本在声子反馈部分还有问题，请随时关注版本更新，或者使用python版本
 的程序：[NAMD-EPC tyy version](https://github.com/vtzf/NAMD-EPC-Cython)**
 
+**上述声子反馈的问题已修复！**
+
+
 # Overview
 
 This is a program to perform non-adiabatic molecular dynamics (NAMD) simultion
