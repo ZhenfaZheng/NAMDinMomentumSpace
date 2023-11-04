@@ -13,7 +13,7 @@ def main():
     #######################################################################
 
     Eref = 0.0
-    which_plt = [1, 11, 12, 2, 31, 4, 5, 6]
+    which_plt = [1, 11, 12, 2, 31, 32, 33, 4, 5, 6]
     '''
     Select which figures to plot.
     1: COUPLE.png; 11:COUPLE_EL.png; 12:COUPLE_PH.png; 2: TDEN.png;
@@ -60,19 +60,6 @@ def main():
     q_index, qp_index = pn.select_kpts_on_path(qpts, qpath, norm=0.001)
     q_loc, qp_loc = pn.loc_on_kpath(qpts_cart, q_index, qp_index, qpath_cart)
 
-    filshps = glob('SHPROP.*')
-    if filshps:
-        shp = pn.readshp(filshps)
-        ntsteps = shp.shape[0]
-        namdtime = shp[-1,0]
-    else:
-        shp = None ; ntsteps = 0 ; namdtime = 0.0
-        print('\nERROR: SHPROP files are not found!')
-
-
-    #                             Plot figures                            #
-    #######################################################################
-
     if ((1 in which_plt) or (11 in which_plt)):
 
         if os.path.isfile('EPECTXT'):
@@ -84,36 +71,27 @@ def main():
         else:
             print("\nERROR: EPELTXT file is not found!")
 
-    if (1 in which_plt):
-        plot_couple(coup_av, figname='COUPLE.png')
-    if (11 in which_plt):
-        plot_couple_el(coup_av, k_loc, en, kp_loc, kplabels, k_index, Enk,
-                       Eref, figname='COUPLE_EL.png')
     if (12 in which_plt):
         if os.path.isfile('EPPHTXT'):
             coup_ph = np.loadtxt('EPPHTXT')
             coup_ph *= 1000.0 # change unit to meV
-            plot_coup_ph(coup_ph, q_loc, phen, qp_loc, qplabels, q_index,
-                         figname='COUPLE_PH.png')
         else:
             print("\nERROR: EPPHTXT file is not found!")
 
-    if (2 in which_plt):
-        plot_tdprop(shp, Eref, lplot=2, ksen=en, figname='TDEN.png')
-
-    if (31 in which_plt):
-        plot_kprop(kpts_cart, shp, B=[b1, b2, b3], axis='xy', figname='TDKPROPxy.png')
-    if (32 in which_plt):
-        plot_kprop(kpts_cart, shp, B=[b1, b2, b3], axis='yz', figname='TDKPROPyz.png')
-    if (33 in which_plt):
-        plot_kprop(kpts_cart, shp, B=[b1, b2, b3], axis='xz', figname='TDKPROPxz.png')
-
-    if (4 in which_plt):
-        # times = [0, 50, 100, 200, 500, 1000]
-        times = list( range(0, int(namdtime)+1, int(namdtime/4)) )
-        plot_tdband_sns(k_loc, en, kp_loc, kplabels, shp, k_index, times,
-                        b_index=b_index, Eref=Eref, figname='TDBAND.png')
-
+    l_read_shp = False
+    for ii in which_plt:
+        if (ii in [2, 31, 32, 33, 4, 7, 8]):
+            l_read_shp = True
+    if (l_read_shp):
+        filshps = glob('SHPROP.*')
+        if filshps:
+            shp = pn.readshp(filshps)
+            ntsteps = shp.shape[0]
+            namdtime = shp[-1,0]
+        else:
+            shp = None ; ntsteps = 0 ; namdtime = 0.0
+            print('\nERROR: SHPROP files are not found!')
+        print('SHPROP files have been read!')
 
     if ((5 in which_plt) or (6 in which_plt)):
         if not os.path.isfile('PHPROP'):
@@ -123,17 +101,46 @@ def main():
             php = np.loadtxt('PHPROP')
             nmodes = int( php.shape[0] / ntsteps ) ; nqs = php.shape[1] - 2
             php = php.reshape(nmodes, ntsteps, nqs+2)
+        print('PHPROP files have been read!')
+
+
+    #                             Plot figures                            #
+    #######################################################################
+
+    if (1 in which_plt):
+        plot_couple(coup_av, figname='COUPLE.png')
+    if (11 in which_plt):
+        plot_couple_el(coup_av, k_loc, en, kp_loc, kplabels, k_index, Enk,
+                       Eref, figname='COUPLE_EL.png')
+    if (12 in which_plt):
+        plot_coup_ph(coup_ph, q_loc, phen, qp_loc, qplabels, q_index,
+                     figname='COUPLE_PH.png')
+
+    if (2 in which_plt):
+        plot_tdprop(shp, Eref, lplot=2, ksen=en, figname='TDEN.png')
+
+    # times = [0, 50, 100, 200, 500, 1000]
+    times = list( range(0, int(namdtime)+1, int(namdtime/5)) )
+
+    if (31 in which_plt):
+        plot_tdkprop(kpts, shp, times, axis='xy', figname='TDKPROPxy.png')
+    if (32 in which_plt):
+        plot_tdkprop(kpts, shp, times, axis='yz', figname='TDKPROPyz.png')
+    if (33 in which_plt):
+        plot_tdkprop(kpts, shp, times, axis='xz', figname='TDKPROPxz.png')
+
+    if (4 in which_plt):
+        plot_tdband_sns(k_loc, en, kp_loc, kplabels, shp, k_index, times,
+                        b_index=b_index, Eref=Eref, figname='TDBAND.png')
 
     if (5 in which_plt):
-        # times = [0, 50, 100, 200, 500, 1000]
-        times = list( range(0, int(namdtime)+1, int(namdtime/4)) )
-        plot_tdph_sns(q_loc, phen, qp_loc, qplabels, php, q_index, times, figname='TDPH.png')
+        plot_tdph_sns(q_loc, phen, qp_loc, qplabels, php, q_index, times,
+                      figname='TDPH.png')
 
     if (6 in which_plt):
         plot_tdphen(php, figname='TDPHEN.png')
 
     if (7 in which_plt):
-        times = list( range(0, int(namdtime)+1, int(namdtime/4)) )
         plot_distrib(en, shp, times, Ef=Eref, figname='DISTRIBUTION.png')
 
     if (8 in which_plt):
@@ -330,7 +337,8 @@ def plot_tdprop(shp, Eref=0.0, lplot=1, ksen=None, figname='tdshp.png'):
         # cmax = math.ceil(cmax*10)/10
         # norm = mpl.colors.Normalize(cmin,cmax)
         pop = shp[:,2:]
-        cmin = np.min(pop[pop>0.0]); cmax = np.max(pop)
+        cmin = 1.0e-4; cmax=1.0
+        # cmin = np.min(pop[pop>0.0]); cmax = np.max(pop)
         norm = mpl.colors.LogNorm(cmin,cmax)
 
         if (ksen.shape[0]!=nbands):
@@ -407,6 +415,80 @@ def plot_kprop(kpts, shp, B, axis='xy', figname='TDKPROP.png'):
     print("\n%s has been saved."%figname)
 
 
+def plot_tdkprop(kpts, shp, times, axis='xy', figname='TDKPROP.png'):
+
+    axdict = {'x':0, 'y':1, 'z':2}
+    # axis must be set as 'xy', 'yz' or 'xz'!
+    kax = [axdict[s] for s in axis]
+
+    namdtime = shp[-1,0]
+    ntsteps = shp.shape[0]
+    potim = namdtime / ntsteps
+    nbasis = shp.shape[1] - 2
+
+    tindex = times2index(times, shp)
+    times = shp[tindex,0]
+    nts = len(times)
+    pop = shp[tindex,2:]
+    cmin = np.min(pop[pop>0.0]); cmax = np.max(pop)
+    norm = mpl.colors.LogNorm(cmin,cmax)
+    cmap = 'hot_r'
+
+    if (nts < 4):
+        ncol = nts; nrow = 1
+    else:
+        ncol = math.ceil(np.sqrt(nts))
+        nrow = math.ceil( nts / ncol )
+
+    figsize_x = 2.7 * ncol + 1.0
+    figsize_y = 2.8 * nrow # in inches
+    fig, axes = plt.subplots(nrow, ncol)
+    fig.set_size_inches(figsize_x, figsize_y)
+    mpl.rcParams['axes.unicode_minus'] = False
+
+    X = kpts[:,kax[0]]
+    Y = kpts[:,kax[1]]
+
+    if (nts < ncol * nrow):
+        for it in range(nts, ncol*nrow):
+            ax = axes[math.floor(it/ncol), it%ncol]
+            ax.axis('off')
+
+    for it in range(nts):
+
+        if (nrow==1):
+            ax = axes[it] if ncol>1 else axes
+        else:
+            ax = axes[math.floor(it/ncol), it%ncol]
+
+        ax.set_title('%.0f fs'%times[it])
+
+        sort = np.argsort(pop[it,:])
+        sc = ax.scatter(X[sort], Y[sort], s=10, lw=0, c=pop[it,sort],
+                        norm=norm, cmap=cmap)
+
+        ax.set_xlim(0, 1)
+        ax.set_ylim(0, 1)
+        ax.set_aspect('equal')
+        # ax.set_xticks([])
+        # ax.set_yticks([])
+        ax.set_xlabel('k$_%s$'%axis[0])
+        ax.set_ylabel('k$_%s$'%axis[1])
+
+    ll = 0.6/figsize_x ; rr = 1.0 - 0.7 / figsize_x
+    bb = 0.5/figsize_y ; tt = 1.0 - 0.4 / figsize_y
+    if (nts < ncol * nrow): rr = 1.0 - 0.2 / figsize_x
+    fig.subplots_adjust(bottom=bb, top=tt, left=ll, right=rr,
+                        wspace=0.4, hspace=0.45)
+    w_cb = 0.12 / figsize_x
+    l, b, w, h = ax.get_position().bounds
+    cb_ax = fig.add_axes([l+w+0.4*w_cb, b, w_cb, h])
+    cbar = plt.colorbar(sc, cax=cb_ax)
+
+    plt.savefig(figname, dpi=400)
+    print("\n%s has been saved."%figname)
+
+
 def plot_tdband(k_loc, en, kp_loc, kplabels, shp, index,
         X_bg=None, E_bg=None, Eref=0.0, figname='TDBAND.png'):
 
@@ -469,10 +551,8 @@ def plot_tdband_sns(k_loc, en, kp_loc, kplabels, shp, index, times,
     namdtime = shp[-1, 0]
     potim = namdtime / ntsteps
 
-    tindex = []
-    for time in times:
-        if time==0: time = potim
-        tindex.append(int(time/potim)-1)
+    tindex = times2index(times, shp)
+    times = shp[tindex,0]
     pop = shp[:,index+2][tindex,:]
     nts = len(times)
 
@@ -483,19 +563,35 @@ def plot_tdband_sns(k_loc, en, kp_loc, kplabels, shp, index, times,
     ymin = E.min() ; ymax = E.max() ; dy = ymax - ymin
     ymin -= dy*0.05 ; ymax += dy*0.05
 
-    figsize_x = 2.4 * nts + 1.0
-    figsize_y = 3.2 # in inches
-    fig, axes = plt.subplots(1, nts)
+    if (nts < 4):
+        ncol = nts; nrow = 1
+    else:
+        ncol = math.ceil(np.sqrt(nts))
+        nrow = math.ceil( nts / ncol )
+
+    figsize_x = 2.6 * ncol + 1.0
+    figsize_y = 3.5 * nrow # in inches
+    fig, axes = plt.subplots(nrow, ncol)
     fig.set_size_inches(figsize_x, figsize_y)
     mpl.rcParams['axes.unicode_minus'] = False
 
     cmap = 'hot_r'
-    cmin = np.min(pop[pop>0.0]); cmax = np.max(pop)
+    # cmin = np.min(pop[pop>0.0]); cmax = np.max(pop)
+    cmin = 1.0e-4; cmax=1.0
     norm = mpl.colors.LogNorm(cmin,cmax)
+
+    if (nts < ncol * nrow):
+        for it in range(nts, ncol*nrow):
+            ax = axes[math.floor(it/ncol), it%ncol]
+            ax.axis('off')
 
     for it in range(nts):
 
-        ax = axes[it]
+        if (nrow==1):
+            ax = axes[it] if ncol>1 else axes
+        else:
+            ax = axes[math.floor(it/ncol), it%ncol]
+
         ax.set_title('%.0f fs'%times[it])
 
         # plot background E-k lines
@@ -527,13 +623,17 @@ def plot_tdband_sns(k_loc, en, kp_loc, kplabels, shp, index, times,
 
         ax.set_xlim(xmin, xmax)
         ax.set_ylim(ymin, ymax)
-        if (it==0):
+        if (it%ncol==0):
             ax.set_ylabel('Energy (eV)')
 
-    ll = 0.8/figsize_x ; rr = 1.0 - 1.0 / figsize_x
-    ll_cb = 1.0 - 0.9 / figsize_x ; ww_cb = 0.12 / figsize_x
-    fig.subplots_adjust(bottom=0.1, top=0.9, left=ll, right=rr, wspace=0.35)
-    cb_ax = fig.add_axes([ll_cb, 0.1, ww_cb, 0.8])
+    ll = 0.8/figsize_x ; rr = 1.0 - 0.8 / figsize_x
+    bb = 0.4/figsize_y ; tt = 1.0 - 0.4 / figsize_y
+    if (nts < ncol * nrow): rr = 1.0 - 0.2 / figsize_x
+    fig.subplots_adjust(bottom=bb, top=tt, left=ll, right=rr,
+                        wspace=0.45, hspace=0.4)
+    w_cb = 0.12 / figsize_x
+    l, b, w, h = ax.get_position().bounds
+    cb_ax = fig.add_axes([l+w+0.4*w_cb, b, w_cb, h])
     cbar = plt.colorbar(sc, cax=cb_ax)
 
     plt.savefig(figname, dpi=400)
@@ -548,12 +648,16 @@ def plot_tdph_sns(q_loc, phen, qp_loc, qplabels, php, index, times,
     nbasis = index.shape[0]
     namdtime = php[0, -1, 0]
     potim = namdtime / ntsteps
+    tindex = times2index(times, php[0,:,:])
+    times = php[0,tindex,0]
     php = np.cumsum(php, axis=1)
 
+    '''
     tindex = []
     for time in times:
         if time==0: time = potim
         tindex.append(int(time/potim)-1)
+    '''
     pop = php[:,:,index+2][:,tindex,:]
     nts = len(times)
 
@@ -568,12 +672,19 @@ def plot_tdph_sns(q_loc, phen, qp_loc, qplabels, php, index, times,
     ymin = E.min() ; ymax = E.max() ; dy = ymax - ymin
     ymin -= dy*0.05 ; ymax += dy*0.05
 
-    figsize_x = 2.4 * nts + 1.0
-    figsize_y = 3.2 # in inches
-    fig, axes = plt.subplots(1, nts)
+    if (nts < 4):
+        ncol = nts; nrow = 1
+    else:
+        ncol = math.ceil(np.sqrt(nts))
+        nrow = math.ceil( nts / ncol )
+
+    figsize_x = 2.6 * ncol + 1.0
+    figsize_y = 3.5 * nrow # in inches
+    fig, axes = plt.subplots(nrow, ncol)
     fig.set_size_inches(figsize_x, figsize_y)
     mpl.rcParams['axes.unicode_minus'] = False
 
+    # cmin = 1.0e-4; cmax=1.0
     cmin = pop.min() ; cmax = pop.max()
     norm = mpl.colors.Normalize(cmin, cmax)
     cmap = genrcmap(cmin, cmax)
@@ -584,12 +695,22 @@ def plot_tdph_sns(q_loc, phen, qp_loc, qplabels, php, index, times,
     s_avg = np.average(size[size>0])
     size = size / size.max()  * 50
 
-
+    if (nts < ncol * nrow):
+        for it in range(nts, ncol*nrow):
+            ax = axes[math.floor(it/ncol), it%ncol]
+            ax.axis('off')
 
     for it in range(nts):
 
-        ax = axes[it]
-        ax.set_title('%.0f fs'%times[it])
+        if (nrow==1):
+            ax = axes[it] if ncol>1 else axes
+        else:
+            ax = axes[math.floor(it/ncol), it%ncol]
+
+        if (it==0):
+            ax.set_title('%.0f fs'%times[it])
+        else:
+            ax.set_title('%.0f - %.0f fs'%(times[it-1], times[it]))
 
         sort_index = np.argsort(q_loc)
         for im in range(nmodes):
@@ -616,12 +737,16 @@ def plot_tdph_sns(q_loc, phen, qp_loc, qplabels, php, index, times,
 
         ax.set_xlim(xmin, xmax)
         ax.set_ylim(ymin, ymax)
-        if(it==0): ax.set_ylabel('Phonon energy (meV)')
+        if(it%ncol==0): ax.set_ylabel('Phonon energy (meV)')
 
     ll = 0.8/figsize_x ; rr = 1.0 - 1.0 / figsize_x
-    ll_cb = 1.0 - 0.9 / figsize_x ; ww_cb = 0.12 / figsize_x
-    fig.subplots_adjust(bottom=0.1, top=0.9, left=ll, right=rr, wspace=0.35)
-    cb_ax = fig.add_axes([ll_cb, 0.1, ww_cb, 0.8])
+    bb = 0.4/figsize_y ; tt = 1.0 - 0.4 / figsize_y
+    if (nts < ncol * nrow): rr = 1.0 - 0.2 / figsize_x
+    fig.subplots_adjust(bottom=bb, top=tt, left=ll, right=rr,
+                        wspace=0.45, hspace=0.4)
+    w_cb = 0.12 / figsize_x
+    l, b, w, h = ax.get_position().bounds
+    cb_ax = fig.add_axes([l+w+0.4*w_cb, b, w_cb, h])
     cbar = plt.colorbar(sc, cax=cb_ax)
 
     plt.savefig(figname, dpi=400)
@@ -648,7 +773,6 @@ def genrcmap(cmin=-1.0, cmax=1.0):
 def plot_tdphen(php, figname='TDPHEN.png'):
 
     phen = php[:, :, 1].T
-    phen = np.cumsum(np.cumsum(phen, axis=0), axis=1)
     nmodes = phen.shape[1]
     X = php[0, :, 0]
     namdtime = X[-1]
@@ -660,9 +784,22 @@ def plot_tdphen(php, figname='TDPHEN.png'):
     fig.set_size_inches(figsize_x, figsize_y)
     mpl.rcParams['axes.unicode_minus'] = False
 
-    ax.fill_between(X, phen[:, 0])
-    for im in range(1, nmodes):
-        ax.fill_between(X, phen[:, im], phen[:, im-1])
+    # phen = np.cumsum(np.cumsum(phen, axis=0), axis=1)
+    # ax.fill_between(X, phen[:, 0])
+    # for im in range(1, nmodes):
+    #     ax.fill_between(X, phen[:, im], phen[:, im-1])
+
+    cmap = plt.cm.nipy_spectral
+    cls = [cmap(i) for i in np.linspace(0, 1, nmodes+2)]
+    lbs = ['mode %d'%(im+1) for im in range(nmodes)]
+
+    for im in range(nmodes):
+        ax.plot(X, phen[:,im], label=lbs[im], color=cls[im], lw=1.0)
+
+    if (nmodes<=100):
+        ncol = int(np.sqrt(nmodes) / 2) + 1
+        fsize = 10 - np.sqrt(nmodes) / 2
+        ax.legend(loc=1, ncol=ncol, fontsize=fsize)
 
     ax.set_xlim(0,namdtime)
     ax.set_xlabel('Time (fs)')
@@ -682,10 +819,8 @@ def plot_distrib(en, shp, times, Ef=0.0, figname='DISTRIBUTION.png'):
     ntsteps = shp.shape[0]
     namdtime = shp[-1, 0]
     potim = namdtime / ntsteps
-    tindex = []
-    for time in times:
-        if time==0: time = potim
-        tindex.append(int(time/potim)-1)
+    tindex = times2index(times, shp)
+    times = shp[tindex,0]
     pop = shp[tindex, 2:][:,sort]
 
     nsns = len(times)
@@ -766,6 +901,20 @@ def plot_Tprop(en, shp, Ef=0.0, figname='TPROP.png'):
     plt.savefig(figname, dpi=400)
     print("\n%s has been saved."%figname)
 
+
+def times2index(times, shp):
+
+    tindex = []
+    for time in times:
+        if (time==0 and shp[0,0]>0): time = shp[0,0]
+        index = np.argwhere(shp[:,0]==time)
+        if (len(index) > 0):
+            tindex.append(index[0][0])
+        else:
+            print("\nWARNING: No data in SHPROP/PHPROP files " +\
+                  "for time=%.0f fs!"%time)
+
+    return np.array(tindex, dtype='int')
 
 
 if __name__=='__main__':

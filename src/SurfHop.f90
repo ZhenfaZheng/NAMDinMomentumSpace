@@ -64,6 +64,7 @@ module shop
     occb = 0
     do i=1, ninibs
       ibas = inp%BASSEL(inp%INIKPT(i), inp%INIBAND(i))
+      ks%sh_pops(ibas, 1) = 1.0
       cstat_all(:,i) = ibas
       occb(:,ibas) = 1
     end do
@@ -72,6 +73,12 @@ module shop
 
     call calcBftot(ks, inp)
     ks%PhQtemp = epc%PhQ * (epc%eiwdt ** (inp%NAMDTINI / inp%POTIM - 1))
+
+    if (irank==0) then
+      tion = 0
+      call initPOPfils(inp)
+      call outputPOP(tion, ks, inp)
+    end if
 
     do tion=1, Nt
 
@@ -128,7 +135,7 @@ module shop
 
       if (irank==0) then
         ks%sh_pops(:,1) = ks%sh_pops(:,1) / inp%NTRAJ
-        if (tion==1) call initPOPfils(inp)
+        ! if (tion==1) call initPOPfils(inp)
         call outputPOP(tion, ks, inp)
       end if
 
@@ -613,6 +620,7 @@ module shop
 
       io = 26
       call outputInp(io, inp)
+      write(unit=26, fmt='(*(G20.10))') (0.0, i=1, inp%NQPOINTS+2)
 
       pops = ks%ph_pops(:,im,:) / Navg
 
