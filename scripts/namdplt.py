@@ -131,7 +131,7 @@ def main():
 
     if (4 in which_plt):
         plot_tdband_sns(k_loc, en, kp_loc, kplabels, shp, k_index, times,
-                        b_index=b_index, Eref=Eref, figname='TDBAND.png')
+                        Enk=Enk, Eref=Eref, figname='TDBAND.png')
 
     if (5 in which_plt):
         plot_tdph_sns(q_loc, phen, qp_loc, qplabels, php, q_index, times,
@@ -544,7 +544,7 @@ def plot_tdband(k_loc, en, kp_loc, kplabels, shp, index,
 
 
 def plot_tdband_sns(k_loc, en, kp_loc, kplabels, shp, index, times,
-        b_index=None, X_bg=None, E_bg=None, Eref=0.0, figname='TDBAND.png'):
+        b_index=None, Enk=None, Eref=0.0, figname='TDBAND.png'):
 
     nbasis = index.shape[0]
     ntsteps = shp.shape[0]
@@ -595,7 +595,10 @@ def plot_tdband_sns(k_loc, en, kp_loc, kplabels, shp, index, times,
         ax.set_title('%.0f fs'%times[it])
 
         # plot background E-k lines
-        if b_index is not None:
+        if b_index is None:
+            for ib in range(Enk.shape[1]-1):
+                ax.plot(Enk[:,0], Enk[:,ib+1]-Eref, '#1A5599', lw=0.7)
+        else:
             if (it==0):
                 sort_index = np.argsort(k_loc)
                 X_bg = k_loc[sort_index]
