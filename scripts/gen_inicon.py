@@ -5,13 +5,18 @@ import numpy as np
 import postnamd as pn
 
 
-# select initial states
-# between iniemin ~ iniemax
-iniemin = 0.98
-iniemax = 1.02
-Ef = -4.52862
-iniemin += Ef
-iniemax += Ef
+# select initial states with energy
+# satisfied | en - inien | < de
+inien = 1.0
+de = 0.02
+
+Ef = 0.0
+inien += Ef
+
+# select initial states around specified k-point center,
+# and satisfies | kpt - kcenter | < dk
+kcenter = [0.0, 0.0, 0.0]
+dk = 2.0
 
 # select initial time between
 # init_time_min ~ init_time_max randomly.
@@ -20,22 +25,29 @@ init_time_max = 200
 
 #=====================================================================#
 
-inp = pn.read_inp('./inp')
-nparts = int(inp['NPARTS'])
-prefix = inp['EPMPREF']
-epmdir = inp['EPMDIR']
-
-# read band energies from h5 files.
-for ip in range(nparts):
-    filepm = os.path.join(epmdir, prefix + '_ephmat_p%d.h5'%(ip+1))
-    en_p = pn.read_ephmath5(filepm, igroup=0, idset=3)
-    if ip==0:
-        en_tot = en_p
-    else:
-        en_tot = np.vstack((en_tot, en_p))
+kcenter = np.array(kcenter)
+iniemin = inien - de
+iniemax = inien + de
 
 # select initial states within energy range.
-index = np.argwhere((en_tot>iniemin) & (en_tot<iniemax)) + 1
+inp = pn.read_inp('./inp')
+en_tot, kpts_tot = pn.read_ektot(inp)
+nks = en_tot.shape[0]
+nbs = en_tot.shape[1]
+index = []
+for ik in range(nks):
+    kpt = kpts_tot[ik]
+    if (np.linalg.norm(kpt-kcenter)<dk):
+        for ib in range(nbs):
+            en = en_tot[ik, ib]
+            if (np.abs(en-inien)<de):
+                index.append([ik,ib])
+index = np.array(index) + 1
+
+emin = float(inp['EMIN'])
+emax = float(inp['EMAX'])
+if (iniemin < emin or iniemax > emax):
+    print("\nWarning: Initial energy range exceeds EMIN ~ EMAX in inp!\n")
 
 # read number of initial states and determine nsample.
 nbas = index.shape[0]
