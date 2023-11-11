@@ -84,7 +84,10 @@ module epcoup
       call calcPhQ(olap_sec, inp, epc)
     else
       if (irank==0) write(*,*) "Decomposing phonon modes from MD traj."
+      allocate(olap_sec%PhQ(inp%NQPOINTS, inp%NMODES, 2, inp%nsw-1))
+      olap_sec%PhQ = cero
       call phDecomp(inp, olap_sec, epc)
+      call savePhQ(olap_sec)
     end if
 
     ! call savePhQ(olap_sec)

@@ -13,13 +13,14 @@ def main():
     #######################################################################
 
     Eref = 0.0
-    which_plt = [1, 11, 12, 2, 31, 32, 33, 4, 5, 6]
+    which_plt = [1, 11, 12, 2, 31, 32, 33, 4, 5, 6, 7, 81]
     '''
     Select which figures to plot.
     1: COUPLE.png; 11:COUPLE_EL.png; 12:COUPLE_PH.png; 2: TDEN.png;
     31: TDKPROPxy.png; 32: TDKPROPyz.png; 33: TDKPROPxz.png;
-    4: TDBAND.png; 5: TDPH.png; 6:TDPHEN.png
-    7: DISTRIBUTION.png; 8: TPROP.png
+    4: TDBAND.png; 5: TDPH.png; 6:TDPHEN.png; 7:TDPHNUM.png
+    81: TDQPROPxy.png; 82: TDQPROPyz.png; 83: TDQPROPxz.png;
+    9: DISTRIBUTION.png; 10: TPROP.png
     '''
 
     kplabels = 'gmkg'
@@ -80,28 +81,36 @@ def main():
 
     l_read_shp = False
     for ii in which_plt:
-        if (ii in [2, 31, 32, 33, 4, 7, 8]):
-            l_read_shp = True
+        if (ii in [2, 31, 32, 33, 4, 9, 10]):
+            l_read_shp = True; break
     if (l_read_shp):
         filshps = glob('SHPROP.*')
         if filshps:
             shp = pn.readshp(filshps)
-            ntsteps = shp.shape[0]
-            namdtime = shp[-1,0]
         else:
-            shp = None ; ntsteps = 0 ; namdtime = 0.0
+            shp = None
             print('\nERROR: SHPROP files are not found!')
         print('SHPROP files have been read!')
 
-    if ((5 in which_plt) or (6 in which_plt)):
-        if not os.path.isfile('PHPROP'):
-            filphps = glob('PHPROP.*')
+    l_read_php = False
+    for ii in which_plt:
+        if (ii in [5, 6, 7, 81, 82, 83]):
+            l_read_php = True; break
+    if (l_read_php):
+        nmodes = phen.shape[1] ; nqs = phen.shape[0]
+        filphps = glob('PHPROP.*')
+        if filphps:
+            filphps = ['PHPROP.%d'%(im+1) for im in range(nmodes)]
             php = pn.readphp(filphps)
-        else:
+            print('PHPROP files have been read!')
+        elif os.path.isfile('PHPROP'):
             php = np.loadtxt('PHPROP')
-            nmodes = int( php.shape[0] / ntsteps ) ; nqs = php.shape[1] - 2
+            ntsteps = php.shape[0] / nmodes
             php = php.reshape(nmodes, ntsteps, nqs+2)
-        print('PHPROP files have been read!')
+            print('PHPROP files have been read!')
+        else:
+            php = None
+            print('\nERROR: PHPROP files are not found!')
 
 
     #                             Plot figures                            #
@@ -120,7 +129,8 @@ def main():
         plot_tdprop(shp, Eref, lplot=2, ksen=en, figname='TDEN.png')
 
     # times = [0, 50, 100, 200, 500, 1000]
-    times = list( range(0, int(namdtime)+1, int(namdtime/5)) )
+    namdtime = int( inp['NAMDTIME'] )
+    times = list( range(0, namdtime+1, int(namdtime/5)) )
 
     if (31 in which_plt):
         plot_tdkprop(kpts, shp, times, axis='xy', figname='TDKPROPxy.png')
@@ -141,9 +151,33 @@ def main():
         plot_tdphen(php, figname='TDPHEN.png')
 
     if (7 in which_plt):
+        plot_tdphnum(php, figname='TDPHNUM.png')
+
+    if (81 in which_plt):
+        print('')
+        for im in range(nmodes):
+            figname = 'TDQPROPxy_Mode%d.png'%(im+1)
+            plot_tdqprop(qpts, php, times, im, axis='xy', figname=figname)
+        plot_tdqprop(qpts, php, times, axis='xy', figname='TDQPROPxy_tot.png')
+
+    if (82 in which_plt):
+        print('')
+        for im in range(nmodes):
+            figname = 'TDQPROPyz_Mode%d.png'%(im+1)
+            plot_tdqprop(qpts, php, times, im, axis='yz', figname=figname)
+        plot_tdqprop(qpts, php, times, axis='yz', figname='TDQPROPyz_tot.png')
+
+    if (83 in which_plt):
+        print('')
+        for im in range(nmodes):
+            figname = 'TDQPROPxz_Mode%d.png'%(im+1)
+            plot_tdqprop(qpts, php, times, im, axis='xz', figname=figname)
+        plot_tdqprop(qpts, php, times, axis='xz', figname='TDQPROPxz_tot.png')
+
+    if (9 in which_plt):
         plot_distrib(en, shp, times, Ef=Eref, figname='DISTRIBUTION.png')
 
-    if (8 in which_plt):
+    if (10 in which_plt):
         plot_Tprop(en, shp, Ef=Eref, figname='TPROP.png')
 
     print("\nDone!\n")
@@ -203,6 +237,7 @@ def plot_couple_el(coup_in, k_loc, en, kp_loc, kplabels, index, Enk,
     cbar.set_label('Coupling (meV)')
     plt.tight_layout()
     plt.savefig(figname, dpi=400)
+    plt.close(fig)
     print("\n%s has been saved."%figname)
 
 
@@ -233,6 +268,7 @@ def plot_couple(coup, figname='COUPLE.png'):
     cbar.set_label('Coupling (meV)')
     plt.tight_layout()
     plt.savefig(figname, dpi=400)
+    plt.close(fig)
     print("\n%s has been saved."%figname)
 
 
@@ -293,6 +329,7 @@ def plot_coup_ph(coup_ph, q_loc, phen, qp_loc, qplabels, index,
 
     plt.tight_layout()
     plt.savefig(figname, dpi=400)
+    plt.close(fig)
     print("\n%s has been saved."%figname)
 
 
@@ -363,55 +400,7 @@ def plot_tdprop(shp, Eref=0.0, lplot=1, ksen=None, figname='tdshp.png'):
 
     plt.tight_layout()
     plt.savefig(figname, dpi=400)
-    print("\n%s has been saved."%figname)
-
-
-def plot_kprop(kpts, shp, B, axis='xy', figname='TDKPROP.png'):
-
-    axdict = {'x':0, 'y':1, 'z':2}
-    # axis must be set as 'xy', 'yz' or 'xz'!
-    kax = [axdict[s] for s in axis]
-
-    gamma = [0, 0, 0]
-    Bpath = np.array([gamma, B[kax[0]], B[kax[0]]+B[kax[1]], B[kax[1]], gamma])
-    xmin = Bpath[:,kax[0]].min(); xmax = Bpath[:,kax[0]].max()
-    ymin = Bpath[:,kax[1]].min(); ymax = Bpath[:,kax[1]].max()
-
-    namdtime = shp[-1,0]
-    ntsteps = shp.shape[0]
-    potim = namdtime / ntsteps
-    nbasis = shp.shape[1] - 2
-
-    scale = np.sqrt( 12.0 / ((ymax - ymin) * (xmax - xmin)) )
-    figsize_x = (xmax - xmin) * scale * 1.3
-    figsize_y = (ymax - ymin) * scale # in inches
-
-    fig, ax = plt.subplots()
-    fig.set_size_inches(figsize_x, figsize_y)
-    mpl.rcParams['axes.unicode_minus'] = False
-
-    cmap = 'rainbow'
-    norm = mpl.colors.Normalize(0,namdtime)
-    color_t = np.tile(np.arange(ntsteps), nbasis).reshape(nbasis,ntsteps).T * potim
-    s_avg = np.average(shp[:,2:][shp[:,2:]>0])
-    dotsize = shp[:,2:] / s_avg * 0.5
-
-    X = np.tile(kpts[:,kax[0]], ntsteps).reshape(ntsteps,nbasis)
-    Y = np.tile(kpts[:,kax[1]], ntsteps).reshape(ntsteps,nbasis)
-
-    ax.plot(Bpath[:, kax[0]], Bpath[:, kax[1]], color='k', lw=1.0)
-
-    sc = ax.scatter(X, Y, s=dotsize, lw=0, c=color_t, norm=norm, cmap=cmap)
-    cbar = plt.colorbar(sc, fraction=0.05)
-    cbar.set_label('Time (fs)')
-
-    ax.set_xlim(xmin, xmax)
-    ax.set_ylim(ymin, ymax)
-    ax.set_aspect('equal')
-
-    plt.axis('off')
-    plt.tight_layout()
-    plt.savefig(figname, dpi=600)
+    plt.close(fig)
     print("\n%s has been saved."%figname)
 
 
@@ -420,11 +409,6 @@ def plot_tdkprop(kpts, shp, times, axis='xy', figname='TDKPROP.png'):
     axdict = {'x':0, 'y':1, 'z':2}
     # axis must be set as 'xy', 'yz' or 'xz'!
     kax = [axdict[s] for s in axis]
-
-    namdtime = shp[-1,0]
-    ntsteps = shp.shape[0]
-    potim = namdtime / ntsteps
-    nbasis = shp.shape[1] - 2
 
     tindex = times2index(times, shp)
     times = shp[tindex,0]
@@ -467,8 +451,8 @@ def plot_tdkprop(kpts, shp, times, axis='xy', figname='TDKPROP.png'):
         sc = ax.scatter(X[sort], Y[sort], s=10, lw=0, c=pop[it,sort],
                         norm=norm, cmap=cmap)
 
-        ax.set_xlim(0, 1)
-        ax.set_ylim(0, 1)
+        ax.set_xlim(-0.02, 1.02)
+        ax.set_ylim(-0.02, 1.02)
         ax.set_aspect('equal')
         # ax.set_xticks([])
         # ax.set_yticks([])
@@ -486,70 +470,12 @@ def plot_tdkprop(kpts, shp, times, axis='xy', figname='TDKPROP.png'):
     cbar = plt.colorbar(sc, cax=cb_ax)
 
     plt.savefig(figname, dpi=400)
-    print("\n%s has been saved."%figname)
-
-
-def plot_tdband(k_loc, en, kp_loc, kplabels, shp, index,
-        X_bg=None, E_bg=None, Eref=0.0, figname='TDBAND.png'):
-
-    nbasis = index.shape[0]
-    ntsteps = shp.shape[0]
-    namdtime = shp[-1, 0]
-    potim = namdtime / ntsteps
-    pop = shp[:, index+2]
-
-    X = np.tile(k_loc, ntsteps).reshape(ntsteps, nbasis)
-    E = np.tile(en[index], ntsteps).reshape(ntsteps, nbasis) - Eref
-
-    xmin = kp_loc[0] ; xmax = kp_loc[-1]
-    ymin = E.min() ; ymax = E.max() ; dy = ymax - ymin
-    ymin -= dy*0.05 ; ymax += dy*0.05
-
-    figsize_x = 4.8
-    figsize_y = 3.6 # in inches
-    fig, ax = plt.subplots()
-    fig.set_size_inches(figsize_x, figsize_y)
-    mpl.rcParams['axes.unicode_minus'] = False
-
-    cmap = 'rainbow'
-    norm = mpl.colors.Normalize(0,namdtime)
-    color_t = np.tile(np.arange(ntsteps), nbasis).reshape(nbasis,ntsteps).T * potim
-    s_avg = np.average(pop[pop>0])
-    dotsize = pop / s_avg * 5
-
-    nkpath = kp_loc.shape[0]
-    for ipath in range(1, nkpath):
-        x = kp_loc[ipath]
-        ax.plot([x,x], [ymin,ymax], 'k', lw=0.7, ls='--')
-
-    sc = ax.scatter(X, E, s=dotsize, lw=0, c=color_t, cmap=cmap, norm=norm)
-    cbar = plt.colorbar(sc, fraction=0.05)
-    cbar.set_label('Time (fs)')
-
-    ticks = []
-    for s in kplabels:
-        s = u'\u0393' if (s=='g' or s=='G') else s.upper()
-        ticks.append(s)
-
-    ax.set_xticks(kp_loc)
-    ax.set_xticklabels(ticks)
-
-    ax.set_xlim(xmin, xmax)
-    ax.set_ylim(ymin, ymax)
-    ax.set_ylabel('Energy (eV)')
-
-    plt.tight_layout()
-    plt.savefig(figname, dpi=400)
+    plt.close(fig)
     print("\n%s has been saved."%figname)
 
 
 def plot_tdband_sns(k_loc, en, kp_loc, kplabels, shp, index, times,
         b_index=None, Enk=None, Eref=0.0, figname='TDBAND.png'):
-
-    nbasis = index.shape[0]
-    ntsteps = shp.shape[0]
-    namdtime = shp[-1, 0]
-    potim = namdtime / ntsteps
 
     tindex = times2index(times, shp)
     times = shp[tindex,0]
@@ -640,6 +566,7 @@ def plot_tdband_sns(k_loc, en, kp_loc, kplabels, shp, index, times,
     cbar = plt.colorbar(sc, cax=cb_ax)
 
     plt.savefig(figname, dpi=400)
+    plt.close(fig)
     print("\n%s has been saved."%figname)
 
 
@@ -647,20 +574,10 @@ def plot_tdph_sns(q_loc, phen, qp_loc, qplabels, php, index, times,
                   X_bg=None, E_bg=None, figname='TDPH.png'):
 
     nmodes = php.shape[0]
-    ntsteps = php.shape[1]
-    nbasis = index.shape[0]
-    namdtime = php[0, -1, 0]
-    potim = namdtime / ntsteps
     tindex = times2index(times, php[0,:,:])
     times = php[0,tindex,0]
     php = np.cumsum(php, axis=1)
 
-    '''
-    tindex = []
-    for time in times:
-        if time==0: time = potim
-        tindex.append(int(time/potim)-1)
-    '''
     pop = php[:,:,index+2][:,tindex,:]
     nts = len(times)
 
@@ -753,6 +670,7 @@ def plot_tdph_sns(q_loc, phen, qp_loc, qplabels, php, index, times,
     cbar = plt.colorbar(sc, cax=cb_ax)
 
     plt.savefig(figname, dpi=400)
+    plt.close(fig)
     print("\n%s has been saved."%figname)
 
 
@@ -787,17 +705,17 @@ def plot_tdphen(php, figname='TDPHEN.png'):
     fig.set_size_inches(figsize_x, figsize_y)
     mpl.rcParams['axes.unicode_minus'] = False
 
-    # phen = np.cumsum(np.cumsum(phen, axis=0), axis=1)
-    # ax.fill_between(X, phen[:, 0])
-    # for im in range(1, nmodes):
-    #     ax.fill_between(X, phen[:, im], phen[:, im-1])
-
-    cmap = plt.cm.nipy_spectral
-    cls = [cmap(i) for i in np.linspace(0, 1, nmodes+2)]
+    cmap = mpl.colormaps['rainbow']
+    cls = [cmap(i) for i in np.linspace(0, 1, nmodes)]
+    # cls = ['C%d'%im for im in range(nmodes)] # 'CN' colors
     lbs = ['mode %d'%(im+1) for im in range(nmodes)]
 
-    for im in range(nmodes):
-        ax.plot(X, phen[:,im], label=lbs[im], color=cls[im], lw=1.0)
+    phen = np.cumsum(np.cumsum(phen, axis=0), axis=1)
+    ax.fill_between(X, phen[:, 0],
+        color=cls[0], label=lbs[0], lw=0.3, alpha=0.75)
+    for im in range(1, nmodes):
+        ax.fill_between(X, phen[:, im], phen[:, im-1],
+            color=cls[im], label=lbs[im], lw=0.3, alpha=0.75)
 
     if (nmodes<=100):
         ncol = int(np.sqrt(nmodes) / 2) + 1
@@ -810,7 +728,130 @@ def plot_tdphen(php, figname='TDPHEN.png'):
 
     plt.tight_layout()
     plt.savefig(figname, dpi=400)
+    plt.close(fig)
     print("\n%s has been saved."%figname)
+
+
+
+def plot_tdphnum(php, figname='TDPHNUM.png'):
+
+    phnum = np.sum(php[:,:,2:], axis=2).T
+    nmodes = phnum.shape[1]
+    X = php[0, :, 0]
+    namdtime = X[-1]
+
+    figsize_x = 4.8
+    figsize_y = 3.2 # in inches
+
+    fig, ax = plt.subplots()
+    fig.set_size_inches(figsize_x, figsize_y)
+    mpl.rcParams['axes.unicode_minus'] = False
+
+    cmap = mpl.colormaps['rainbow']
+    cls = [cmap(i) for i in np.linspace(0, 1, nmodes)]
+    lbs = ['mode %d'%(im+1) for im in range(nmodes)]
+
+    for im in range(nmodes):
+        ax.plot(X, phnum[:,im], label=lbs[im], color=cls[im], lw=1.0)
+
+    if (nmodes<=100):
+        ncol = int(np.sqrt(nmodes) / 2) + 1
+        fsize = 10 - np.sqrt(nmodes) / 2
+        ax.legend(loc=1, ncol=ncol, fontsize=fsize)
+
+    ax.set_xlim(0,namdtime)
+    ax.set_xlabel('Time (fs)')
+    ax.set_ylabel('Phonon Number')
+
+    plt.tight_layout()
+    plt.savefig(figname, dpi=400)
+    plt.close(fig)
+    print("\n%s has been saved."%figname)
+
+
+def plot_tdqprop(qpts, php, times, im=None, axis='xy', figname='TDQPROP.png'):
+
+    axdict = {'x':0, 'y':1, 'z':2}
+    # axis must be set as 'xy', 'yz' or 'xz'!
+    qax = [axdict[s] for s in axis]
+
+    tindex = times2index(times, php[0,:,:])
+    times = php[0,tindex,0]
+    nts = len(times)
+
+    if im is None:
+        php = np.sum(np.cumsum(php, axis=1), axis=0)
+        pop = php[tindex,2:]
+    else:
+        php = np.cumsum(php, axis=1)
+        pop = php[im, tindex,2:]
+
+    # calculate ph number variation between it-1 and it.
+    for ii in range(nts-1, 1, -1):
+        pop[ii,:] = pop[ii,:] - pop[ii-1,:]
+
+    cmin = np.min(pop[pop>0.0]); cmax = np.max(pop)
+    cmin = cmax * 1.0e-4
+    norm = mpl.colors.LogNorm(cmin,cmax)
+    cmap = 'hot_r'
+
+    if (nts < 4):
+        ncol = nts; nrow = 1
+    else:
+        ncol = math.ceil(np.sqrt(nts))
+        nrow = math.ceil( nts / ncol )
+
+    figsize_x = 2.7 * ncol + 1.0
+    figsize_y = 2.8 * nrow # in inches
+    fig, axes = plt.subplots(nrow, ncol)
+    fig.set_size_inches(figsize_x, figsize_y)
+    mpl.rcParams['axes.unicode_minus'] = False
+
+    X = qpts[:,qax[0]]
+    Y = qpts[:,qax[1]]
+
+    if (nts < ncol * nrow):
+        for it in range(nts, ncol*nrow):
+            ax = axes[math.floor(it/ncol), it%ncol]
+            ax.axis('off')
+
+    for it in range(nts):
+
+        if (nrow==1):
+            ax = axes[it] if ncol>1 else axes
+        else:
+            ax = axes[math.floor(it/ncol), it%ncol]
+
+        if (it==0):
+            ax.set_title('%.0f fs'%times[it])
+        else:
+            ax.set_title('%.0f - %.0f fs'%(times[it-1], times[it]))
+
+        sort = np.argsort(pop[it,:])
+        sc = ax.scatter(X[sort], Y[sort], s=10, lw=0, c=pop[it,sort],
+                        norm=norm, cmap=cmap)
+
+        ax.set_xlim(-0.02, 1.02)
+        ax.set_ylim(-0.02, 1.02)
+        ax.set_aspect('equal')
+        # ax.set_xticks([])
+        # ax.set_yticks([])
+        ax.set_xlabel('q$_%s$'%axis[0])
+        ax.set_ylabel('q$_%s$'%axis[1])
+
+    ll = 0.6/figsize_x ; rr = 1.0 - 0.7 / figsize_x
+    bb = 0.5/figsize_y ; tt = 1.0 - 0.4 / figsize_y
+    if (nts < ncol * nrow): rr = 1.0 - 0.2 / figsize_x
+    fig.subplots_adjust(bottom=bb, top=tt, left=ll, right=rr,
+                        wspace=0.4, hspace=0.45)
+    w_cb = 0.12 / figsize_x
+    l, b, w, h = ax.get_position().bounds
+    cb_ax = fig.add_axes([l+w+0.4*w_cb, b, w_cb, h])
+    cbar = plt.colorbar(sc, cax=cb_ax)
+
+    plt.savefig(figname, dpi=400)
+    plt.close(fig)
+    print("%s has been saved."%figname)
 
 
 def plot_distrib(en, shp, times, Ef=0.0, figname='DISTRIBUTION.png'):
@@ -819,17 +860,11 @@ def plot_distrib(en, shp, times, Ef=0.0, figname='DISTRIBUTION.png'):
     en = en[sort] - Ef
     enfit = np.arange(en.min(), en.max(), 0.01)
 
-    ntsteps = shp.shape[0]
-    namdtime = shp[-1, 0]
-    potim = namdtime / ntsteps
     tindex = times2index(times, shp)
     times = shp[tindex,0]
     pop = shp[tindex, 2:][:,sort]
 
     nsns = len(times)
-    ntsteps = shp.shape[0]
-    namdtime = shp[-1, 0]
-    potim = namdtime / ntsteps
 
     figsize_x = 4.8
     figsize_y = 1.2 * nsns # in inches
@@ -867,6 +902,7 @@ def plot_distrib(en, shp, times, Ef=0.0, figname='DISTRIBUTION.png'):
 
     plt.tight_layout()
     plt.savefig(figname, dpi=400)
+    plt.close(fig)
     print("\n%s has been saved."%figname)
 
 
@@ -874,8 +910,6 @@ def plot_Tprop(en, shp, Ef=0.0, figname='TPROP.png'):
 
     en -= Ef
     ntsteps = shp.shape[0]
-    namdtime = shp[-1, 0]
-    potim = namdtime / ntsteps
 
     from scipy.optimize import curve_fit
     itime = np.arange(0, ntsteps, 20)
@@ -902,6 +936,7 @@ def plot_Tprop(en, shp, Ef=0.0, figname='TPROP.png'):
 
     plt.tight_layout()
     plt.savefig(figname, dpi=400)
+    plt.close(fig)
     print("\n%s has been saved."%figname)
 
 
