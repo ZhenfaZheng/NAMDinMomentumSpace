@@ -797,9 +797,6 @@ def plot_tdqprop(qpts, php, times, im=None, axis='xy', figname='TDQPROP.png'):
     cmin = pop.min() ; cmax = pop.max()
     norm = mpl.colors.Normalize(cmin, cmax)
     cmap = genrcmap(cmin, cmax)
-    size = np.sqrt(np.abs(pop))
-    s_avg = np.average(size[size>0])
-    size = size / size.max()  * 50
 
     if (nts < 4):
         ncol = nts; nrow = 1
@@ -833,13 +830,9 @@ def plot_tdqprop(qpts, php, times, im=None, axis='xy', figname='TDQPROP.png'):
         else:
             ax.set_title('%.0f - %.0f fs'%(times[it-1], times[it]))
 
-        # sort = np.argsort(pop[it,:])
-        # sc = ax.scatter(X[sort], Y[sort], s=10, lw=0, c=pop[it,sort],
-        #                 norm=norm, cmap=cmap)
-        sort = np.argsort(size[it,:])
-        sc = ax.scatter(X[sort], Y[sort],
-                 s=size[it,sort], lw=0, c=pop[it,sort],
-                 norm=norm, cmap=cmap)
+        sort = np.argsort(pop[it,:])
+        sc = ax.scatter(X[sort], Y[sort], s=10, lw=0, c=pop[it,sort],
+                        norm=norm, cmap=cmap)
 
         ax.set_xlim(-0.02, 1.01)
         ax.set_ylim(-0.02, 1.01)

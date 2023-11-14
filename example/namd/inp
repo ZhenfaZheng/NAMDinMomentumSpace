@@ -1,33 +1,28 @@
 &NAMDPARA
   BMIN       = 1
   BMAX       = 2
-  KMIN       = 1
-  KMAX       = 40
   EMIN       = -4.6
-  EMAX       = -1.5
+  EMAX       = -3.5
   NBANDS     = 2
-  NKPOINTS   = 81
+  NKPOINTS   = 8100
   NINIBS     = 1
-  Np         = 81
+  Np         = 8100
 
-  NSW        = 1200
+  NSW        = 2200
   POTIM      = 1.0
   TEMP       = 300
 
-  NSAMPLE    = 6
-  NAMDTIME   = 1000
+  NSAMPLE    = 3
+  NAMDTIME   = 2000
   NELM       = 1000
   NTRAJ      = 10000
   LHOLE      = .F.
-  LCPEXT     = .F.
 
   LEPC       = .T.
-  LBASSEL    = .F.
-  LARGEBS    = .T.
   LSORT      = .T.
   EPCTYPE    = 1
-  NPARTS     = 1
-  EPMDIR     = './'
+  NPARTS     = 14
+  EPMDIR     = 'h5files/'
   EPMPREF    = 'graphene'
-! FILMD      = 'XDATCAR'
+  SIGMA      = 0.025 ! eV
 /

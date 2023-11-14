@@ -1,0 +1,20 @@
+#!/bin/bash
+#SBATCH --partition          h3c
+#SBATCH --time               24:00:00
+#SBATCH --nodes              1
+#SBATCH --ntasks-per-node    48
+#SBATCH --cpus-per-task      1
+
+# Load Modules
+module load hdf5/intel
+module load qe/7.2_intel
+export HDF5_USE_FILE_LOCKING="FALSE"
+export PATH=/public/apps/NAMD-EPC/src:$PATH
+
+echo "Job Running ..."
+
+JOB='namd'
+EXE='namd-epc'
+mpirun -n $SLURM_NTASKS $EXE > $JOB.out
+
+echo "Job Done!"

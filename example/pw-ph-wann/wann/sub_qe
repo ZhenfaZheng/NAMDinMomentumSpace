@@ -1,0 +1,25 @@
+#!/bin/bash
+#SBATCH --partition          h3c
+#SBATCH --time               24:00:00
+#SBATCH --nodes              1
+#SBATCH --ntasks-per-node    48
+#SBATCH --cpus-per-task      1
+
+# Load Modules
+module load qe/7.2_intel
+
+echo "Job Running ..."
+
+PREFIX='graphene'
+
+EXE='wannier90.x'
+mpirun -n 1 $EXE -pp $PREFIX
+
+JOB='pw2wan'
+EXE='pw2wannier90.x'
+mpirun -n $SLURM_NTASKS $EXE < $JOB.in > $JOB.out
+
+EXE='wannier90.x'
+mpirun -n 1 $EXE $PREFIX
+
+echo "Job Done!"

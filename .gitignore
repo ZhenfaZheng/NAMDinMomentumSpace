@@ -18,8 +18,5 @@ test
 perttest
 copy
 
-# ignore example folder
-example
-
 # others
 patch/calc_ephmat_ZJJ_modified.f90

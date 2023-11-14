@@ -1,0 +1,17 @@
+#!/bin/bash
+#SBATCH --partition          h3c
+#SBATCH --time               24:00:00
+#SBATCH --nodes              1
+#SBATCH --ntasks-per-node    28
+#SBATCH --cpus-per-task      1
+
+# Load Modules
+module load qe/7.2_intel
+
+echo "Job Running ..."
+
+JOB='nscf'
+EXE='pw.x'
+mpirun -n $SLURM_NTASKS $EXE < $JOB.in > $JOB.out
+
+echo "Job Done!"

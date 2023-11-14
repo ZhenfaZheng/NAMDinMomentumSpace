@@ -1,9 +1,9 @@
 
-This is a patch for PERTURBO to output e-ph coupling related informations.
+This is a patch for PERTURBO to output e-ph coupling related information.
 
 Usage: replace the pert-src/calc_ephmat.f90 file in PERTRUBO source codes, then complie perturebo.x.
 
 
-calc_ephmat_for_perturbo-1.0.f90 suitable for QE-6.4 ~ QE-6.5 & Perturbo-1.0
-calc_ephmat_for_perturbo-2.0.1.f90 suitable for QE-7.0 & Perturbo-2.0.1
-calc_ephmat_for_perturbo-2.1.0.f90 suitable for QE-7.2 & Perturbo-2.1.0
+1.0/calc_ephmat.f90 suitable for QE-6.4 ~ QE-6.5 & Perturbo-1.0
+2.0.1/calc_ephmat.f90 suitable for QE-7.0 & Perturbo-2.0.1
+2.1.0/calc_ephmat.f90 suitable for QE-7.2 & Perturbo-2.1.0

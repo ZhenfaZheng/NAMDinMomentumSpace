@@ -1,21 +1,21 @@
 #-------------------------------------------------------------------------------
 # defaults
 #-------------------------------------------------------------------------------
-#FC= gfortran
-
-FC = ifort
-FFLAGS = -g -O2 -assume byterecl
+# FC= gfortran
+# FC = ifort
+# FFLAGS = -g -O2 -assume byterecl
 
 FC = mpiifort
 FFLAGS = -g -O3 -assume byterecl -mkl -fpp -traceback
 
 MAKE = make
 
-#path to HDF5 library
+# Path to HDF5 library
 IFLAGS = -I/public/apps/qe/hdf5/1.12.1_intel/include
 LFLAGS = -L/public/apps/qe/hdf5/1.12.1_intel/lib -lhdf5 -lhdf5_fortran
 FFLAGS += $(IFLAGS)
 SPGLIB += $(LFLAGS)
+
 #-------------------------------------------------------------------------------
 # Src
 #-------------------------------------------------------------------------------

@@ -1,0 +1,64 @@
+#!/bin/bash
+#SBATCH --partition          h3c
+#SBATCH --time               24:00:00
+#SBATCH --nodes              1
+#SBATCH --ntasks-per-node    48
+#SBATCH --cpus-per-task      1
+
+# Load Modules
+module load hdf5/intel
+module load qe/7.2_intel
+export HDF5_USE_FILE_LOCKING="FALSE"
+
+################################################################################
+# Modified For LOOP
+################################################################################
+START=1
+END=7
+NDIGIT=$(echo -n ${END} | wc -c)
+RUNDIR=${PWD}
+
+for i in `seq ${START} ${END}`
+do
+    ip=`printf "%0${NDIGIT}dP" ${i}`
+
+    if [[ -d "${ip}" ]]; then
+
+        # goto the working directory
+        cd ${ip}
+
+        # Skip this directory if job is running or has ended
+        if [[ -f RUNNING || -f ENDED ]]; then
+            # Do nothing, go back to the parent directory
+            cd ${RUNDIR}
+            continue
+        fi
+
+        # Mark the directory as RUNNING
+        touch RUNNING
+        echo
+        echo "#### RUNNING in DIR: ${RUNDIR}/${ip}"
+        sleep 1
+
+        ############################################################
+        # Run QE
+        ############################################################
+        mpirun -n ${SLURM_NTASKS} perturbo.x -npools ${SLURM_NTASKS} \
+            < pert.in > pert.out 
+        ############################################################
+
+        # Check if jobs ended correctly
+        if grep 'Program was terminated' pert.out >& /dev/null; then
+            # If so, mark the job as ENDED
+            touch ENDED
+        else
+            rm ENDED 2> /dev/null
+        fi
+
+        # Delete redundant files
+        rm RUNNING >& /dev/null
+
+        # Go back to the parent directory
+        cd ${RUNDIR}
+    fi
+done

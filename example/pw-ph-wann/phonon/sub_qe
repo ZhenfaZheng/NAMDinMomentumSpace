@@ -1,0 +1,17 @@
+#!/bin/bash
+#SBATCH --partition          h3c
+#SBATCH --time               5:00:00:00
+#SBATCH --nodes              3
+#SBATCH --ntasks-per-node    6
+#SBATCH --cpus-per-task      8
+
+# Load Modules
+module load qe/7.2_intel
+
+echo "Job Running ..."
+
+JOB='ph'
+EXE='ph.x'
+mpirun -n $SLURM_NTASKS $EXE < $JOB.in > $JOB.out
+
+echo "Job Done!"

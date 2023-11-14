@@ -1,0 +1,13 @@
+&perturbo
+  prefix = 'graphene'
+  calc_mode = 'ephmat'
+  fklist = 'eph.kpt'
+  fqlist = 'eph.qpt'
+
+  band_min = 1
+  band_max = 2
+
+  phfreq_cutoff = 0.625    ! meV
+
+  output_yaml = .False.
+ /
