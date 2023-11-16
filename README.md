@@ -59,26 +59,26 @@ carriers in condensed matter systems*".
 
 The user can get the source files of this program from Github
 ```
-\$ git clone https://github.com/ZhenfaZheng/NAMDinMomentumSpace.git
+$ git clone https://github.com/ZhenfaZheng/NAMDinMomentumSpace.git
 ```
 Then, go into folder of source files
 ```
-\$ cd src
+$ cd src
 ```
 To compile this program, you should specify the path to your HDF5 library.
 Open the "Makefile"
 ```
-\$ vim Makefile
+$ vim Makefile
 ```
 Modify the two flags "IFLAGS" and "LFLAGS"
 ```
-IFLAGS = -I/\${path-to-your-hdf5-dir}/include
-LFLAGS = -I/\${path-to-your-hdf5-dir}/lib -lhdf5 -lhdf5_fortran
+IFLAGS = -I/${path-to-your-hdf5-dir}/include
+LFLAGS = -I/${path-to-your-hdf5-dir}/lib -lhdf5 -lhdf5_fortran
 ```
 After modifying the "Makefile", compile the Hefei-NAMD-EPC
 ```
-\$ make clean
-\$ make
+$ make clean
+$ make
 ```
 You will get an executable file "namd-epc" for simulations of NAMD in momentum
 space.
@@ -104,9 +104,9 @@ and it will output files containing *e-ph* information (named
 "calc\_mode = 'ephmat'".
 
 To run perturbo.x for doing e-ph coupling calculations in ultra-fine
-$mathbf{k}$- and $mathbf{q}$-points grids, one needs to prepare input file
-("pert.in"), $mathbf{k}$- and $mathbf{q}$-point list files ("eph.kpt",
-"eph.qpt"), and "\${prefix}\_epr.h5" file from qe2pert calculation.
+$\mathbf{k}$- and $\mathbf{q}$-points grids, one needs to prepare input file
+"pert.in", $\mathbf{k}$- and $\mathbf{q}$-point list files "eph.kpt", and
+"eph.qpt", and "\${prefix}\_epr.h5" file from qe2pert calculation.
 
 The input file "pert.in" can be set as follows
 ```
@@ -125,28 +125,28 @@ The input file "pert.in" can be set as follows
  /
 ```
 
-We provide a python script "kqgen.py" to generate $mathbf{k}$- and
-$mathbf{q}$-point list files. User needs to set nkx, nky and nkz in the first
+We provide a python script "kqgen.py" to generate $\mathbf{k}$- and
+$\mathbf{q}$-point list files. User needs to set nkx, nky and nkz in the first
 few lines of "kqgen.py" script. Then excute
 ```
-\$ python kqgen.py
+$ python kqgen.py
 ```
-If there are too many $mathbf{k}$- and $mathbf{q}$-points (nks * nqs > 10^7),
-the script will separate the $mathbf{k}$-points into several parts and save
+If there are too many $\mathbf{k}$- and $\mathbf{q}$-points (nks * nqs > $10^7$),
+the script will separate the $\mathbf{k}$-points into several parts and save
 "eph.kpt" and "eph.qpt" files in differen folders ("1P", "2P", ...). Then user
 needs to link "pert.in" and "\${prefix}\_epr.h5" file into folders for
-different parts of $mathbf{k}$-points to do perturbo calculations respectively.
+different parts of $\mathbf{k}$-points to do perturbo calculations respectively.
 ```
-\$ foor ip in *P
-\$ do
-\$     cd ${ip}
-\$     cp ../pert.in .
-\$     ln -sf ../../qe2pert/prefix_epr.h5 .
-\$     cd ..
-\$ done
+$ for ip in *P
+$ do
+$     cd ${ip}
+$     cp ../pert.in .
+$     ln -sf ../../qe2pert/prefix_epr.h5 .
+$     cd ..
+$ done
 ```
 We provide a Sbatch script "sub\_pert\_part" for users to run perturbo
-calculations for different parts of $mathbf{k}$-points.
+calculations for different parts of $\mathbf{k}$-points.
 
 
 ## 2. Prepare input files
@@ -165,14 +165,14 @@ Then generate "inp" file, below is an example
 &NAMDPARA
   BMIN       = 1       ! minimum band index
   BMAX       = 2       ! maximum band index
-  KMIN       = 1       ! minimum $mathbf{k}$-point index
-  KMAX       = 40      ! maximum $mathbf{k}$-point index
+  KMIN       = 1       ! minimum $\mathbf{k}$-point index
+  KMAX       = 40      ! maximum $\mathbf{k}$-point index
   EMIN       = -4.6    ! minimum energy, in unit of eV
   EMAX       = -1.5    ! maximum energy, in unit of eV
   NBANDS     = 2       ! number of bands
-  NKPOINTS   = 81      ! number of $mathbf{k}$-points
+  NKPOINTS   = 81      ! number of $\mathbf{k}$-points
   NINIBS     = 1       ! number of initial states
-  Np         = 81      ! number of unit cells corresponding to the $mathbf{k}$-grid
+  Np         = 81      ! number of unit cells corresponding to the $\mathbf{k}$-grid
 
   NSW        = 1200    ! number of time steps for the MD trajctory
   POTIM      = 1.0     ! time step for the MD trajctory, in unit of fs
@@ -193,7 +193,7 @@ Then generate "inp" file, below is an example
   EPCTYPE    = 1       ! 1: calculate EPC from average phonon populations.
                        ! 2: calculate EPC by norm mode decompositon form MD traj
   NPARTS     = 1       ! number of parts of ephmat information
-  EPMDIR     = './'    ! directory of ephmat.h5 files
+  EPMDIR     = 'h5files/'    ! directory of ephmat.h5 files
   EPMPREF    = 'graphene'    ! prefix of ephmat.h5 files
 /
 ```
@@ -211,7 +211,7 @@ Each line of "INICON" represents initial condition of each sample, the first
 column indicates initial time, the second and third column indicate
 $\mathbf{k}$ and band indices of initial electronic state. We provide a python
 script "gen\_inicon.py" to help user generate "INICON" file, user has to set the
-energy and $mathbf{k}$-point location for initial states at the first few line in
+energy and $\mathbf{k}$-point location for initial states at the first few line in
 "gen\_inicon.py" script.
 
 
@@ -219,7 +219,7 @@ energy and $mathbf{k}$-point location for initial states at the first few line i
 
 Copy executable file "namd-epc" to your work diretory, then execute
 ```
-\$ mpirun -np 16 ./namd-epc # Here, 16 is the number of processes as an example
+$ mpirun -np 16 ./namd-epc # Here, 16 is the number of processes as an example
 ```
 User can also use Sbatch script "sub\_namd" to submit the computational job.
 
@@ -243,7 +243,7 @@ We provide python scripts to do the data processing, just copy the
 "postnamd.py" and "namdplt.py" from the folder "scripts" to your work diretory,
 and execute
 ```
-\$ python namdplt.py
+$ python namdplt.py
 ```
 You will obtain figures of results, including: COUPLE.png, COUPLE\_EL.png,
 COUPLE\_PH.png, TDEN.png, TDBAND.png, TDKPROP.png, TDPH.png, TDPHEN.png,
