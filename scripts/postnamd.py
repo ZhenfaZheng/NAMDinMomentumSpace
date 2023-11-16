@@ -120,7 +120,7 @@ def read_ektot(inp):
     return en_tot, kpts_tot
 
 
-def ek_selected(filephmat='', filbassel='BASSEL', inp=None):
+def ek_selected(filephmat='', bassel=None, inp=None):
     '''
     Extract energies and k-list that are selected in namd simulation.
     This function will use function read_ephmath5 below.
@@ -140,7 +140,9 @@ def ek_selected(filephmat='', filbassel='BASSEL', inp=None):
     else:
         en_tot, kpts_tot = read_ektot(inp)
 
-    bassel  = np.loadtxt(filbassel, skiprows=1)
+    if (bassel is None):
+        filbassel='BASSEL'
+        bassel  = np.loadtxt(filbassel, skiprows=1)
     kb_index = np.array(bassel[:, :2], dtype=int) - 1
     en = en_tot[kb_index[:,0], kb_index[:,1]]
     kpts = kpts_tot[kb_index[:,0]]
