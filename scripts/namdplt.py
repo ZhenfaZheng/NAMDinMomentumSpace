@@ -41,25 +41,14 @@ def main():
     prefix = inp['EPMPREF']; epmdir = inp['EPMDIR']
     filepm = os.path.join(epmdir, prefix + '_ephmat_p1.h5')
     A = pn.read_ephmath5(filepm, dset='/el_ph_band_info/lattice_vec_angstrom')
-    a1, a2, a3 = (A[0], A[1], A[2])
-    b1, b2, b3 = pn.calc_rec_vec(a1, a2, a3)
-
-    filbassel='BASSEL'
-    bassel  = np.loadtxt(filbassel, skiprows=1)
-    b_index = np.array(bassel[:, 1], dtype=int) - 1
 
     en, kpts = pn.ek_selected(inp=inp) # en & kpts selected
-    Enk = pn.get_Enk(kpath, B=[b1, b2, b3], inp=inp) # total Enk
-    kpts_cart = pn.frac2cart(kpts, b1, b2, b3)
-    kpath_cart = pn.frac2cart(kpath, b1, b2, b3)
-    k_index, kp_index = pn.select_kpts_on_path(kpts, kpath, norm=0.001)
-    k_loc, kp_loc = pn.loc_on_kpath(kpts_cart, k_index, kp_index, kpath_cart)
+    Enk = pn.get_Enk_tot(kpath, A, inp=inp) # total Enk
     qpts = pn.read_ephmath5(filepm, dset='/el_ph_band_info/q_list')
     phen = pn.read_ephmath5(filepm, dset='/el_ph_band_info/ph_disp_meV')
-    qpts_cart = pn.frac2cart(qpts, b1, b2, b3)
-    qpath_cart = pn.frac2cart(qpath, b1, b2, b3)
-    q_index, qp_index = pn.select_kpts_on_path(qpts, qpath, norm=0.001)
-    q_loc, qp_loc = pn.loc_on_kpath(qpts_cart, q_index, qp_index, qpath_cart)
+
+    k_index, k_loc, kp_loc = pn.pick_kpts_on_path(kpts, kpath, A, norm=0.001)
+    q_index, q_loc, qp_loc = pn.pick_kpts_on_path(qpts, qpath, A, norm=0.001)
 
     if ((1 in which_plt) or (11 in which_plt)):
 

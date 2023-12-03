@@ -323,6 +323,72 @@ def loc_on_kpath(kpts, k_index, path_index, kpath):
     return loc, kpath_loc
 
 
+def pick_kpts_on_path(kpts, kpath, A, norm=1e-4):
+    '''
+    Select k points on k path from kpts.
+
+    Parameters:
+    kpts : array, with shape of (nks,3) or (3), k point coordinates.
+    kpath: array, with shape of (npath+1, 3), coordinates of begin and end
+           points of k path.
+    norm : float, stard value to determine whether k point is on path.
+
+    Returns:
+    k_index   : array, with shape of (nks_onpath), indexes of k points on path.
+    path_index: array, with shape of (nks_onpath), indexes of k path segments.
+    '''
+
+    if (len(kpts.shape)==1):
+        kpts = np.array([kpts])
+        nks = 1
+    else:
+        nks = kpts.shape[0]
+
+    npath = kpath.shape[0] - 1
+
+    if npath==0:
+        print("\nkpath must contain 2 k-points at least!\n")
+        return
+
+    kpath_loc = np.zeros(npath+1)
+    segment_length = np.zeros(npath)
+    for ipath in range(npath):
+        dk = kpath[ipath+1] - kpath[ipath]
+        segment_length[ipath] = np.linalg.norm(np.matmul(dk, A))
+        kpath_loc[ipath+1] = kpath_loc[ipath] + segment_length[ipath]
+
+    pathes = np.zeros( (npath, 2, 3) )
+    pathes[:,0,:] = kpath[:npath, :]
+    pathes[:,1,:] = kpath[1:, :]
+    dks = pathes[:,1,:] - pathes[:,0,:]
+    dks_sum = np.sum( np.abs(dks), axis=1)
+
+    k_index = []; loc = []
+    for ik in range(nks):
+        for ipath in range(npath):
+
+            kpt = kpts[ik,:]
+            for iax in range(3):
+                dktemp = kpt[iax] - pathes[ipath, :, iax]
+                if (dktemp.max() > 1.0 ):
+                    kpt[iax] -= np.floor(dktemp.max())
+                elif (dktemp.min() < -1.0):
+                    kpt[iax] -= np.ceil(dktemp.min())
+
+            lendkpt = False if (ipath<npath-1) else True
+            zz = k_on_path(kpt, pathes[ipath], dks[ipath], norm, lendkpt)
+            if (zz):
+                k_index.append(ik)
+                scale = np.sum(np.abs(kpt-kpath[ipath])) / dks_sum[ipath]
+                loc_temp = kpath_loc[ipath] + segment_length[ipath] * scale
+                loc.append(loc_temp)
+
+    k_index = np.array(k_index, dtype='int32')
+    loc = np.array(loc)
+
+    return k_index, loc, kpath_loc
+
+
 def select_kpts_on_path(kpts, kpath, norm=1e-4):
     '''
     Select k points on k path from kpts.
@@ -433,6 +499,17 @@ def get_Enk(kpath, B, inp):
     k_index, kp_index = select_kpts_on_path(kpts, kpath)
     k_loc, kp_loc = loc_on_kpath(kpts_cart, k_index, kp_index, kpath_cart)
 
+    Enk = np.hstack(( np.array([k_loc]).T, en[k_index,:] ))
+    sort = np.argsort(Enk[:,0])
+
+    return Enk[sort,:]
+
+
+def get_Enk_tot(kpath, A, inp):
+
+    en, kpts= read_ektot(inp)
+
+    k_index, k_loc, kp_loc = pick_kpts_on_path(kpts, kpath, A)
     Enk = np.hstack(( np.array([k_loc]).T, en[k_index,:] ))
     sort = np.argsort(Enk[:,0])
 
