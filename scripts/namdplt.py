@@ -117,6 +117,12 @@ def main():
     #                             Plot figures                            #
     #######################################################################
 
+    global fig_path, phmod_path
+    fig_path = './figs/'
+    phmod_path = './phmods/'
+    if not os.path.exists(fig_path): os.mkdir(fig_path)
+    if not os.path.exists(phmod_path): os.mkdir(phmod_path)
+
     if (1 in which_plt):
         plot_couple(coup_av, figname='COUPLE.png')
     if (11 in which_plt):
@@ -245,7 +251,7 @@ def plot_couple_el(coup_in, k_loc, en, kp_loc, kplabels, index, Enk,
     cbar = plt.colorbar(sc, aspect=30)
     cbar.set_label('Coupling (meV)')
     plt.tight_layout()
-    plt.savefig(figname, dpi=400)
+    plt.savefig(os.path.join(fig_path, figname), dpi=300)
     plt.close(fig)
     print("\n%s has been saved."%figname)
 
@@ -276,7 +282,7 @@ def plot_couple(coup, figname='COUPLE.png'):
     # cbar.ax.set_title('   meV')
     cbar.set_label('Coupling (meV)')
     plt.tight_layout()
-    plt.savefig(figname, dpi=400)
+    plt.savefig(os.path.join(fig_path, figname), dpi=300)
     plt.close(fig)
     print("\n%s has been saved."%figname)
 
@@ -337,7 +343,7 @@ def plot_coup_ph(coup_ph, q_loc, phen, qp_loc, qplabels, index,
     cbar.set_label('Coupling (meV)')
 
     plt.tight_layout()
-    plt.savefig(figname, dpi=400)
+    plt.savefig(os.path.join(fig_path, figname), dpi=300)
     plt.close(fig)
     print("\n%s has been saved."%figname)
 
@@ -408,7 +414,7 @@ def plot_tdprop(shp, Eref=0.0, lplot=1, ksen=None, figname='tdshp.png'):
     ax.set_xlabel('Time (fs)')
 
     plt.tight_layout()
-    plt.savefig(figname, dpi=400)
+    plt.savefig(os.path.join(fig_path, figname), dpi=300)
     plt.close(fig)
     print("\n%s has been saved."%figname)
 
@@ -478,7 +484,7 @@ def plot_tdkprop(kpts, shp, times, axis='xy', figname='TDKPROP.png'):
     cb_ax = fig.add_axes([l+w+0.4*w_cb, b, w_cb, h])
     cbar = plt.colorbar(sc, cax=cb_ax)
 
-    plt.savefig(figname, dpi=400)
+    plt.savefig(os.path.join(fig_path, figname), dpi=300)
     plt.close(fig)
     print("\n%s has been saved."%figname)
 
@@ -574,7 +580,7 @@ def plot_tdband_sns(k_loc, en, kp_loc, kplabels, shp, index, times,
     cb_ax = fig.add_axes([l+w+0.4*w_cb, b, w_cb, h])
     cbar = plt.colorbar(sc, cax=cb_ax)
 
-    plt.savefig(figname, dpi=400)
+    plt.savefig(os.path.join(fig_path, figname), dpi=300)
     plt.close(fig)
     print("\n%s has been saved."%figname)
 
@@ -678,7 +684,7 @@ def plot_tdph_sns(q_loc, phen, qp_loc, qplabels, php, index, times,
     cb_ax = fig.add_axes([l+w+0.4*w_cb, b, w_cb, h])
     cbar = plt.colorbar(sc, cax=cb_ax)
 
-    plt.savefig(figname, dpi=400)
+    plt.savefig(os.path.join(fig_path, figname), dpi=300)
     plt.close(fig)
     print("\n%s has been saved."%figname)
 
@@ -736,7 +742,7 @@ def plot_tdphen(php, figname='TDPHEN.png'):
     ax.set_ylabel('Energy (eV)')
 
     plt.tight_layout()
-    plt.savefig(figname, dpi=400)
+    plt.savefig(os.path.join(fig_path, figname), dpi=300)
     plt.close(fig)
     print("\n%s has been saved."%figname)
 
@@ -773,7 +779,7 @@ def plot_tdphnum(php, figname='TDPHNUM.png'):
     ax.set_ylabel('Phonon Number')
 
     plt.tight_layout()
-    plt.savefig(figname, dpi=400)
+    plt.savefig(os.path.join(fig_path, figname), dpi=300)
     plt.close(fig)
     print("\n%s has been saved."%figname)
 
@@ -868,7 +874,7 @@ def plot_tdqprop(qpts, php, times, im=None, axis='xy', figname='TDQPROP.png'):
     cb_ax = fig.add_axes([l+w+0.4*w_cb, b, w_cb, h])
     cbar = plt.colorbar(sc, cax=cb_ax)
 
-    plt.savefig(figname, dpi=400)
+    plt.savefig(os.path.join(fig_path, figname), dpi=300)
     plt.close(fig)
     print("%s has been saved."%figname)
 
@@ -920,7 +926,7 @@ def plot_distrib(en, shp, times, Ef=0.0, figname='DISTRIBUTION.png'):
             ax.set_xlabel('$E-E_f$ (eV)')
 
     plt.tight_layout()
-    plt.savefig(figname, dpi=400)
+    plt.savefig(os.path.join(fig_path, figname), dpi=300)
     plt.close(fig)
     print("\n%s has been saved."%figname)
 
@@ -954,7 +960,7 @@ def plot_Tprop(en, shp, Ef=0.0, figname='TPROP.png'):
     ax.set_ylabel('Temperature (K)')
 
     plt.tight_layout()
-    plt.savefig(figname, dpi=400)
+    plt.savefig(os.path.join(fig_path, figname), dpi=300)
     plt.close(fig)
     print("\n%s has been saved."%figname)
 
@@ -1011,7 +1017,8 @@ def save_phmod(inp, ph_indices, coup_ph=None):
     qpts = pn.read_ephmath5(filepm, dset='/el_ph_band_info/q_list')
     phen = pn.read_ephmath5(filepm, dset='/el_ph_band_info/ph_disp_meV')
     latt_vec = pn.read_ephmath5(filepm, dset='/el_ph_band_info/lattice_vec_angstrom')
-    phmod_ev_tot = pn.read_ephmath5(filepm, dset='/el_ph_band_info/phmod_ev_r')
+    phmod_ev_r_tot = pn.read_ephmath5(filepm, dset='/el_ph_band_info/phmod_ev_r')
+    phmod_ev_i_tot = pn.read_ephmath5(filepm, dset='/el_ph_band_info/phmod_ev_i')
     at_pos = pn.read_ephmath5(filepm, dset='/el_ph_band_info/atom_pos')
     at_mass = pn.read_ephmath5(filepm, dset='/el_ph_band_info/mass_a.u.')
 
@@ -1023,7 +1030,8 @@ def save_phmod(inp, ph_indices, coup_ph=None):
         iq = ph_indices[iph,0]
         im = ph_indices[iph,1]
         qpt = qpts[iq]
-        phmod_ev = phmod_ev_tot[:,:,im,iq].T
+        phmod_ev_r = phmod_ev_r_tot[:,:,im,iq].T
+        phmod_ev_i = phmod_ev_i_tot[:,:,im,iq].T
 
         if (coup_ph is None):
             header  = "Phonon Mode\n"
@@ -1034,18 +1042,20 @@ def save_phmod(inp, ph_indices, coup_ph=None):
             header += "# qpt: ( %10.6f%10.6f%10.6f ) iq: %d im: %d\n"%(*qpt, iq+1, im+1)
             header += "# freq: %.3f meV coupling: %.3G meV"%(phen[iq,im], coup_ph[iq,im])
 
-        filname = 'PHMOD_%d_%d.xsf'%(iq+1, im+1)
-        gen_xsf(latt_vec, at_pos, at_num, phmod_ev, header, filname)
+        filname = 'PHMOD_%d_%d_r.xsf'%(iq+1, im+1)
+        gen_xsf(latt_vec, at_pos, at_num, phmod_ev_r, header, filname, phmod_path)
+        filname = 'PHMOD_%d_%d_i.xsf'%(iq+1, im+1)
+        gen_xsf(latt_vec, at_pos, at_num, phmod_ev_i, header, filname, phmod_path)
 
 
-def gen_xsf(latt_vec, at_pos, at_num, phmod_ev, header='', filname='PHMOD.xsf'):
+def gen_xsf(latt_vec, at_pos, at_num, phmod_ev,
+            header='', filname='PHMOD.xsf', path='./'):
 
     nat = at_pos.shape[0]
     at_pos_cart = np.matmul(at_pos, latt_vec)
     pos_phev = np.hstack((at_pos_cart, phmod_ev))
 
-    mode = 'w'
-    with open(filname, mode) as ff:
+    with open(os.path.join(path,filname), 'w') as ff:
 
         if (header != ''):
             ff.write("# %s\n"%header)
