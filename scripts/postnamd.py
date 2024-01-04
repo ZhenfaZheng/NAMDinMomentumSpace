@@ -190,7 +190,7 @@ def readphp(filphps):
 
 def read_ephmath5(filname, igroup=-1, idset=-1, dset=""):
     '''
-    Read informations about e-ph coupling from PERTURBO output h5 file.
+    Read information about e-ph coupling from PERTURBO output h5 file.
 
     Parameters:
     filname: string, file name or path of PERTURBO output file.
@@ -580,5 +580,5 @@ def func_fd(en, T):
 if __name__=='__main__':
     intro = "\nThis is a namd postprocessing module, you can add this file to" \
         " your PYTHONPATH,\nand import \"postnamd\" in your python scripts.\n" \
-        "\nFor more informations, you can email to zhenfacn@gmail.com.\n"
+        "\nFor more information, you can email to zhenfacn@gmail.com.\n"
     print(intro)

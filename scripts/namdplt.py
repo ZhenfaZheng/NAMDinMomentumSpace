@@ -33,6 +33,18 @@ def main():
     qpath = kpath # for TDPH.png
     qplabels = kplabels
 
+    '''
+    You can choose phonon modes to save their eigenvectors
+    by setting ph_indices = [ [iq1, im1], [iq2, im2], ... ]
+    '''
+    # ph_indices = [[0, 0], [0,1], [0,2]]
+    ph_indices = []
+    '''
+    If you set ph_indices = [], this script will pick primary phonon modes
+    with larger couplings to save automatically.
+    '''
+
+
     #                              Read data                              #
     #######################################################################
 
@@ -61,7 +73,7 @@ def main():
         else:
             print("\nERROR: EPELTXT file is not found!")
 
-    if (12 in which_plt):
+    if ((12 in which_plt) or (len(ph_indices)==0)):
         if os.path.isfile('EPPHTXT'):
             coup_ph = np.loadtxt('EPPHTXT')
             coup_ph *= 1000.0 # change unit to meV
@@ -144,23 +156,23 @@ def main():
 
     if (81 in which_plt):
         print('')
-        for im in range(nmodes):
-            figname = 'TDQPROPxy_Mode%d.png'%(im+1)
-            plot_tdqprop(qpts, php, times, im, axis='xy', figname=figname)
+        # for im in range(nmodes):
+        #     figname = 'TDQPROPxy_Mode%d.png'%(im+1)
+        #     plot_tdqprop(qpts, php, times, im, axis='xy', figname=figname)
         plot_tdqprop(qpts, php, times, axis='xy', figname='TDQPROPxy_tot.png')
 
     if (82 in which_plt):
         print('')
-        for im in range(nmodes):
-            figname = 'TDQPROPyz_Mode%d.png'%(im+1)
-            plot_tdqprop(qpts, php, times, im, axis='yz', figname=figname)
+        # for im in range(nmodes):
+        #     figname = 'TDQPROPyz_Mode%d.png'%(im+1)
+        #     plot_tdqprop(qpts, php, times, im, axis='yz', figname=figname)
         plot_tdqprop(qpts, php, times, axis='yz', figname='TDQPROPyz_tot.png')
 
     if (83 in which_plt):
         print('')
-        for im in range(nmodes):
-            figname = 'TDQPROPxz_Mode%d.png'%(im+1)
-            plot_tdqprop(qpts, php, times, im, axis='xz', figname=figname)
+        # for im in range(nmodes):
+        #     figname = 'TDQPROPxz_Mode%d.png'%(im+1)
+        #     plot_tdqprop(qpts, php, times, im, axis='xz', figname=figname)
         plot_tdqprop(qpts, php, times, axis='xz', figname='TDQPROPxz_tot.png')
 
     if (9 in which_plt):
@@ -168,6 +180,14 @@ def main():
 
     if (10 in which_plt):
         plot_Tprop(en, shp, Ef=Eref, figname='TPROP.png')
+
+    if (len(ph_indices)==0):
+        ph_indices = pick_prim_phmod(coup_ph, q_index)
+        print("\nSave primary phonon modes with larger coupling.")
+        save_phmod(inp, ph_indices, coup_ph)
+    else:
+        print("\nSave choosen phonon modes.")
+        save_phmod(inp, ph_indices)
 
     print("\nDone!\n")
 
@@ -952,6 +972,98 @@ def times2index(times, shp):
                   "for time=%.0f fs!"%time)
 
     return np.array(tindex, dtype='int')
+
+
+def pick_prim_phmod(coup_ph, q_index):
+
+    # Choose primary phonon modes
+    coup_max = coup_ph[q_index,:].max()
+    coup_norm = coup_max / 10.0
+    nmodes = coup_ph.shape[1]
+    nqs = q_index.shape[0]
+    nqparts = 1 if (nqs<=4) else 4
+    nqs_p = int(nqs/nqparts)
+    ph_indices = []
+    for im in range(nmodes):
+        coup = coup_ph[q_index, im]
+        for ipart in range(nqparts):
+            ist = ipart * nqs_p
+            ied = (ipart+1)*nqs_p if (ipart<nqparts-1) else nqs
+            coup_p = coup[ist:ied]
+            ii = np.argpartition(-coup_p, 1)[0] + ist
+            if (coup[ii] > coup_norm):
+                iq = q_index[ii]
+                ph_indices.append([iq,im])
+
+    return ph_indices
+
+
+def save_phmod(inp, ph_indices, coup_ph=None):
+
+    ph_indices = np.array(ph_indices)
+    nph = ph_indices.shape[0]
+    if (nph == 0):
+        print("\nNo phonon mode to save!!!")
+        return
+
+    prefix = inp['EPMPREF']; epmdir = inp['EPMDIR']
+    filepm = os.path.join(epmdir, prefix + '_ephmat_p1.h5')
+    qpts = pn.read_ephmath5(filepm, dset='/el_ph_band_info/q_list')
+    phen = pn.read_ephmath5(filepm, dset='/el_ph_band_info/ph_disp_meV')
+    latt_vec = pn.read_ephmath5(filepm, dset='/el_ph_band_info/lattice_vec_angstrom')
+    phmod_ev_tot = pn.read_ephmath5(filepm, dset='/el_ph_band_info/phmod_ev_r')
+    at_pos = pn.read_ephmath5(filepm, dset='/el_ph_band_info/atom_pos')
+    at_mass = pn.read_ephmath5(filepm, dset='/el_ph_band_info/mass_a.u.')
+
+    # Atom number maybe wrong, please check output .xsf files!!!
+    at_num = [int(mass/2) for mass in at_mass]
+
+    for iph in range(nph):
+
+        iq = ph_indices[iph,0]
+        im = ph_indices[iph,1]
+        qpt = qpts[iq]
+        phmod_ev = phmod_ev_tot[:,:,im,iq].T
+
+        if (coup_ph is None):
+            header  = "Phonon Mode\n"
+            header += "# qpt: ( %10.6f%10.6f%10.6f ) iq: %d im: %d\n"%(*qpt, iq+1, im+1)
+            header += "# freq: %.3f meV"%phen[iq,im]
+        else:
+            header  = "Phonon Mode with Larger Coupling\n"
+            header += "# qpt: ( %10.6f%10.6f%10.6f ) iq: %d im: %d\n"%(*qpt, iq+1, im+1)
+            header += "# freq: %.3f meV coupling: %.3G meV"%(phen[iq,im], coup_ph[iq,im])
+
+        filname = 'PHMOD_%d_%d.xsf'%(iq+1, im+1)
+        gen_xsf(latt_vec, at_pos, at_num, phmod_ev, header, filname)
+
+
+def gen_xsf(latt_vec, at_pos, at_num, phmod_ev, header='', filname='PHMOD.xsf'):
+
+    nat = at_pos.shape[0]
+    at_pos_cart = np.matmul(at_pos, latt_vec)
+    pos_phev = np.hstack((at_pos_cart, phmod_ev))
+
+    mode = 'w'
+    with open(filname, mode) as ff:
+
+        if (header != ''):
+            ff.write("# %s\n"%header)
+
+        ff.write("CRYSTAL\n")
+        ff.write("PRIMVEC\n")
+
+        for vec in latt_vec:
+            ff.write("  {:16.10f}{:16.10f}{:16.10f}\n".format(*vec))
+
+        ff.write("PRIMCOORD\n")
+        ff.write(" {:d} {:d}\n".format(nat, 1))
+
+        coord_form = "{:d} {:12.6f}{:12.6f}{:12.6f}{:12.6f}{:12.6f}{:12.6f}\n"
+        for iat in range(nat):
+            ff.write(coord_form.format(at_num[iat], *pos_phev[iat]))
+
+    print("%s has been saved."%filname)
 
 
 if __name__=='__main__':
